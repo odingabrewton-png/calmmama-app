@@ -297,7 +297,13 @@ function playSoftSuccessChime() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.6);
-    setTimeout(() => ctx.close(), 700);
+    setTimeout(() => {
+      try {
+        ctx.close();
+      } catch {
+        // Preview-only chime; silent fallback if audio is blocked
+      }
+    }, 700);
   } catch {
     // Preview-only chime; silent fallback if audio is blocked
   }
@@ -1335,6 +1341,14 @@ function RegistryNestListItem({ item, registryVouches, expandedRegistryNotes, on
   );
 }
 
+function getShowSplitAppHeader(activeTab, inSoulSanctuary, userJourney) {
+  return (
+    !(activeTab === 'sanctuary' && inSoulSanctuary) &&
+    activeTab !== 'profile' &&
+    (activeTab !== 'nursery' || userJourney === 'postpartum')
+  );
+}
+
 function renderSplitAppHeader(activeTab, pulseAnim, userJourney) {
   const useOfficialLogo =
     activeTab === 'home' ||
@@ -2320,8 +2334,16 @@ export default function App() {
   const communityPostIdRef = useRef(10);
   const basketListingIdRef = useRef(10);
 
+  const showSplitAppHeader = getShowSplitAppHeader(activeTab, inSoulSanctuary, userJourney);
+
   useEffect(() => {
-    injectNurseryWebFonts();
+    try {
+      injectNurseryWebFonts();
+    } catch (fontError) {
+      if (Platform.OS === 'web' && typeof console !== 'undefined') {
+        console.warn('[CalmMama Village] Web font injection skipped:', fontError);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -2387,16 +2409,20 @@ export default function App() {
     startLogoPulseLoop(pulseAnim, pulseLoopRef);
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const onVisible = () => {
-        if (document.visibilityState === 'visible') {
-          startLogoPulseLoop(pulseAnim, pulseLoopRef);
-        }
-      };
-      document.addEventListener('visibilitychange', onVisible);
-      return () => {
-        pulseLoopRef.current?.stop();
-        document.removeEventListener('visibilitychange', onVisible);
-      };
+      try {
+        const onVisible = () => {
+          if (document.visibilityState === 'visible') {
+            startLogoPulseLoop(pulseAnim, pulseLoopRef);
+          }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+          pulseLoopRef.current?.stop();
+          document.removeEventListener('visibilitychange', onVisible);
+        };
+      } catch (visibilityError) {
+        console.warn('[CalmMama Village] Visibility listener skipped:', visibilityError);
+      }
     }
 
     return () => pulseLoopRef.current?.stop();
@@ -2985,7 +3011,13 @@ export default function App() {
   };
 
   const handleOpenVillagePortal = () => {
-    configureVillageLayoutTransition();
+    try {
+      configureVillageLayoutTransition();
+    } catch (layoutError) {
+      if (Platform.OS === 'web' && typeof console !== 'undefined') {
+        console.warn('[CalmMama Village] Layout transition skipped on web:', layoutError);
+      }
+    }
     setVillagePortalTab('constellation');
     setSelectedVillageMamaId(null);
     setInVillagePortal(true);
@@ -3297,6 +3329,10 @@ export default function App() {
     setBirthPromptDismissed(true);
   };
 
+  const handleCompleteOnboarding = () => {
+    setIsOnboarded(true);
+  };
+
   // 📋 ONBOARDING VIEW ENGINE
   if (!isOnboarded) {
     return (
@@ -3391,11 +3427,21 @@ export default function App() {
                 <Text style={styles.secureDetailsText}>On-device encryption vault active</Text>
               </View>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={() => setIsOnboarded(true)} activeOpacity={0.92}>
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleCompleteOnboarding}
+                activeOpacity={0.92}
+                accessibilityRole="button"
+              >
                 <Text style={styles.submitBtnText}>Welcome to the Village</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.bypassLink} onPress={() => setIsOnboarded(true)} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.bypassLink}
+                onPress={handleCompleteOnboarding}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
                 <Text style={styles.bypassLinkText}>Skip for now — let me browse first →</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -3485,11 +3531,6 @@ export default function App() {
       ? renderSplitAppHeader(activeTab, pulseAnim, userJourney)
       : null,
   };
-
-  const showSplitAppHeader =
-    !(activeTab === 'sanctuary' && inSoulSanctuary) &&
-    activeTab !== 'profile' &&
-    (activeTab !== 'nursery' || userJourney === 'postpartum');
 
   return (
     <View style={styles.webWrapper}>

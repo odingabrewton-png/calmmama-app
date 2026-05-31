@@ -62,7 +62,30 @@ const { width: BLOOM_SCREEN_W } = Dimensions.get('window');
 const BLOOM_LANDSCAPE_W = Math.min(BLOOM_SCREEN_W - 72, 360);
 const BLOOM_LANDSCAPE_H = Math.round(BLOOM_LANDSCAPE_W * 0.56);
 
-function BellyCaressVideo({ week, palette, visual }) {
+function BellyCaressVideoWebFallback({ week, palette, visual }) {
+  return (
+    <View style={[silhouetteStyles.landscapeStage, { backgroundColor: palette.wash }]}>
+      <View style={[silhouetteStyles.washBlob, { backgroundColor: palette.accent }]} />
+      <View
+        style={[
+          silhouetteStyles.landscapeFrame,
+          silhouetteStyles.landscapeWebFallback,
+          { width: BLOOM_LANDSCAPE_W, height: BLOOM_LANDSCAPE_H, borderColor: palette.accent },
+        ]}
+      >
+        <Text style={silhouetteStyles.landscapeWebEmoji}>🤰</Text>
+        <Text style={[silhouetteStyles.landscapeWebLabel, { color: palette.primary }]}>
+          Week {week} bloom
+        </Text>
+      </View>
+      <Text style={[silhouetteStyles.weekBadge, { color: palette.primary }]}>
+        Week {week} · {visual.dressLabel}
+      </Text>
+    </View>
+  );
+}
+
+function BellyCaressVideoNative({ week, palette, visual }) {
   const trimester = getTrimesterForWeek(week);
   const videoSource = getBloomVideoForWeek(week);
 
@@ -98,6 +121,13 @@ function BellyCaressVideo({ week, palette, visual }) {
       </Text>
     </View>
   );
+}
+
+function BellyCaressVideo(props) {
+  if (Platform.OS === 'web') {
+    return <BellyCaressVideoWebFallback {...props} />;
+  }
+  return <BellyCaressVideoNative {...props} />;
 }
 
 function WeightChart({ entries, palette, maxWeek }) {
@@ -359,6 +389,20 @@ const silhouetteStyles = StyleSheet.create({
     zIndex: 2,
     overflow: 'hidden',
     borderRadius: 14,
+  },
+  landscapeWebFallback: {
+    backgroundColor: 'rgba(255, 252, 248, 0.72)',
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  landscapeWebEmoji: {
+    fontSize: 42,
+    marginBottom: 6,
+  },
+  landscapeWebLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   landscapeVideo: {
     backgroundColor: 'transparent',
