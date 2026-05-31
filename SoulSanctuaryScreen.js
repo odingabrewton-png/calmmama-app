@@ -20,6 +20,7 @@ import {
   getDerivedAssistance,
 } from './soulSanctuaryData';
 import { useVillageReveal } from './villageScreenTransitions';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import SanctuaryStarsLayer from './SanctuaryStarsLayer';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -71,13 +72,13 @@ export default function SoulSanctuaryScreen({
           Animated.timing(anim, {
             toValue: 1,
             duration,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(anim, {
             toValue: 0,
             duration,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ])

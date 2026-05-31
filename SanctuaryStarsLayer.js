@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet, Platform } from 'react-native';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -36,13 +37,13 @@ export default function SanctuaryStarsLayer() {
           Animated.timing(anim, {
             toValue: 1,
             duration: 1800 + index * 140,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(anim, {
             toValue: 0.3,
             duration: 1800 + index * 140,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ])

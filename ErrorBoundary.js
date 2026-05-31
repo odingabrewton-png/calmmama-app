@@ -99,6 +99,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#BAC6BC',
     ...Platform.select({
       web: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 99999,
         minHeight: '100vh',
         width: '100vw',
       },

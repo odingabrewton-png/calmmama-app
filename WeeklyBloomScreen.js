@@ -131,7 +131,7 @@ function BellyCaressVideo(props) {
 }
 
 function WeightChart({ entries, palette, maxWeek }) {
-  if (!entries.length) {
+  if (!entries?.length) {
     return (
       <Text style={bloomStyles.chartEmpty}>Log your first weight to see your gentle trend line grow.</Text>
     );

@@ -40,6 +40,7 @@ import {
   getTherapeuticHeadlineForVibes,
 } from './mealsTherapeuticMap';
 import { configureVillageLayoutTransition, useVillagePressTransition } from './villageScreenTransitions';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import { injectNurseryWebFonts, retroHubTitle } from './nurseryRetroFonts';
 import { getVillageRemedy } from './villageRemedyTips';
 import { REGISTRY_CURATED_PRODUCTS } from './registryData';
@@ -767,7 +768,7 @@ function VillageRemedyPopup({ symptom, visible, onDismissed }) {
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start(() => {
-      const readMs = Math.min(14000, Math.max(5000, remedy.tip.length * 48 + 3500));
+      const readMs = Math.min(14000, Math.max(5000, (remedy.tip?.length || 0) * 48 + 3500));
       driftTimerRef.current = setTimeout(driftAway, readMs);
     });
 
@@ -1124,7 +1125,7 @@ function PostpartumDailyTracker({
     Animated.timing(messageFade, {
       toValue,
       duration: durationMs,
-      easing: toValue ? Easing.out(Easing.cubic) : Easing.inOut(Easing.sin),
+      easing: toValue ? Easing.out(Easing.cubic) : VILLAGE_IN_OUT_SIN,
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start(({ finished }) => {
       if (finished && onDone) onDone();

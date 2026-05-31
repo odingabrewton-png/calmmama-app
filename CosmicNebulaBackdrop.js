@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, Easing, StyleSheet, Platform } from 'react-native';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const STAR_COUNT = 18;
@@ -36,13 +37,13 @@ export default function CosmicNebulaBackdrop({ phaseAnim }) {
           Animated.timing(anim, {
             toValue: 1,
             duration: 1400 + (index % 5) * 220,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(anim, {
             toValue: 0.2,
             duration: 1400 + (index % 5) * 220,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ])

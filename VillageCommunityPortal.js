@@ -13,6 +13,7 @@ import {
 import VillageBrandHeader from './VillageBrandHeader';
 import CosmicNebulaBackdrop from './CosmicNebulaBackdrop';
 import { injectNurseryWebFonts, retroSoft, retroAccent, retroHubTitle } from './nurseryRetroFonts';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import {
   VILLAGE_PRIVACY_BANNER,
   ICEBREAKER_HINTS,
@@ -139,13 +140,13 @@ function VillageMapPanel() {
         Animated.timing(mapDrift, {
           toValue: 1,
           duration: 5200,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(mapDrift, {
           toValue: 0,
           duration: 5200,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
@@ -155,13 +156,13 @@ function VillageMapPanel() {
         Animated.timing(mapGlow, {
           toValue: 1,
           duration: 3600,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(mapGlow, {
           toValue: 0,
           duration: 3600,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
@@ -255,13 +256,13 @@ function VillageConstellationPanel({ selectedVillageMamaId, onSelectVillageMama 
         Animated.timing(phaseAnim, {
           toValue: 1,
           duration: 8000,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(phaseAnim, {
           toValue: 0,
           duration: 8000,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
@@ -274,13 +275,13 @@ function VillageConstellationPanel({ selectedVillageMamaId, onSelectVillageMama 
           Animated.timing(anim, {
             toValue: 1,
             duration: 1800 + (index % 5) * 260,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
           Animated.timing(anim, {
             toValue: 0.2,
             duration: 1800 + (index % 5) * 260,
-            easing: Easing.inOut(Easing.sin),
+            easing: VILLAGE_IN_OUT_SIN,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ])

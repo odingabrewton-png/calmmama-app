@@ -16,6 +16,7 @@ import {
   BIRTHDAY_DISCOUNT_PERCENT,
   buildBirthdayBundleProductIds,
 } from './birthdayBoutiqueConfig';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -76,13 +77,13 @@ function ConfettiPiece({ emoji, left, delay, duration, drift }) {
         Animated.timing(sway, {
           toValue: drift * 14,
           duration: 900 + delay * 0.2,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(sway, {
           toValue: drift * -14,
           duration: 900 + delay * 0.2,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
@@ -195,13 +196,13 @@ export default function BirthdayBoutiqueModal({
         Animated.timing(heroPulse, {
           toValue: 1.06,
           duration: 1200,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(heroPulse, {
           toValue: 1,
           duration: 1200,
-          easing: Easing.inOut(Easing.sin),
+          easing: VILLAGE_IN_OUT_SIN,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ])
