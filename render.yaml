@@ -1,0 +1,20 @@
+# Render Blueprint — CalmMama Village (Expo web)
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: calmmama-village
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      # Set in Render dashboard (sync: false = secret / manual entry)
+      - key: EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
