@@ -1385,9 +1385,18 @@ function renderSplitAppHeader(activeTab, pulseAnim, userJourney) {
 }
 
 function FlowPanel({ anim, children, embedded }) {
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] });
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 0.55, 1],
+  });
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 0],
+  });
+  const scale = anim.interpolate({
+    inputRange: [0, 0.65, 1],
+    outputRange: [0.96, 1.028, 1],
+  });
 
   return (
     <Animated.View
@@ -2492,7 +2501,7 @@ export default function App() {
     }).start();
   }, [isOnboarded, shellEnterAnim]);
 
-  // Tab / journey panels pop up and fade in on each flow change (skip first mount — shell already entering)
+  // Tab / journey panels — premium cross-fade + gentle scale pop on each navigation
   useEffect(() => {
     if (!isOnboarded) return;
     if (!flowReady.current) {
@@ -2503,11 +2512,24 @@ export default function App() {
     flowAnim.setValue(0);
     Animated.timing(flowAnim, {
       toValue: 1,
-      duration: 750,
-      easing: Easing.out(Easing.back(1.15)),
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [activeTab, userJourney, isOnboarded, flowAnim]);
+
+  const runTabTransition = useCallback(
+    (nextTab) => {
+      if (nextTab === activeTab) return;
+      setInSoulSanctuary(false);
+      setInVillagePortal(false);
+      if (flowReady.current) {
+        flowAnim.setValue(0);
+      }
+      setActiveTab(nextTab);
+    },
+    [activeTab, flowAnim]
+  );
 
   const shellOpacity = shellEnterAnim;
   const shellLift = shellEnterAnim.interpolate({
@@ -3286,7 +3308,7 @@ export default function App() {
   };
 
   const handleOpenKitchenTab = () => {
-    setActiveTab('kitchen');
+    runTabTransition('kitchen');
   };
 
   const handleToggleNestingTask = (taskId) => {
@@ -3767,10 +3789,7 @@ export default function App() {
             <View style={[styles.bottomNav, bottomNavStyle]}>
             <TouchableOpacity
               style={styles.navItem}
-              onPress={() => {
-                setInSoulSanctuary(false);
-                setActiveTab('home');
-              }}
+              onPress={() => runTabTransition('home')}
             >
               <Text style={[styles.navIcon, activeTab === 'home' && styles.activeText]}>🏡</Text>
               <Text style={[styles.navText, activeTab === 'home' && styles.activeText]}>Home</Text>
@@ -3778,10 +3797,7 @@ export default function App() {
 
             <TouchableOpacity
               style={styles.navItem}
-              onPress={() => {
-                setInSoulSanctuary(false);
-                setActiveTab('kitchen');
-              }}
+              onPress={() => runTabTransition('kitchen')}
             >
               <Text style={[styles.navIcon, activeTab === 'kitchen' && styles.activeText]}>🍳</Text>
               <Text style={[styles.navText, activeTab === 'kitchen' && styles.activeText]}>Kitchen</Text>
@@ -3789,10 +3805,7 @@ export default function App() {
 
             <TouchableOpacity
               style={styles.navItem}
-              onPress={() => {
-                setInSoulSanctuary(false);
-                setActiveTab('sanctuary');
-              }}
+              onPress={() => runTabTransition('sanctuary')}
             >
               <Text style={[styles.navIcon, activeTab === 'sanctuary' && styles.activeText]}>🕊️</Text>
               <Text style={[styles.navText, activeTab === 'sanctuary' && styles.activeText]}>Sanctuary</Text>
@@ -3802,20 +3815,14 @@ export default function App() {
               <>
                 <TouchableOpacity
                   style={styles.navItem}
-                  onPress={() => {
-                    setInSoulSanctuary(false);
-                    setActiveTab('daily');
-                  }}
+                  onPress={() => runTabTransition('daily')}
                 >
                   <Text style={[styles.navIcon, activeTab === 'daily' && styles.activeText]}>✨</Text>
                   <Text style={[styles.navText, activeTab === 'daily' && styles.activeText]}>Daily</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.navItem}
-                  onPress={() => {
-                    setInSoulSanctuary(false);
-                    setActiveTab('tracker');
-                  }}
+                  onPress={() => runTabTransition('tracker')}
                 >
                   <Text style={[styles.navIcon, activeTab === 'tracker' && styles.activeText]}>🌱</Text>
                   <Text style={[styles.navText, activeTab === 'tracker' && styles.activeText]}>Bloom</Text>
@@ -3825,20 +3832,14 @@ export default function App() {
               <>
                 <TouchableOpacity
                   style={styles.navItem}
-                  onPress={() => {
-                    setInSoulSanctuary(false);
-                    setActiveTab('daily');
-                  }}
+                  onPress={() => runTabTransition('daily')}
                 >
                   <Text style={[styles.navIcon, activeTab === 'daily' && styles.activeText]}>✨</Text>
                   <Text style={[styles.navText, activeTab === 'daily' && styles.activeText]}>Daily</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.navItem}
-                  onPress={() => {
-                    setInSoulSanctuary(false);
-                    setActiveTab('nursery');
-                  }}
+                  onPress={() => runTabTransition('nursery')}
                 >
                   <Text style={[styles.navIcon, activeTab === 'nursery' && styles.activeText]}>☁️</Text>
                   <Text style={[styles.navText, activeTab === 'nursery' && styles.activeText]}>Nursery</Text>
@@ -3846,7 +3847,7 @@ export default function App() {
               </>
             )}
 
-            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('profile')}>
+            <TouchableOpacity style={styles.navItem} onPress={() => runTabTransition('profile')}>
               <Text style={[styles.navIcon, activeTab === 'profile' && styles.activeText]}>👤</Text>
               <Text style={[styles.navText, activeTab === 'profile' && styles.activeText]}>Me</Text>
             </TouchableOpacity>

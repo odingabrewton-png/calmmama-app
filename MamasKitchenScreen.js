@@ -12,7 +12,7 @@ import {
   Easing,
   Linking,
   Modal,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import {
   MAMA_KITCHEN_RECIPES,
@@ -23,8 +23,18 @@ import {
 import { getTherapeuticMeals } from './mealsTherapeuticMap';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = (Math.min(SCREEN_W, 390) - 72) / 2;
+const GRID_COLUMNS = 2;
+const GRID_GAP = 12;
+const GRID_H_PADDING = 20;
+const GRID_MAX_WIDTH = 420;
+
+function getKitchenGridMetrics(screenWidth) {
+  const contentWidth = Math.min(screenWidth, GRID_MAX_WIDTH);
+  const cardWidth = Math.floor(
+    (contentWidth - GRID_H_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
+  );
+  return { contentWidth, cardWidth };
+}
 
 const TIME_LABELS = {
   morning: 'Morning',
@@ -114,6 +124,11 @@ export default function MamasKitchenScreen({
   therapeuticTags,
   listHeaderPrefix = null,
 }) {
+  const { width: screenWidth } = useWindowDimensions();
+  const { contentWidth, cardWidth } = useMemo(
+    () => getKitchenGridMetrics(screenWidth),
+    [screenWidth]
+  );
   const activeTime = timeOfDay ?? getDefaultKitchenTimeOfDay();
   const [activeFilter, setActiveFilter] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -167,7 +182,7 @@ export default function MamasKitchenScreen({
   const renderRecipeCard = useCallback(
     ({ item: recipe }) => (
       <TouchableOpacity
-        style={styles.recipeCard}
+        style={[styles.recipeCard, { width: cardWidth }]}
         onPress={() => openRecipe(recipe)}
         activeOpacity={0.92}
       >
@@ -185,14 +200,14 @@ export default function MamasKitchenScreen({
         </View>
       </TouchableOpacity>
     ),
-    [openRecipe]
+    [openRecipe, cardWidth]
   );
 
   const listHeader = useMemo(
     () => (
       <View>
         {listHeaderPrefix}
-        <View style={styles.kitchenContent}>
+        <View style={[styles.kitchenContent, { maxWidth: contentWidth, alignSelf: 'center', width: '100%' }]}>
           <View style={styles.introCard}>
             <Text style={styles.introEyebrow}>PREMIUM NOURISHMENT</Text>
             <Text style={styles.introTitle}>Mama's Kitchen</Text>
@@ -217,12 +232,7 @@ export default function MamasKitchenScreen({
           </View>
 
           <View style={styles.glassPanelHeader}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.filterRow}
-            >
+            <View style={styles.filterWrap}>
               <TouchableOpacity
                 style={[styles.filterPill, !activeFilter && styles.filterPillActive]}
                 onPress={handleAllRecipes}
@@ -247,7 +257,7 @@ export default function MamasKitchenScreen({
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+            </View>
 
             <Text style={styles.filterResultLine}>
               {filteredRecipes.length} {TIME_LABELS[activeTime]?.toLowerCase() || 'village'} recipes
@@ -266,7 +276,21 @@ export default function MamasKitchenScreen({
       activeFilterLabel,
       filteredRecipes.length,
       therapeuticTags,
+      contentWidth,
     ]
+  );
+
+  const recipeRowStyle = useMemo(
+    () => [
+      styles.recipeRow,
+      {
+        maxWidth: contentWidth,
+        alignSelf: 'center',
+        gap: GRID_GAP,
+        paddingHorizontal: GRID_H_PADDING,
+      },
+    ],
+    [contentWidth]
   );
 
   const listFooter = useMemo(() => {
@@ -307,8 +331,8 @@ export default function MamasKitchenScreen({
         ListFooterComponent={listFooter}
         ListEmptyComponent={listEmpty}
         style={styles.kitchenList}
-        contentContainerStyle={styles.recipeListContent}
-        columnWrapperStyle={filteredRecipes.length > 0 ? styles.recipeRow : undefined}
+        contentContainerStyle={[styles.recipeListContent, { alignItems: 'center' }]}
+        columnWrapperStyle={filteredRecipes.length > 0 ? recipeRowStyle : undefined}
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -337,11 +361,14 @@ const styles = StyleSheet.create({
     }),
   },
   kitchenContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: GRID_H_PADDING,
+    width: '100%',
+    alignSelf: 'center',
   },
   recipeListContent: {
     paddingBottom: 104,
     flexGrow: 1,
+    width: '100%',
   },
   recipeListGlassFooter: {
     marginHorizontal: 20,
@@ -391,11 +418,16 @@ const styles = StyleSheet.create({
   },
   timeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     marginTop: 12,
     gap: 8,
   },
   timeBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 92,
+    maxWidth: 120,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(232, 218, 244, 0.45)',
@@ -439,11 +471,14 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  filterRow: {
+  filterWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    gap: 8,
-    alignItems: 'center',
   },
   filterPill: {
     paddingVertical: 8,
@@ -452,7 +487,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(232, 218, 244, 0.55)',
     borderWidth: 1,
     borderColor: 'rgba(154, 122, 184, 0.28)',
-    marginRight: 8,
   },
   filterPillActive: {
     backgroundColor: THEME.sage,
@@ -476,17 +510,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   recipeRow: {
-    justifyContent: 'space-between',
-    marginHorizontal: 20,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
     paddingBottom: 16,
     backgroundColor: THEME.glass,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: THEME.glassBorder,
+    width: '100%',
   },
   recipeCard: {
-    width: CARD_W,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderRadius: 16,
     marginBottom: 12,

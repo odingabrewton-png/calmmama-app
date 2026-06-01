@@ -55,8 +55,7 @@ export default function SoulSanctuaryScreen({
 
   const othersFade = useRef(new Animated.Value(1)).current;
   const panelSlide = useRef(new Animated.Value(0)).current;
-  const chatReveal = useRef(new Animated.Value(0)).current;
-  const chatDrawerSlide = useRef(new Animated.Value(0)).current;
+  const chatSlide = useRef(new Animated.Value(0)).current;
   const popupAnim = useRef(new Animated.Value(0)).current;
   const cloudDrifts = useRef(SANCTUARY_MOODS.map(() => new Animated.Value(0))).current;
   const cloudScales = useRef(SANCTUARY_MOODS.map(() => new Animated.Value(1))).current;
@@ -99,8 +98,7 @@ export default function SoulSanctuaryScreen({
     popupAnim.setValue(0);
     othersFade.setValue(1);
     panelSlide.setValue(0);
-    chatReveal.setValue(0);
-    chatDrawerSlide.setValue(0);
+    chatSlide.setValue(0);
     cloudDrifts.forEach((d) => d.setValue(0));
     cloudScales.forEach((s) => s.setValue(1));
   };
@@ -112,8 +110,7 @@ export default function SoulSanctuaryScreen({
     setMessages([{ id: nextId(), role: 'friend', text: getFriendOpeningLine(mood.id) }]);
     setPhase('journal');
     panelSlide.setValue(0);
-    chatReveal.setValue(0);
-    chatDrawerSlide.setValue(0);
+    chatSlide.setValue(0);
 
     Animated.parallel([
       Animated.timing(cloudScales[index], {
@@ -144,21 +141,13 @@ export default function SoulSanctuaryScreen({
     ]).start();
 
     Animated.sequence([
-      Animated.delay(520),
-      Animated.parallel([
-        Animated.spring(chatDrawerSlide, {
-          toValue: 1,
-          friction: 9,
-          tension: 52,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(chatReveal, {
-          toValue: 1,
-          duration: 640,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]),
+      Animated.delay(460),
+      Animated.timing(chatSlide, {
+        toValue: 1,
+        duration: 560,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
     ]).start();
   };
 
@@ -214,13 +203,13 @@ export default function SoulSanctuaryScreen({
     inputRange: [0, 1],
     outputRange: [48, 0],
   });
-  const chatOpacity = chatReveal.interpolate({
-    inputRange: [0, 0.2, 1],
-    outputRange: [0, 0.55, 1],
+  const chatOpacity = chatSlide.interpolate({
+    inputRange: [0, 0.22, 1],
+    outputRange: [0, 0.88, 1],
   });
-  const chatTranslateY = chatDrawerSlide.interpolate({
+  const chatTranslateY = chatSlide.interpolate({
     inputRange: [0, 1],
-    outputRange: [160, 0],
+    outputRange: [88, 0],
   });
   const popupScale = popupAnim.interpolate({
     inputRange: [0, 1],
@@ -565,6 +554,7 @@ const styles = StyleSheet.create({
   },
   chatDrawer: {
     marginBottom: 12,
+    overflow: 'hidden',
   },
   chatSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -572,7 +562,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     padding: 12,
-    marginBottom: 12,
     ...Platform.select({
       web: { backdropFilter: 'blur(10px)' },
     }),
