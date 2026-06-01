@@ -41,6 +41,14 @@ import {
 } from './mealsTherapeuticMap';
 import { configureVillageLayoutTransition, useVillagePressTransition } from './villageScreenTransitions';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
+import {
+  getBottomNavStyle,
+  getIphoneFrameStyle,
+  getShellFooterLinksStyle,
+  getWebWrapperStyle,
+  injectMobileWebViewport,
+  useMobileWebLayout,
+} from './mobileWebLayout';
 import { injectNurseryWebFonts, retroHubTitle } from './nurseryRetroFonts';
 import { getVillageRemedy } from './villageRemedyTips';
 import { REGISTRY_CURATED_PRODUCTS } from './registryData';
@@ -2336,9 +2344,15 @@ export default function App() {
   const basketListingIdRef = useRef(10);
 
   const showSplitAppHeader = getShowSplitAppHeader(activeTab, inSoulSanctuary, userJourney);
+  const isMobileWeb = useMobileWebLayout();
+  const webWrapperStyle = getWebWrapperStyle();
+  const iphoneFrameStyle = getIphoneFrameStyle(isMobileWeb);
+  const bottomNavStyle = getBottomNavStyle(isMobileWeb);
+  const shellFooterLinksStyle = getShellFooterLinksStyle(isMobileWeb);
 
   useEffect(() => {
     try {
+      injectMobileWebViewport();
       injectNurseryWebFonts();
     } catch (fontError) {
       if (Platform.OS === 'web' && typeof console !== 'undefined') {
@@ -3337,8 +3351,8 @@ export default function App() {
   // 📋 ONBOARDING VIEW ENGINE
   if (!isOnboarded) {
     return (
-      <View style={styles.webWrapper}>
-        <View style={styles.iphoneFrame}>
+      <View style={[styles.webWrapper, webWrapperStyle]}>
+        <View style={[styles.iphoneFrame, iphoneFrameStyle]}>
           <StatusBar barStyle="dark-content" />
           {Platform.OS === 'web' ? <View style={styles.iphoneNotch} /> : null}
           
@@ -3534,8 +3548,8 @@ export default function App() {
   };
 
   return (
-    <View style={styles.webWrapper}>
-      <View style={styles.iphoneFrame}>
+    <View style={[styles.webWrapper, webWrapperStyle]}>
+      <View style={[styles.iphoneFrame, iphoneFrameStyle]}>
         <StatusBar barStyle={inSoulSanctuary && activeTab === 'sanctuary' ? 'light-content' : 'dark-content'} />
         {Platform.OS === 'web' ? <View style={styles.iphoneNotch} /> : null}
         {inSoulSanctuary && activeTab === 'sanctuary' && !inVillagePortal ? (
@@ -3624,7 +3638,7 @@ export default function App() {
               </TouchableOpacity>
             ) : null}
 
-            <View style={styles.shellFooterLinks}>
+            <View style={[styles.shellFooterLinks, shellFooterLinksStyle]}>
               <TouchableOpacity onPress={() => handleOpenInfoModal('about')} activeOpacity={0.75}>
                 <Text style={styles.shellFooterLinkText}>About Us</Text>
               </TouchableOpacity>
@@ -3750,7 +3764,7 @@ export default function App() {
               />
             ) : null}
 
-            <View style={styles.bottomNav}>
+            <View style={[styles.bottomNav, bottomNavStyle]}>
             <TouchableOpacity
               style={styles.navItem}
               onPress={() => {
@@ -3854,8 +3868,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#BAC6BC',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100vw',
-        height: '100vh',
+        minHeight: '100dvh',
+        height: '100dvh',
         overflow: 'hidden',
       },
       default: {
@@ -3875,7 +3889,8 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         width: 355,
-        height: '92vh',
+        minHeight: '92dvh',
+        height: '92dvh',
         maxHeight: 750,
         borderRadius: 40,
         borderWidth: 10,
@@ -3910,11 +3925,21 @@ const styles = StyleSheet.create({
   shellLayout: {
     flex: 1,
     backgroundColor: 'transparent',
+    ...Platform.select({
+      web: { position: 'relative', minHeight: 0 },
+      default: {},
+    }),
   },
   kitchenTabShell: {
     flex: 1,
     minHeight: 0,
     backgroundColor: 'transparent',
+    ...Platform.select({
+      web: {
+        paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 16px))',
+      },
+      default: {},
+    }),
   },
   kitchenTabBody: {
     flex: 1,
@@ -3927,8 +3952,15 @@ const styles = StyleSheet.create({
   },
   mainScrollContent: {
     flexGrow: 1,
-    paddingBottom: 104,
     backgroundColor: 'transparent',
+    ...Platform.select({
+      web: {
+        paddingBottom: 'calc(104px + env(safe-area-inset-bottom, 16px))',
+      },
+      default: {
+        paddingBottom: 104,
+      },
+    }),
   },
   flowFill: {
     flex: 1,
@@ -6593,7 +6625,6 @@ const styles = StyleSheet.create({
   },
   shellFooterLinks: {
     position: 'absolute',
-    bottom: 56,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -6605,6 +6636,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(186, 152, 138, 0.1)',
+    ...Platform.select({
+      web: {
+        bottom: 'calc(56px + env(safe-area-inset-bottom, 16px))',
+      },
+      default: {
+        bottom: 56,
+      },
+    }),
   },
   shellFooterLinkText: {
     fontSize: 9,
@@ -6712,14 +6751,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 56,
+    minHeight: 56,
     backgroundColor: 'rgba(255, 255, 255, 0.62)',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.04)',
-    paddingBottom: 2,
+    paddingTop: 4,
+    ...Platform.select({
+      web: {
+        zIndex: 9999,
+        paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+      },
+      default: {
+        paddingBottom: 2,
+      },
+    }),
   },
   navItem: {
     alignItems: 'center',
