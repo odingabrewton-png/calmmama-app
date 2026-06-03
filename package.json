@@ -15,8 +15,11 @@
   },
   "scripts": {
     "start": "expo start",
-    "start:prod": "node server.js",
-    "build": "expo export --platform web",
+    "start:dev": "expo start",
+    "start:prod": "node scripts/assert-production-dist.mjs && node server.js",
+    "build": "node scripts/build-web-production.mjs",
+    "build:web": "node scripts/build-web-production.mjs",
+    "export:web": "node scripts/build-web-production.mjs",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
