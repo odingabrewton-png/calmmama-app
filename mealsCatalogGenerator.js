@@ -3,28 +3,7 @@
  * tagged for pregnant/postpartum nourishment and dietary/allergen filters.
  */
 
-const FOOD_IMAGES = [
-  'photo-1547592166-23ac45744acd',
-  'photo-1512621776951-a57141f2eefd',
-  'photo-1488477181946-6428a0291777',
-  'photo-1540420773420-3366772f4999',
-  'photo-1467003909585-bf69a37992c8',
-  'photo-1604908176997-125f25cc6f3d',
-  'photo-1571212515414-88974ccee396',
-  'photo-1621996346565-e3dbc646d9a9',
-  'photo-1576092762791-2fd0672467fd',
-  'photo-1505252585467-054154774f77',
-  'photo-1490645935967-10de6ba17061',
-  'photo-1511690743698-d9d85f2fbf38',
-  'photo-1546069901-ba9599a7e63c',
-  'photo-1565299624946-b28f40a0ae38',
-  'photo-1565958011703-44f9829ba187',
-  'photo-1482049010885-56566fdebb37',
-  'photo-1525351484163-7529414344d8',
-  'photo-1476224203421-9ac39bceb794',
-  'photo-1504674900247-0877df9cc836',
-  'photo-1551183053-bf91a1d81141',
-];
+import { assignKitchenImage } from './kitchenMealImages';
 
 const MEAL_SLOTS = ['breakfast', 'snack', 'lunch', 'dinner'];
 
@@ -86,11 +65,6 @@ const SUBTITLE_TEMPLATES = [
   'Nutrient-dense comfort food that honors how hard your body is working.',
   'Simple pantry staples elevated into something that feels like a hug.',
 ];
-
-function imageUrl(index) {
-  const id = FOOD_IMAGES[index % FOOD_IMAGES.length];
-  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
-}
 
 /** Assign dietary tags so every filter yields 30+ matches across 140 generated recipes */
 function dietaryTagsForIndex(i) {
@@ -214,24 +188,25 @@ export function generateKitchenCatalog(count = 140, idOffset = 100) {
     const journey = i % 5 === 0 ? 'postpartum' : i % 3 === 0 ? 'both' : 'pregnant';
     const slug = slugify(`${prefix}-${baseName}-${i}`);
 
-    recipes.push({
-      id: `kitchen-gen-${idOffset + i}`,
-      title,
-      subtitle: SUBTITLE_TEMPLATES[i % SUBTITLE_TEMPLATES.length],
-      imageUrl: imageUrl(i),
-      prepMinutes: 8 + (i % 7) * 5 + (slot === 'dinner' ? 10 : 0),
-      servings: slot === 'snack' ? 2 : 3 + (i % 3),
-      mealSlot: slot,
-      journey,
-      tags: {
-        pregnant: PREGNANT_TAGS[i % PREGNANT_TAGS.length],
-        dietary,
-      },
-      ingredients: buildIngredients(slot, title, dietary),
-      steps: buildSteps(slot),
-      amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(baseName + ' organic ingredients')}&tag=calmmamavilla-20`,
-      instacartUrl: `https://www.instacart.com/store/s?k=${encodeURIComponent(baseName.replace(/ /g, '+'))}`,
-    });
+    recipes.push(
+      assignKitchenImage({
+        id: `kitchen-gen-${idOffset + i}`,
+        title,
+        subtitle: SUBTITLE_TEMPLATES[i % SUBTITLE_TEMPLATES.length],
+        prepMinutes: 8 + (i % 7) * 5 + (slot === 'dinner' ? 10 : 0),
+        servings: slot === 'snack' ? 2 : 3 + (i % 3),
+        mealSlot: slot,
+        journey,
+        tags: {
+          pregnant: PREGNANT_TAGS[i % PREGNANT_TAGS.length],
+          dietary,
+        },
+        ingredients: buildIngredients(slot, title, dietary),
+        steps: buildSteps(slot),
+        amazonUrl: `https://www.amazon.com/s?k=${encodeURIComponent(baseName + ' organic ingredients')}&tag=calmmamavilla-20`,
+        instacartUrl: `https://www.instacart.com/store/s?k=${encodeURIComponent(baseName.replace(/ /g, '+'))}`,
+      })
+    );
   }
 
   return recipes;

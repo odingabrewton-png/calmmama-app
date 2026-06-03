@@ -1,6 +1,7 @@
 /** Mama's Kitchen — curated nourishment recipes with filter tags & grocery links */
 
 import { generateKitchenCatalog } from './mealsCatalogGenerator';
+import { assignKitchenImages } from './kitchenMealImages';
 
 export const KITCHEN_FILTERS = [
   { id: 'vegetarian', label: 'Vegetarian' },
@@ -364,10 +365,10 @@ const HAND_CRAFTED_KITCHEN_RECIPES = [
   },
 ];
 
-export const MAMA_KITCHEN_RECIPES = [
+export const MAMA_KITCHEN_RECIPES = assignKitchenImages([
   ...HAND_CRAFTED_KITCHEN_RECIPES,
   ...generateKitchenCatalog(150 - HAND_CRAFTED_KITCHEN_RECIPES.length),
-].slice(0, 150);
+]).slice(0, 150);
 
 export function filterKitchenRecipes(recipes, dietaryFilter, timeOfDay) {
   let result = recipes;

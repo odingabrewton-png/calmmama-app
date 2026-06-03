@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -21,14 +21,19 @@ import {
   getDefaultKitchenTimeOfDay,
 } from './mealsData';
 import { getTherapeuticMeals } from './mealsTherapeuticMap';
+import { getKitchenImageUrl, KITCHEN_PLACEHOLDER_URL } from './kitchenMealImages';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PHONE_MAX_W = 390;
 const KITCHEN_H_PAD = 20;
 const KITCHEN_CARD_GAP = 12;
 const KITCHEN_CONTENT_W = Math.min(SCREEN_W, PHONE_MAX_W);
 const CARD_W = Math.floor((KITCHEN_CONTENT_W - KITCHEN_H_PAD * 2 - KITCHEN_CARD_GAP) / 2);
+
+const INITIAL_VISIBLE = 12;
+const LOAD_MORE_STEP = 10;
+const MEAL_VIEWPORT_MAX_H = Math.round(SCREEN_H * 0.65);
 
 const TIME_LABELS = {
   morning: 'Morning',
@@ -44,6 +49,68 @@ const THEME = {
   glass: 'rgba(255, 255, 255, 0.72)',
   glassBorder: 'rgba(186, 198, 188, 0.45)',
 };
+
+const RecipeMealImage = memo(function RecipeMealImage({ recipe, style, resizeMode = 'cover' }) {
+  const primaryUri = recipe?.imageUrl || getKitchenImageUrl(recipe);
+  const [uri, setUri] = useState(primaryUri);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setUri(primaryUri);
+    setFailed(false);
+  }, [primaryUri, recipe?.id]);
+
+  const handleError = () => {
+    if (uri !== KITCHEN_PLACEHOLDER_URL) {
+      setUri(KITCHEN_PLACEHOLDER_URL);
+      return;
+    }
+    setFailed(true);
+  };
+
+  if (failed) {
+    return (
+      <View style={[style, styles.imageFallback]}>
+        <Text style={styles.imageFallbackEmoji}>🥗</Text>
+        <Text style={styles.imageFallbackLabel} numberOfLines={1}>
+          Village nourishment
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={style}
+      resizeMode={resizeMode}
+      onError={handleError}
+    />
+  );
+});
+
+const RecipeCard = memo(function RecipeCard({ recipe, onPress }) {
+  if (recipe?.__pad) {
+    return <View style={styles.recipeCardPad} pointerEvents="none" />;
+  }
+
+  return (
+    <TouchableOpacity style={styles.recipeCard} onPress={() => onPress(recipe)} activeOpacity={0.92}>
+      <RecipeMealImage recipe={recipe} style={styles.recipeImage} resizeMode="cover" />
+      <View style={styles.recipeCardBody}>
+        <Text style={styles.recipeTitle} numberOfLines={2}>
+          {recipe.title}
+        </Text>
+        <Text style={styles.recipeSub} numberOfLines={2}>
+          {recipe.subtitle}
+        </Text>
+        <Text style={styles.recipeMeta}>
+          {recipe.prepMinutes} min · {recipe.servings} servings
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 function RecipeDetailSheet({ recipe, visible, onClose, sheetAnim }) {
   if (!recipe) return null;
@@ -62,7 +129,7 @@ function RecipeDetailSheet({ recipe, visible, onClose, sheetAnim }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.sheetScrollContent}
         >
-          <Image source={{ uri: recipe.imageUrl }} style={styles.sheetHeroImage} resizeMode="cover" />
+          <RecipeMealImage recipe={recipe} style={styles.sheetHeroImage} resizeMode="cover" />
           <Text style={styles.sheetTitle}>{recipe.title}</Text>
           <Text style={styles.sheetSub}>{recipe.subtitle}</Text>
           <Text style={styles.sheetMeta}>
@@ -122,6 +189,7 @@ export default function MamasKitchenScreen({
   const [activeFilter, setActiveFilter] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const sheetTranslateY = useRef(new Animated.Value(480)).current;
 
   const filteredRecipes = useMemo(() => {
@@ -132,27 +200,39 @@ export default function MamasKitchenScreen({
     return base;
   }, [activeFilter, activeTime, therapeuticTags]);
 
-  /** Pad odd-length grids so the last row stays centered in a 2-column layout */
-  const gridRecipes = useMemo(() => {
-    if (filteredRecipes.length % 2 === 0) return filteredRecipes;
-    return [...filteredRecipes, { id: '__kitchen_grid_pad__', __pad: true }];
-  }, [filteredRecipes]);
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [activeFilter, activeTime, therapeuticTags]);
 
+  const visibleRecipes = useMemo(
+    () => filteredRecipes.slice(0, visibleCount),
+    [filteredRecipes, visibleCount]
+  );
+
+  const gridRecipes = useMemo(() => {
+    if (visibleRecipes.length % 2 === 0) return visibleRecipes;
+    return [...visibleRecipes, { id: '__kitchen_grid_pad__', __pad: true }];
+  }, [visibleRecipes]);
+
+  const hasMore = visibleCount < filteredRecipes.length;
   const activeFilterLabel = activeFilter
     ? KITCHEN_FILTERS.find((f) => f.id === activeFilter)?.label
     : null;
 
-  const openRecipe = useCallback((recipe) => {
-    setSelectedRecipe(recipe);
-    setSheetOpen(true);
-    sheetTranslateY.setValue(480);
-    Animated.timing(sheetTranslateY, {
-      toValue: 0,
-      duration: 520,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [sheetTranslateY]);
+  const openRecipe = useCallback(
+    (recipe) => {
+      setSelectedRecipe(recipe);
+      setSheetOpen(true);
+      sheetTranslateY.setValue(480);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }).start();
+    },
+    [sheetTranslateY]
+  );
 
   const closeRecipe = () => {
     Animated.timing(sheetTranslateY, {
@@ -174,39 +254,52 @@ export default function MamasKitchenScreen({
     setActiveFilter(null);
   };
 
+  const loadMoreRecipes = useCallback(() => {
+    if (!hasMore) return;
+    setVisibleCount((prev) => Math.min(prev + LOAD_MORE_STEP, filteredRecipes.length));
+  }, [hasMore, filteredRecipes.length]);
+
   const renderRecipeCard = useCallback(
-    ({ item: recipe }) => {
-      if (recipe.__pad) {
-        return <View style={styles.recipeCardPad} pointerEvents="none" />;
-      }
-      return (
-      <TouchableOpacity
-        style={styles.recipeCard}
-        onPress={() => openRecipe(recipe)}
-        activeOpacity={0.92}
-      >
-        <Image source={{ uri: recipe.imageUrl }} style={styles.recipeImage} resizeMode="cover" />
-        <View style={styles.recipeCardBody}>
-          <Text style={styles.recipeTitle} numberOfLines={2}>
-            {recipe.title}
-          </Text>
-          <Text style={styles.recipeSub} numberOfLines={2}>
-            {recipe.subtitle}
-          </Text>
-          <Text style={styles.recipeMeta}>
-            {recipe.prepMinutes} min · {recipe.servings} servings
-          </Text>
-        </View>
-      </TouchableOpacity>
-      );
-    },
+    ({ item }) => <RecipeCard recipe={item} onPress={openRecipe} />,
     [openRecipe]
   );
 
-  const listHeader = useMemo(
-    () => (
-      <View>
+  const keyExtractor = useCallback((item) => item.id, []);
+
+  const listFooter = useMemo(() => {
+    if (filteredRecipes.length === 0) return null;
+    return (
+      <View style={styles.listFooterWrap}>
+        {hasMore ? (
+          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMoreRecipes} activeOpacity={0.88}>
+            <Text style={styles.loadMoreText}>
+              Load more recipes ({filteredRecipes.length - visibleCount} remaining)
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.kitchenEndCap}>
+            <Text style={styles.kitchenEndCapText}>
+              You&apos;ve explored all {filteredRecipes.length} gentle recipes for this season.
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }, [filteredRecipes.length, hasMore, loadMoreRecipes, visibleCount]);
+
+  const listEmpty = (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyFilterText}>
+        No {TIME_LABELS[activeTime]?.toLowerCase()} recipes match — try All Recipes or another filter.
+      </Text>
+    </View>
+  );
+
+  return (
+    <>
+      <View style={styles.kitchenShell}>
         {listHeaderPrefix}
+
         <View style={styles.kitchenContent}>
           <View style={styles.introCard}>
             <Text style={styles.introEyebrow}>PREMIUM NOURISHMENT</Text>
@@ -260,71 +353,38 @@ export default function MamasKitchenScreen({
             </View>
 
             <Text style={styles.filterResultLine}>
-              {filteredRecipes.length} {TIME_LABELS[activeTime]?.toLowerCase() || 'village'} recipes
+              Showing {Math.min(visibleCount, filteredRecipes.length)} of {filteredRecipes.length}{' '}
+              {TIME_LABELS[activeTime]?.toLowerCase() || 'village'} recipes
               {activeFilterLabel ? ` · ${activeFilterLabel}` : ''}
               {therapeuticTags?.length ? ' · therapeutic focus' : ''}
-              {!activeFilter && !therapeuticTags?.length ? ' · full village kitchen' : ''}
             </Text>
           </View>
         </View>
-      </View>
-    ),
-    [
-      listHeaderPrefix,
-      activeTime,
-      activeFilter,
-      activeFilterLabel,
-      filteredRecipes.length,
-      therapeuticTags,
-    ]
-  );
 
-  const listFooter = useMemo(() => {
-    if (filteredRecipes.length === 0) return null;
-    return (
-      <View style={styles.kitchenContent}>
-        <View style={styles.recipeListGlassFooter} />
-        <View style={styles.kitchenEndCap}>
-          <Text style={styles.kitchenEndCapText}>
-            You&apos;ve reached the end of the village kitchen — {filteredRecipes.length} gentle
-            recipes for your season.
-          </Text>
+        <View style={styles.mealScrollViewport}>
+          <FlatList
+            data={gridRecipes}
+            key={gridRecipes.length > 0 ? `grid-${activeTime}-${activeFilter}-${visibleCount}` : 'grid-empty'}
+            keyExtractor={keyExtractor}
+            numColumns={2}
+            renderItem={renderRecipeCard}
+            ListFooterComponent={listFooter}
+            ListEmptyComponent={listEmpty}
+            style={styles.kitchenList}
+            contentContainerStyle={styles.recipeListContent}
+            columnWrapperStyle={visibleRecipes.length > 0 ? styles.recipeRow : undefined}
+            showsVerticalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS !== 'web'}
+            onEndReached={loadMoreRecipes}
+            onEndReachedThreshold={0.35}
+          />
         </View>
-      </View>
-    );
-  }, [filteredRecipes.length]);
-
-  const listEmpty = useMemo(
-    () => (
-      <View style={styles.emptyWrap}>
-        <Text style={styles.emptyFilterText}>
-          No {TIME_LABELS[activeTime]?.toLowerCase()} recipes match — try All Recipes or another
-          filter.
-        </Text>
-      </View>
-    ),
-    [activeTime]
-  );
-
-  return (
-    <>
-      <View style={styles.kitchenShell}>
-        <FlatList
-          data={gridRecipes}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          renderItem={renderRecipeCard}
-          ListHeaderComponent={listHeader}
-          ListFooterComponent={listFooter}
-          ListEmptyComponent={listEmpty}
-          style={styles.kitchenList}
-          contentContainerStyle={styles.recipeListContent}
-          columnWrapperStyle={filteredRecipes.length > 0 ? styles.recipeRow : undefined}
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          nestedScrollEnabled
-        />
       </View>
 
       <RecipeDetailSheet
@@ -345,11 +405,37 @@ const styles = StyleSheet.create({
     maxWidth: PHONE_MAX_W,
     alignSelf: 'center',
     overflow: 'hidden',
+  },
+  kitchenContent: {
+    width: '100%',
+    maxWidth: KITCHEN_CONTENT_W,
+    alignSelf: 'center',
+    paddingHorizontal: KITCHEN_H_PAD,
+    flexShrink: 0,
+  },
+  mealScrollViewport: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+    maxWidth: KITCHEN_CONTENT_W,
+    alignSelf: 'center',
+    marginTop: 0,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: THEME.glassBorder,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    backgroundColor: THEME.glass,
+    overflow: 'hidden',
     ...Platform.select({
       web: {
-        maxHeight: '100%',
+        maxHeight: '65vh',
+        overflowY: 'hidden',
       },
-      default: {},
+      default: {
+        maxHeight: MEAL_VIEWPORT_MAX_H,
+      },
     }),
   },
   kitchenList: {
@@ -358,39 +444,25 @@ const styles = StyleSheet.create({
     width: '100%',
     ...Platform.select({
       web: {
-        overflowY: 'scroll',
+        overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
-        maxWidth: '100%',
       },
       default: {},
     }),
   },
-  kitchenContent: {
-    width: '100%',
-    maxWidth: KITCHEN_CONTENT_W,
-    alignSelf: 'center',
-    paddingHorizontal: KITCHEN_H_PAD,
-  },
   recipeListContent: {
-    paddingBottom: 104,
-    flexGrow: 1,
+    paddingTop: 12,
+    paddingBottom: 16,
+    flexGrow: 0,
     width: '100%',
-    maxWidth: KITCHEN_CONTENT_W,
     alignSelf: 'center',
   },
-  recipeListGlassFooter: {
-    marginHorizontal: 20,
-    height: 1,
-    backgroundColor: THEME.glass,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: THEME.glassBorder,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 0,
+  listFooterWrap: {
+    width: '100%',
+    paddingHorizontal: KITCHEN_H_PAD,
+    paddingBottom: 8,
   },
   introCard: {
     backgroundColor: 'rgba(255, 252, 248, 0.52)',
@@ -399,6 +471,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(186, 198, 188, 0.48)',
     marginBottom: 12,
+    marginTop: 4,
     ...Platform.select({
       web: { boxShadow: '0 10px 26px rgba(92, 122, 104, 0.08)' },
       default: { elevation: 3 },
@@ -435,6 +508,7 @@ const styles = StyleSheet.create({
   },
   timeBtn: {
     flex: 1,
+    minWidth: 88,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(232, 218, 244, 0.45)',
@@ -519,7 +593,7 @@ const styles = StyleSheet.create({
     color: '#5C6E63',
     fontStyle: 'italic',
     paddingHorizontal: 14,
-    paddingBottom: 8,
+    paddingBottom: 10,
     textAlign: 'center',
   },
   recipeRow: {
@@ -529,14 +603,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     alignSelf: 'center',
     width: '100%',
-    maxWidth: KITCHEN_CONTENT_W,
     paddingHorizontal: KITCHEN_H_PAD,
-    paddingBottom: 16,
+    paddingBottom: 12,
     gap: KITCHEN_CARD_GAP,
-    backgroundColor: THEME.glass,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: THEME.glassBorder,
     ...Platform.select({
       web: { rowGap: KITCHEN_CARD_GAP, columnGap: KITCHEN_CARD_GAP },
       default: {},
@@ -555,7 +624,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderRadius: 16,
-    marginBottom: 0,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(186, 198, 188, 0.35)',
@@ -568,6 +636,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 96,
     backgroundColor: THEME.lavender,
+  },
+  imageFallback: {
+    width: '100%',
+    height: 96,
+    backgroundColor: 'rgba(232, 218, 244, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageFallbackEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  imageFallbackLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#6B5588',
+    letterSpacing: 0.3,
   },
   recipeCardBody: {
     padding: 10,
@@ -591,19 +676,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.sage,
   },
+  loadMoreBtn: {
+    marginTop: 4,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(92, 122, 104, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(92, 122, 104, 0.28)',
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.sage,
+  },
   emptyWrap: {
     alignSelf: 'center',
     width: '100%',
-    maxWidth: KITCHEN_CONTENT_W,
-    marginHorizontal: KITCHEN_H_PAD,
     paddingHorizontal: 12,
     paddingVertical: 24,
-    backgroundColor: THEME.glass,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: THEME.glassBorder,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
     marginBottom: 12,
   },
   emptyFilterText: {
@@ -614,9 +707,9 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   kitchenEndCap: {
-    marginTop: 0,
+    marginTop: 4,
     marginBottom: 8,
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 14,
     borderRadius: 14,
     backgroundColor: 'rgba(232, 218, 244, 0.35)',
