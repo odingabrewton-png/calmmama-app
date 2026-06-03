@@ -373,7 +373,7 @@ export default function SoulSanctuaryScreen({
                 </TouchableOpacity>
               </View>
               </View>
-            </View>
+            </Animated.View>
 
             <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
               <Text style={styles.shareBtnText}>Share with your village friend</Text>
