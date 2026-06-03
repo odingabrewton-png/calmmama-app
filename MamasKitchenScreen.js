@@ -12,7 +12,7 @@ import {
   Easing,
   Linking,
   Modal,
-  useWindowDimensions,
+  Dimensions,
 } from 'react-native';
 import {
   MAMA_KITCHEN_RECIPES,
@@ -23,18 +23,12 @@ import {
 import { getTherapeuticMeals } from './mealsTherapeuticMap';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const GRID_COLUMNS = 2;
-const GRID_GAP = 12;
-const GRID_H_PADDING = 20;
-const GRID_MAX_WIDTH = 420;
-
-function getKitchenGridMetrics(screenWidth) {
-  const contentWidth = Math.min(screenWidth, GRID_MAX_WIDTH);
-  const cardWidth = Math.floor(
-    (contentWidth - GRID_H_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
-  );
-  return { contentWidth, cardWidth };
-}
+const { width: SCREEN_W } = Dimensions.get('window');
+const PHONE_MAX_W = 390;
+const KITCHEN_H_PAD = 20;
+const KITCHEN_CARD_GAP = 12;
+const KITCHEN_CONTENT_W = Math.min(SCREEN_W, PHONE_MAX_W);
+const CARD_W = Math.floor((KITCHEN_CONTENT_W - KITCHEN_H_PAD * 2 - KITCHEN_CARD_GAP) / 2);
 
 const TIME_LABELS = {
   morning: 'Morning',
@@ -124,11 +118,6 @@ export default function MamasKitchenScreen({
   therapeuticTags,
   listHeaderPrefix = null,
 }) {
-  const { width: screenWidth } = useWindowDimensions();
-  const { contentWidth, cardWidth } = useMemo(
-    () => getKitchenGridMetrics(screenWidth),
-    [screenWidth]
-  );
   const activeTime = timeOfDay ?? getDefaultKitchenTimeOfDay();
   const [activeFilter, setActiveFilter] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -142,6 +131,12 @@ export default function MamasKitchenScreen({
     }
     return base;
   }, [activeFilter, activeTime, therapeuticTags]);
+
+  /** Pad odd-length grids so the last row stays centered in a 2-column layout */
+  const gridRecipes = useMemo(() => {
+    if (filteredRecipes.length % 2 === 0) return filteredRecipes;
+    return [...filteredRecipes, { id: '__kitchen_grid_pad__', __pad: true }];
+  }, [filteredRecipes]);
 
   const activeFilterLabel = activeFilter
     ? KITCHEN_FILTERS.find((f) => f.id === activeFilter)?.label
@@ -180,9 +175,13 @@ export default function MamasKitchenScreen({
   };
 
   const renderRecipeCard = useCallback(
-    ({ item: recipe }) => (
+    ({ item: recipe }) => {
+      if (recipe.__pad) {
+        return <View style={styles.recipeCardPad} pointerEvents="none" />;
+      }
+      return (
       <TouchableOpacity
-        style={[styles.recipeCard, { width: cardWidth }]}
+        style={styles.recipeCard}
         onPress={() => openRecipe(recipe)}
         activeOpacity={0.92}
       >
@@ -199,15 +198,16 @@ export default function MamasKitchenScreen({
           </Text>
         </View>
       </TouchableOpacity>
-    ),
-    [openRecipe, cardWidth]
+      );
+    },
+    [openRecipe]
   );
 
   const listHeader = useMemo(
     () => (
       <View>
         {listHeaderPrefix}
-        <View style={[styles.kitchenContent, { maxWidth: contentWidth, alignSelf: 'center', width: '100%' }]}>
+        <View style={styles.kitchenContent}>
           <View style={styles.introCard}>
             <Text style={styles.introEyebrow}>PREMIUM NOURISHMENT</Text>
             <Text style={styles.introTitle}>Mama's Kitchen</Text>
@@ -276,21 +276,7 @@ export default function MamasKitchenScreen({
       activeFilterLabel,
       filteredRecipes.length,
       therapeuticTags,
-      contentWidth,
     ]
-  );
-
-  const recipeRowStyle = useMemo(
-    () => [
-      styles.recipeRow,
-      {
-        maxWidth: contentWidth,
-        alignSelf: 'center',
-        gap: GRID_GAP,
-        paddingHorizontal: GRID_H_PADDING,
-      },
-    ],
-    [contentWidth]
   );
 
   const listFooter = useMemo(() => {
@@ -322,21 +308,24 @@ export default function MamasKitchenScreen({
 
   return (
     <>
-      <FlatList
-        data={filteredRecipes}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        renderItem={renderRecipeCard}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-        ListEmptyComponent={listEmpty}
-        style={styles.kitchenList}
-        contentContainerStyle={[styles.recipeListContent, { alignItems: 'center' }]}
-        columnWrapperStyle={filteredRecipes.length > 0 ? recipeRowStyle : undefined}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      />
+      <View style={styles.kitchenShell}>
+        <FlatList
+          data={gridRecipes}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          renderItem={renderRecipeCard}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={listFooter}
+          ListEmptyComponent={listEmpty}
+          style={styles.kitchenList}
+          contentContainerStyle={styles.recipeListContent}
+          columnWrapperStyle={filteredRecipes.length > 0 ? styles.recipeRow : undefined}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        />
+      </View>
 
       <RecipeDetailSheet
         recipe={selectedRecipe}
@@ -349,26 +338,47 @@ export default function MamasKitchenScreen({
 }
 
 const styles = StyleSheet.create({
+  kitchenShell: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+    maxWidth: PHONE_MAX_W,
+    alignSelf: 'center',
+    overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        maxHeight: '100%',
+      },
+      default: {},
+    }),
+  },
   kitchenList: {
     flex: 1,
     minHeight: 0,
+    width: '100%',
     ...Platform.select({
       web: {
+        overflowY: 'scroll',
+        WebkitOverflowScrolling: 'touch',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
+        maxWidth: '100%',
       },
       default: {},
     }),
   },
   kitchenContent: {
-    paddingHorizontal: GRID_H_PADDING,
     width: '100%',
+    maxWidth: KITCHEN_CONTENT_W,
     alignSelf: 'center',
+    paddingHorizontal: KITCHEN_H_PAD,
   },
   recipeListContent: {
     paddingBottom: 104,
     flexGrow: 1,
     width: '100%',
+    maxWidth: KITCHEN_CONTENT_W,
+    alignSelf: 'center',
   },
   recipeListGlassFooter: {
     marginHorizontal: 20,
@@ -424,10 +434,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   timeBtn: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 92,
-    maxWidth: 120,
+    flex: 1,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: 'rgba(232, 218, 244, 0.45)',
@@ -448,6 +455,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   glassPanelHeader: {
+    width: '100%',
+    alignSelf: 'center',
     backgroundColor: THEME.glass,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -476,9 +485,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    gap: 8,
+    ...Platform.select({
+      web: { rowGap: 8, columnGap: 8 },
+      default: {},
+    }),
   },
   filterPill: {
     paddingVertical: 8,
@@ -510,18 +523,39 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   recipeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
+    alignItems: 'flex-start',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: KITCHEN_CONTENT_W,
+    paddingHorizontal: KITCHEN_H_PAD,
     paddingBottom: 16,
+    gap: KITCHEN_CARD_GAP,
     backgroundColor: THEME.glass,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: THEME.glassBorder,
-    width: '100%',
+    ...Platform.select({
+      web: { rowGap: KITCHEN_CARD_GAP, columnGap: KITCHEN_CARD_GAP },
+      default: {},
+    }),
+  },
+  recipeCardPad: {
+    width: CARD_W,
+    maxWidth: CARD_W,
+    height: 1,
+    opacity: 0,
   },
   recipeCard: {
+    width: CARD_W,
+    maxWidth: CARD_W,
+    flexGrow: 0,
+    flexShrink: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 0,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(186, 198, 188, 0.35)',
@@ -558,7 +592,10 @@ const styles = StyleSheet.create({
     color: THEME.sage,
   },
   emptyWrap: {
-    marginHorizontal: 20,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: KITCHEN_CONTENT_W,
+    marginHorizontal: KITCHEN_H_PAD,
     paddingHorizontal: 12,
     paddingVertical: 24,
     backgroundColor: THEME.glass,

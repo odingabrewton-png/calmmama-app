@@ -39,7 +39,12 @@ import {
   getTherapeuticHeadlineForSymptoms,
   getTherapeuticHeadlineForVibes,
 } from './mealsTherapeuticMap';
-import { configureVillageLayoutTransition, useVillagePressTransition } from './villageScreenTransitions';
+import {
+  animateVillageTabFlow,
+  configureVillageLayoutTransition,
+  getVillageTabFlowStyle,
+  useVillagePressTransition,
+} from './villageScreenTransitions';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import {
   getBottomNavStyle,
@@ -1385,25 +1390,11 @@ function renderSplitAppHeader(activeTab, pulseAnim, userJourney) {
 }
 
 function FlowPanel({ anim, children, embedded }) {
-  const opacity = anim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0.55, 1],
-  });
-  const translateY = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [16, 0],
-  });
-  const scale = anim.interpolate({
-    inputRange: [0, 0.65, 1],
-    outputRange: [0.96, 1.028, 1],
-  });
+  const flowStyle = getVillageTabFlowStyle(anim);
 
   return (
     <Animated.View
-      style={[
-        embedded ? styles.flowEmbedded : styles.flowFill,
-        { opacity, transform: [{ translateY }, { scale }] },
-      ]}
+      style={[embedded ? styles.flowEmbedded : styles.flowFill, flowStyle]}
     >
       {children}
     </Animated.View>
@@ -2501,26 +2492,16 @@ export default function App() {
     }).start();
   }, [isOnboarded, shellEnterAnim]);
 
-  // Tab / journey panels — premium cross-fade + gentle scale pop on each navigation
+  // Tab / journey panels — shared cross-fade + scale pop (see villageScreenTransitions)
   useEffect(() => {
     if (!isOnboarded) return;
-    if (!flowReady.current) {
-      flowReady.current = true;
-      flowAnim.setValue(1);
-      return;
-    }
-    flowAnim.setValue(0);
-    Animated.timing(flowAnim, {
-      toValue: 1,
-      duration: 520,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
+    animateVillageTabFlow(flowAnim, flowReady);
   }, [activeTab, userJourney, isOnboarded, flowAnim]);
 
   const runTabTransition = useCallback(
     (nextTab) => {
       if (nextTab === activeTab) return;
+      configureVillageLayoutTransition();
       setInSoulSanctuary(false);
       setInVillagePortal(false);
       if (flowReady.current) {

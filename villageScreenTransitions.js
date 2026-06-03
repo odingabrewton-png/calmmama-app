@@ -3,6 +3,50 @@ import { Animated, Easing, Platform, LayoutAnimation, UIManager } from 'react-na
 
 export const VILLAGE_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
+/** Shared bottom-tab cross-fade + scale pop */
+export const VILLAGE_TAB_TRANSITION_MS = 480;
+
+export const VILLAGE_TAB_TRANSITION_EASING = Easing.out(Easing.cubic);
+
+export function getVillageTabFlowStyle(flowAnim) {
+  return {
+    opacity: flowAnim.interpolate({
+      inputRange: [0, 0.32, 1],
+      outputRange: [0, 0.58, 1],
+    }),
+    transform: [
+      {
+        translateY: flowAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [18, 0],
+        }),
+      },
+      {
+        scale: flowAnim.interpolate({
+          inputRange: [0, 0.55, 1],
+          outputRange: [0.962, 1.024, 1],
+        }),
+      },
+    ],
+  };
+}
+
+export function animateVillageTabFlow(flowAnim, flowReadyRef) {
+  configureVillageLayoutTransition();
+  if (!flowReadyRef.current) {
+    flowReadyRef.current = true;
+    flowAnim.setValue(1);
+    return;
+  }
+  flowAnim.setValue(0);
+  Animated.timing(flowAnim, {
+    toValue: 1,
+    duration: VILLAGE_TAB_TRANSITION_MS,
+    easing: VILLAGE_TAB_TRANSITION_EASING,
+    useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
+  }).start();
+}
+
 /** Smooth layout reflow — call right before state changes that show/hide panels */
 export function configureVillageLayoutTransition() {
   if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

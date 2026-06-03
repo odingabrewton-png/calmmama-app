@@ -52,6 +52,7 @@ export default function SoulSanctuaryScreen({
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [assistancePopup, setAssistancePopup] = useState(null);
+  const [showChat, setShowChat] = useState(false);
 
   const othersFade = useRef(new Animated.Value(1)).current;
   const panelSlide = useRef(new Animated.Value(0)).current;
@@ -95,6 +96,7 @@ export default function SoulSanctuaryScreen({
     setChatInput('');
     setMessages([]);
     setAssistancePopup(null);
+    setShowChat(false);
     popupAnim.setValue(0);
     othersFade.setValue(1);
     panelSlide.setValue(0);
@@ -109,6 +111,7 @@ export default function SoulSanctuaryScreen({
     setSelectedIndex(index);
     setMessages([{ id: nextId(), role: 'friend', text: getFriendOpeningLine(mood.id) }]);
     setPhase('journal');
+    setShowChat(true);
     panelSlide.setValue(0);
     chatSlide.setValue(0);
 
@@ -133,18 +136,15 @@ export default function SoulSanctuaryScreen({
       }),
       Animated.timing(panelSlide, {
         toValue: 1,
-        duration: 680,
-        delay: 180,
+        duration: 640,
+        delay: 120,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-    ]).start();
-
-    Animated.sequence([
-      Animated.delay(460),
       Animated.timing(chatSlide, {
         toValue: 1,
-        duration: 560,
+        duration: 520,
+        delay: 280,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
@@ -198,18 +198,21 @@ export default function SoulSanctuaryScreen({
     }).start(() => setAssistancePopup(null));
   };
 
-  const panelOpacity = panelSlide;
+  const panelOpacity = panelSlide.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.85, 1],
+  });
   const panelTranslateY = panelSlide.interpolate({
     inputRange: [0, 1],
-    outputRange: [48, 0],
-  });
-  const chatOpacity = chatSlide.interpolate({
-    inputRange: [0, 0.22, 1],
-    outputRange: [0, 0.88, 1],
+    outputRange: [36, 0],
   });
   const chatTranslateY = chatSlide.interpolate({
     inputRange: [0, 1],
-    outputRange: [88, 0],
+    outputRange: [220, 0],
+  });
+  const chatOpacity = chatSlide.interpolate({
+    inputRange: [0, 0.2, 1],
+    outputRange: [0, 1, 1],
   });
   const popupScale = popupAnim.interpolate({
     inputRange: [0, 1],
@@ -320,11 +323,13 @@ export default function SoulSanctuaryScreen({
             <Animated.View
               style={[
                 styles.chatDrawer,
+                showChat && selectedMood ? styles.chatDrawerOpen : styles.chatDrawerClosed,
                 {
                   opacity: chatOpacity,
                   transform: [{ translateY: chatTranslateY }],
                 },
               ]}
+              pointerEvents={showChat && selectedMood ? 'auto' : 'none'}
             >
               <View style={styles.chatSection}>
               <Text style={styles.chatTitle}>Your village companion</Text>
@@ -368,7 +373,7 @@ export default function SoulSanctuaryScreen({
                 </TouchableOpacity>
               </View>
               </View>
-            </Animated.View>
+            </View>
 
             <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
               <Text style={styles.shareBtnText}>Share with your village friend</Text>
@@ -555,6 +560,21 @@ const styles = StyleSheet.create({
   chatDrawer: {
     marginBottom: 12,
     overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        willChange: 'transform, opacity',
+      },
+      default: {},
+    }),
+  },
+  chatDrawerClosed: {
+    height: 0,
+    marginBottom: 0,
+    overflow: 'hidden',
+  },
+  chatDrawerOpen: {
+    minHeight: 0,
+    maxHeight: 420,
   },
   chatSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -562,6 +582,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     padding: 12,
+    marginBottom: 12,
     ...Platform.select({
       web: { backdropFilter: 'blur(10px)' },
     }),

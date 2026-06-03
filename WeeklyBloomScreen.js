@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,22 @@ import {
   StyleSheet,
   Platform,
   Image,
-  useWindowDimensions,
+  Animated,
 } from 'react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { getBloomWeek, getCombinedWeeklyMedicalInsight, TRIMESTER_LABELS } from './bloomWeekData';
-import { getBloomVideoForWeek, getTrimesterForWeek } from './bloomVideoConfig';
+import { getTrimesterForWeek } from './bloomVideoConfig';
 import { getBloomVisualForWeek } from './bloomWeekVisuals';
 import { getWeeklyAffirmation } from './bloomAffirmations';
+import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 
-const TRIMESTER_FALLBACK_EMOJI = {
-  1: '🌱',
-  2: '🌿',
-  3: '🌸',
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+const BLOOM_BODY_W = 300;
+const BLOOM_BODY_H = 300;
+
+const BLOOM_TRIMESTER_IMAGES = {
+  1: require('./assets/soul-cloud-peach.png'),
+  2: require('./assets/soul-cloud-sage.png'),
+  3: require('./assets/soul-cloud-lavender.png'),
 };
 
 const AFFIRMATION_SERIF = Platform.select({
@@ -63,176 +67,93 @@ function BloomAffirmationMiniCard({ affirmation, trimesterLabel, week }) {
   );
 }
 
-/** Trimester-specific caress loop — landscape widescreen frame */
-function useBloomLandscapeSize() {
-  const { width: screenW } = useWindowDimensions();
-  const landscapeW = Math.min(screenW - 72, 360);
-  const landscapeH = Math.round(landscapeW * 0.56);
-  return { landscapeW, landscapeH };
-}
-
-function BloomStaticFallback({ week, palette, visual, width, height }) {
+/** Stable trimester bloom graphic — fixed dimensions + gentle breathe loop (web-safe) */
+function BloomingBodyGraphic({ week, palette, visual }) {
   const trimester = getTrimesterForWeek(week);
-  return (
-    <View
-      style={[
-        silhouetteStyles.landscapeFrame,
-        silhouetteStyles.landscapeWebFallback,
-        {
-          width,
-          height,
-          minWidth: width,
-          minHeight: height,
-          borderColor: palette.accent,
-        },
-      ]}
-    >
-      <Text style={silhouetteStyles.landscapeWebEmoji}>{TRIMESTER_FALLBACK_EMOJI[trimester] || '🤰'}</Text>
-      <Text style={[silhouetteStyles.landscapeWebLabel, { color: palette.primary }]}>
-        Week {week} bloom
-      </Text>
-      <Text style={silhouetteStyles.landscapeWebDress}>{visual.dressLabel}</Text>
-    </View>
-  );
-}
-
-function BloomWebVideoFrame({ week, palette, visual, width, height }) {
-  const [mediaFailed, setMediaFailed] = useState(false);
-  const videoSource = getBloomVideoForWeek(week);
-  const asset = Image.resolveAssetSource(videoSource);
-  const mediaUri = asset?.uri;
-
-  if (mediaFailed || !mediaUri) {
-    return <BloomStaticFallback week={week} palette={palette} visual={visual} width={width} height={height} />;
-  }
-
-  if (Platform.OS === 'web') {
-    return (
-      <View
-        style={[
-          silhouetteStyles.landscapeFrame,
-          {
-            width,
-            height,
-            minWidth: width,
-            minHeight: height,
-            borderColor: palette.accent,
-          },
-        ]}
-      >
-        <video
-          src={mediaUri}
-          autoPlay
-          loop
-          muted
-          playsInline
-          onError={() => setMediaFailed(true)}
-          style={{
-            width,
-            height,
-            objectFit: 'cover',
-            borderRadius: 14,
-            display: 'block',
-            backgroundColor: palette.wash,
-          }}
-        />
-      </View>
-    );
-  }
-
-  return <BloomStaticFallback week={week} palette={palette} visual={visual} width={width} height={height} />;
-}
-
-function BellyCaressVideoWebFallback({ week, palette, visual }) {
-  const { landscapeW, landscapeH } = useBloomLandscapeSize();
-
-  return (
-    <View
-      style={[
-        silhouetteStyles.landscapeStage,
-        {
-          backgroundColor: palette.wash,
-          width: '100%',
-          minHeight: landscapeH + 36,
-        },
-      ]}
-    >
-      <View style={[silhouetteStyles.washBlob, { backgroundColor: palette.accent }]} />
-      <BloomWebVideoFrame
-        week={week}
-        palette={palette}
-        visual={visual}
-        width={landscapeW}
-        height={landscapeH}
-      />
-      <Text style={[silhouetteStyles.weekBadge, { color: palette.primary }]}>
-        Week {week} · {visual.dressLabel}
-      </Text>
-    </View>
-  );
-}
-
-function BellyCaressVideoNative({ week, palette, visual }) {
-  const { landscapeW, landscapeH } = useBloomLandscapeSize();
-  const trimester = getTrimesterForWeek(week);
-  const videoSource = getBloomVideoForWeek(week);
-
-  const player = useVideoPlayer(videoSource, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
+  const [imageFailed, setImageFailed] = useState(false);
+  const [imageReady, setImageReady] = useState(false);
+  const breathe = useRef(new Animated.Value(0)).current;
+  const imageSource = BLOOM_TRIMESTER_IMAGES[trimester] || BLOOM_TRIMESTER_IMAGES[2];
 
   useEffect(() => {
-    player.play();
-  }, [week, trimester, player]);
+    setImageFailed(false);
+    setImageReady(false);
+  }, [trimester, week]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 2600,
+          easing: VILLAGE_IN_OUT_SIN,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 2600,
+          easing: VILLAGE_IN_OUT_SIN,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [breathe]);
+
+  const breatheScale = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.045],
+  });
+
+  const showImage = !imageFailed;
 
   return (
-    <View
-      style={[
-        silhouetteStyles.landscapeStage,
-        {
-          backgroundColor: palette.wash,
-          width: '100%',
-          minHeight: landscapeH + 36,
-        },
-      ]}
-    >
+    <View style={[silhouetteStyles.landscapeStage, { backgroundColor: palette.wash }]}>
       <View style={[silhouetteStyles.washBlob, { backgroundColor: palette.accent }]} />
-      <View
+      <Animated.View
         style={[
           silhouetteStyles.landscapeFrame,
-          {
-            width: landscapeW,
-            height: landscapeH,
-            minWidth: landscapeW,
-            minHeight: landscapeH,
-          },
+          { width: BLOOM_BODY_W, height: BLOOM_BODY_H, borderColor: palette.accent },
+          { transform: [{ scale: breatheScale }] },
         ]}
       >
-        <VideoView
-          player={player}
-          style={[
-            silhouetteStyles.landscapeVideo,
-            { width: landscapeW, height: landscapeH, minWidth: landscapeW, minHeight: landscapeH },
-          ]}
-          contentFit="cover"
-          nativeControls={false}
-          allowsPictureInPicture={false}
-        />
-      </View>
+        {showImage ? (
+          <>
+            {!imageReady ? (
+              <View style={silhouetteStyles.bloomBodyPlaceholder}>
+                <Text style={silhouetteStyles.landscapeWebEmoji}>🌸</Text>
+              </View>
+            ) : null}
+            <Image
+              source={imageSource}
+              style={[
+                silhouetteStyles.bloomBodyImage,
+                !imageReady && silhouetteStyles.bloomBodyImageLoading,
+              ]}
+              resizeMode="contain"
+              accessibilityLabel={`Week ${week} blooming body illustration`}
+              onLoad={() => setImageReady(true)}
+              onError={() => {
+                setImageFailed(true);
+                setImageReady(false);
+              }}
+            />
+          </>
+        ) : (
+          <View style={silhouetteStyles.bloomBodyFallback}>
+            <Text style={silhouetteStyles.landscapeWebEmoji}>🤰</Text>
+            <Text style={[silhouetteStyles.landscapeWebLabel, { color: palette.primary }]}>
+              Week {week} bloom
+            </Text>
+          </View>
+        )}
+      </Animated.View>
       <Text style={[silhouetteStyles.weekBadge, { color: palette.primary }]}>
         Week {week} · {visual.dressLabel}
       </Text>
     </View>
   );
-}
-
-function BellyCaressVideo(props) {
-  if (Platform.OS === 'web') {
-    return <BellyCaressVideoWebFallback {...props} />;
-  }
-  return <BellyCaressVideoNative {...props} />;
 }
 
 function WeightChart({ entries, palette, maxWeek }) {
@@ -355,8 +276,8 @@ export default function WeeklyBloomScreen({
 
       <View style={[bloomStyles.silhouetteCard, { backgroundColor: data.palette.wash, borderColor: data.palette.accent }]}>
         <Text style={bloomStyles.cardEyebrow}>YOUR BLOOMING BODY</Text>
-        <BellyCaressVideo
-          key={`belly-video-t${visual.trimester}`}
+        <BloomingBodyGraphic
+          key={`bloom-body-t${visual.trimester}`}
           week={week}
           palette={data.palette}
           visual={visual}
@@ -475,12 +396,13 @@ export default function WeeklyBloomScreen({
 const silhouetteStyles = StyleSheet.create({
   landscapeStage: {
     width: '100%',
+    minHeight: BLOOM_BODY_H + 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 6,
-    overflow: 'hidden',
-    borderRadius: 16,
     alignSelf: 'center',
+    marginVertical: 6,
+    overflow: 'visible',
+    borderRadius: 16,
   },
   washBlob: {
     position: 'absolute',
@@ -495,10 +417,49 @@ const silhouetteStyles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 14,
     borderWidth: 1,
-    alignSelf: 'center',
-  },
-  landscapeWebFallback: {
     backgroundColor: 'rgba(255, 252, 248, 0.72)',
+    ...Platform.select({
+      web: {
+        width: BLOOM_BODY_W,
+        height: BLOOM_BODY_H,
+        minWidth: BLOOM_BODY_W,
+        minHeight: BLOOM_BODY_H,
+        maxWidth: BLOOM_BODY_W,
+        maxHeight: BLOOM_BODY_H,
+      },
+      default: {},
+    }),
+  },
+  bloomBodyImage: {
+    width: BLOOM_BODY_W,
+    height: BLOOM_BODY_H,
+    minWidth: BLOOM_BODY_W,
+    minHeight: BLOOM_BODY_H,
+    ...Platform.select({
+      web: {
+        objectFit: 'contain',
+      },
+      default: {},
+    }),
+  },
+  bloomBodyImageLoading: {
+    opacity: 0,
+    position: 'absolute',
+  },
+  bloomBodyPlaceholder: {
+    position: 'absolute',
+    width: BLOOM_BODY_W,
+    height: BLOOM_BODY_H,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 252, 248, 0.5)',
+  },
+  bloomBodyFallback: {
+    width: BLOOM_BODY_W,
+    height: BLOOM_BODY_H,
+    minWidth: BLOOM_BODY_W,
+    minHeight: BLOOM_BODY_H,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   landscapeWebEmoji: {
@@ -509,18 +470,6 @@ const silhouetteStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
-  },
-  landscapeWebDress: {
-    fontSize: 10,
-    color: '#6a7a6e',
-    marginTop: 4,
-    textAlign: 'center',
-    paddingHorizontal: 8,
-    fontStyle: 'italic',
-  },
-  landscapeVideo: {
-    backgroundColor: 'transparent',
-    ...(Platform.OS === 'web' ? { objectFit: 'cover' } : {}),
   },
   weekBadge: {
     position: 'absolute',
@@ -744,8 +693,6 @@ const bloomStyles = StyleSheet.create({
     borderWidth: 1.5,
     overflow: 'hidden',
     alignItems: 'center',
-    width: '100%',
-    alignSelf: 'center',
   },
   caressCaption: {
     fontSize: 11,
