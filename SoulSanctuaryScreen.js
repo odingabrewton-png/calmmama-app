@@ -33,6 +33,8 @@ const CLOUD_LAYOUT = [
   { top: 248, right: 4, width: 122, height: 72 },
 ];
 
+const CHAT_DRAWER_HEIGHT = 268;
+
 let messageId = 0;
 const nextId = () => {
   messageId += 1;
@@ -208,11 +210,11 @@ export default function SoulSanctuaryScreen({
   });
   const chatTranslateY = chatSlide.interpolate({
     inputRange: [0, 1],
-    outputRange: [220, 0],
+    outputRange: [CHAT_DRAWER_HEIGHT, 0],
   });
   const chatOpacity = chatSlide.interpolate({
-    inputRange: [0, 0.2, 1],
-    outputRange: [0, 1, 1],
+    inputRange: [0, 0.15, 1],
+    outputRange: [0, 0.92, 1],
   });
   const popupScale = popupAnim.interpolate({
     inputRange: [0, 1],
@@ -320,60 +322,66 @@ export default function SoulSanctuaryScreen({
               />
             </View>
 
-            <Animated.View
+            <View
               style={[
-                styles.chatDrawer,
-                showChat && selectedMood ? styles.chatDrawerOpen : styles.chatDrawerClosed,
-                {
-                  opacity: chatOpacity,
-                  transform: [{ translateY: chatTranslateY }],
-                },
+                styles.chatDrawerClip,
+                selectedMood ? styles.chatDrawerClipOpen : styles.chatDrawerClipClosed,
               ]}
-              pointerEvents={showChat && selectedMood ? 'auto' : 'none'}
+              pointerEvents={selectedMood && showChat ? 'auto' : 'none'}
             >
-              <View style={styles.chatSection}>
-              <Text style={styles.chatTitle}>Your village companion</Text>
-              <ScrollView
-                style={styles.chatLog}
-                contentContainerStyle={styles.chatLogContent}
-                showsVerticalScrollIndicator={false}
+              <Animated.View
+                style={[
+                  styles.chatDrawer,
+                  {
+                    opacity: chatOpacity,
+                    transform: [{ translateY: chatTranslateY }],
+                  },
+                ]}
               >
-                {messages.map((msg) => (
-                  <View
-                    key={msg.id}
-                    style={[
-                      styles.bubble,
-                      msg.role === 'user' ? styles.userBubble : styles.friendBubble,
-                    ]}
+                <View style={styles.chatSection}>
+                  <Text style={styles.chatTitle}>Your village companion</Text>
+                  <ScrollView
+                    style={styles.chatLog}
+                    contentContainerStyle={styles.chatLogContent}
+                    showsVerticalScrollIndicator={false}
                   >
-                    <Text
-                      style={[
-                        styles.bubbleText,
-                        msg.role === 'user' ? styles.userBubbleText : styles.friendBubbleText,
-                      ]}
-                    >
-                      {msg.text}
-                    </Text>
-                  </View>
-                ))}
-              </ScrollView>
+                    {messages.map((msg) => (
+                      <View
+                        key={msg.id}
+                        style={[
+                          styles.bubble,
+                          msg.role === 'user' ? styles.userBubble : styles.friendBubble,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.bubbleText,
+                            msg.role === 'user' ? styles.userBubbleText : styles.friendBubbleText,
+                          ]}
+                        >
+                          {msg.text}
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
 
-              <View style={styles.chatInputRow}>
-                <TextInput
-                  style={styles.chatInput}
-                  placeholder="Talk to your friend…"
-                  placeholderTextColor="rgba(200, 190, 220, 0.6)"
-                  value={chatInput}
-                  onChangeText={setChatInput}
-                  onSubmitEditing={sendChat}
-                  returnKeyType="send"
-                />
-                <TouchableOpacity style={styles.sendBtn} onPress={sendChat}>
-                  <Text style={styles.sendBtnText}>Send</Text>
-                </TouchableOpacity>
-              </View>
-              </View>
-            </Animated.View>
+                  <View style={styles.chatInputRow}>
+                    <TextInput
+                      style={styles.chatInput}
+                      placeholder="Talk to your friend…"
+                      placeholderTextColor="rgba(200, 190, 220, 0.6)"
+                      value={chatInput}
+                      onChangeText={setChatInput}
+                      onSubmitEditing={sendChat}
+                      returnKeyType="send"
+                    />
+                    <TouchableOpacity style={styles.sendBtn} onPress={sendChat}>
+                      <Text style={styles.sendBtnText}>Send</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Animated.View>
+            </View>
 
             <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
               <Text style={styles.shareBtnText}>Share with your village friend</Text>
@@ -557,32 +565,35 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     backgroundColor: 'transparent',
   },
-  chatDrawer: {
-    marginBottom: 12,
+  chatDrawerClip: {
     overflow: 'hidden',
+    width: '100%',
     ...Platform.select({
       web: {
-        willChange: 'transform, opacity',
+        willChange: 'transform',
       },
       default: {},
     }),
   },
-  chatDrawerClosed: {
+  chatDrawerClipClosed: {
     height: 0,
     marginBottom: 0,
-    overflow: 'hidden',
   },
-  chatDrawerOpen: {
-    minHeight: 0,
-    maxHeight: 420,
+  chatDrawerClipOpen: {
+    height: CHAT_DRAWER_HEIGHT,
+    marginBottom: 12,
+  },
+  chatDrawer: {
+    height: CHAT_DRAWER_HEIGHT,
+    width: '100%',
   },
   chatSection: {
+    flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     padding: 12,
-    marginBottom: 12,
     ...Platform.select({
       web: { backdropFilter: 'blur(10px)' },
     }),
@@ -596,6 +607,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   chatLog: {
+    flex: 1,
+    minHeight: 88,
     maxHeight: 150,
     marginBottom: 10,
   },

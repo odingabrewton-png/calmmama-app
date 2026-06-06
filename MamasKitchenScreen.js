@@ -5,6 +5,7 @@ import {
   ScrollView,
   FlatList,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Platform,
   Image,
@@ -24,31 +25,120 @@ import { getTherapeuticMeals } from './mealsTherapeuticMap';
 import { getKitchenImageUrl, KITCHEN_PLACEHOLDER_URL } from './kitchenMealImages';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const PHONE_MAX_W = 390;
-const KITCHEN_H_PAD = 20;
-const KITCHEN_CARD_GAP = 12;
-const KITCHEN_CONTENT_W = Math.min(SCREEN_W, PHONE_MAX_W);
-const CARD_W = Math.floor((KITCHEN_CONTENT_W - KITCHEN_H_PAD * 2 - KITCHEN_CARD_GAP) / 2);
+const PHONE_MAX_W = 480;
+const H_PAD = 16;
+const GRID_GAP = 12;
+const THREE_COL_BREAKPOINT = 360;
 
-const INITIAL_VISIBLE = 12;
-const LOAD_MORE_STEP = 10;
-const MEAL_VIEWPORT_MAX_H = Math.round(SCREEN_H * 0.65);
-
-const TIME_LABELS = {
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  night: 'Night',
-};
+const MEAL_TABS = [
+  { id: 'morning', label: 'Morning', Icon: IconRisingSun },
+  { id: 'afternoon', label: 'Noon', Icon: IconFullSun },
+  { id: 'night', label: 'Night', Icon: IconCrescentMoon },
+];
 
 const THEME = {
-  lavender: '#E8DAF4',
-  lavenderDeep: '#9A7AB8',
   sage: '#5C7A68',
-  sageLight: '#D1FAE5',
-  glass: 'rgba(255, 255, 255, 0.72)',
-  glassBorder: 'rgba(186, 198, 188, 0.45)',
+  gold: '#C4A574',
+  goldSoft: 'rgba(196, 165, 116, 0.28)',
+  goldGlow: 'rgba(196, 165, 116, 0.45)',
+  ink: '#1E2622',
+  inkSoft: '#5C6E63',
+  cream: 'rgba(255, 252, 248, 0.88)',
+  glass: 'rgba(255, 255, 255, 0.62)',
+  instacart: '#43B02A',
+  amazon: '#232F3E',
+  amazonSmile: '#FF9900',
 };
+
+function useGridLayout() {
+  const [screenW, setScreenW] = useState(() => Dimensions.get('window').width);
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => setScreenW(window.width));
+    return () => sub?.remove?.();
+  }, []);
+
+  const contentW = Math.min(screenW, PHONE_MAX_W);
+  const columns = screenW >= THREE_COL_BREAKPOINT ? 3 : 2;
+  const cellW = Math.floor((contentW - H_PAD * 2 - GRID_GAP * (columns - 1)) / columns);
+
+  return { contentW, columns, cellW, screenW };
+}
+
+/* ── Minimal line-art tab icons ── */
+function IconRisingSun({ color = THEME.ink, size = 18 }) {
+  return (
+    <View style={[iconStyles.wrap, { width: size, height: size }]}>
+      <View style={[iconStyles.horizon, { backgroundColor: color, width: size * 0.9 }]} />
+      <View
+        style={[
+          iconStyles.sunArc,
+          { borderColor: color, width: size * 0.55, height: size * 0.28, bottom: size * 0.22 },
+        ]}
+      />
+      <View style={[iconStyles.ray, { backgroundColor: color, top: 0, height: size * 0.22 }]} />
+      <View style={[iconStyles.ray, { backgroundColor: color, top: 2, left: 2, height: size * 0.16, transform: [{ rotate: '-28deg' }] }]} />
+      <View style={[iconStyles.ray, { backgroundColor: color, top: 2, right: 2, height: size * 0.16, transform: [{ rotate: '28deg' }] }]} />
+    </View>
+  );
+}
+
+function IconFullSun({ color = THEME.ink, size = 18 }) {
+  return (
+    <View style={[iconStyles.wrap, { width: size, height: size }]}>
+      <View style={[iconStyles.fullSun, { borderColor: color, width: size * 0.52, height: size * 0.52 }]} />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <View
+          key={deg}
+          style={[
+            iconStyles.sunRay,
+            {
+              backgroundColor: color,
+              transform: [{ rotate: `${deg}deg` }, { translateY: -(size * 0.38) }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function IconCrescentMoon({ color = THEME.ink, size = 18 }) {
+  return (
+    <View style={[iconStyles.wrap, { width: size, height: size }]}>
+      <View style={[iconStyles.moonOuter, { borderColor: color, width: size * 0.62, height: size * 0.62 }]} />
+      <View
+        style={[
+          iconStyles.moonInner,
+          {
+            backgroundColor: '#F7F3EE',
+            width: size * 0.48,
+            height: size * 0.48,
+            right: size * 0.04,
+            top: size * 0.04,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+const iconStyles = StyleSheet.create({
+  wrap: { alignItems: 'center', justifyContent: 'center' },
+  horizon: { position: 'absolute', bottom: 2, height: 1.5, borderRadius: 1 },
+  sunArc: {
+    position: 'absolute',
+    borderWidth: 1.5,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 100,
+    borderTopRightRadius: 100,
+  },
+  ray: { position: 'absolute', width: 1.5, borderRadius: 1 },
+  fullSun: { borderRadius: 999, borderWidth: 1.5 },
+  sunRay: { position: 'absolute', width: 1.5, height: 4, borderRadius: 1 },
+  moonOuter: { borderRadius: 999, borderWidth: 1.5 },
+  moonInner: { position: 'absolute', borderRadius: 999 },
+});
 
 const RecipeMealImage = memo(function RecipeMealImage({ recipe, style, resizeMode = 'cover' }) {
   const primaryUri = recipe?.imageUrl || getKitchenImageUrl(recipe);
@@ -60,21 +150,10 @@ const RecipeMealImage = memo(function RecipeMealImage({ recipe, style, resizeMod
     setFailed(false);
   }, [primaryUri, recipe?.id]);
 
-  const handleError = () => {
-    if (uri !== KITCHEN_PLACEHOLDER_URL) {
-      setUri(KITCHEN_PLACEHOLDER_URL);
-      return;
-    }
-    setFailed(true);
-  };
-
   if (failed) {
     return (
       <View style={[style, styles.imageFallback]}>
         <Text style={styles.imageFallbackEmoji}>🥗</Text>
-        <Text style={styles.imageFallbackLabel} numberOfLines={1}>
-          Village nourishment
-        </Text>
       </View>
     );
   }
@@ -84,801 +163,864 @@ const RecipeMealImage = memo(function RecipeMealImage({ recipe, style, resizeMod
       source={{ uri }}
       style={style}
       resizeMode={resizeMode}
-      onError={handleError}
+      onError={() => {
+        if (uri !== KITCHEN_PLACEHOLDER_URL) setUri(KITCHEN_PLACEHOLDER_URL);
+        else setFailed(true);
+      }}
     />
   );
 });
 
-const RecipeCard = memo(function RecipeCard({ recipe, onPress }) {
-  if (recipe?.__pad) {
-    return <View style={styles.recipeCardPad} pointerEvents="none" />;
-  }
+const GridMealTile = memo(function GridMealTile({ recipe, cellW, onPress }) {
+  if (recipe?.__pad) return <View style={{ width: cellW }} pointerEvents="none" />;
 
   return (
-    <TouchableOpacity style={styles.recipeCard} onPress={() => onPress(recipe)} activeOpacity={0.92}>
-      <RecipeMealImage recipe={recipe} style={styles.recipeImage} resizeMode="cover" />
-      <View style={styles.recipeCardBody}>
-        <Text style={styles.recipeTitle} numberOfLines={2}>
-          {recipe.title}
-        </Text>
-        <Text style={styles.recipeSub} numberOfLines={2}>
-          {recipe.subtitle}
-        </Text>
-        <Text style={styles.recipeMeta}>
-          {recipe.prepMinutes} min · {recipe.servings} servings
-        </Text>
+    <TouchableOpacity
+      style={[styles.gridTile, { width: cellW }]}
+      onPress={() => onPress(recipe)}
+      activeOpacity={0.92}
+    >
+      <View style={[styles.gridImageWrap, { width: cellW, height: cellW * 1.05 }]}>
+        <RecipeMealImage recipe={recipe} style={styles.gridImage} />
       </View>
+      <Text style={styles.gridLabel} numberOfLines={2}>
+        {recipe.title}
+      </Text>
     </TouchableOpacity>
   );
 });
 
-function RecipeDetailSheet({ recipe, visible, onClose, sheetAnim }) {
+function HybridKitchenHeader({
+  activeTab,
+  onTabChange,
+  filtersOpen,
+  onToggleFilters,
+  activeFilter,
+  onFilterChange,
+  tabHighlightX,
+  tabSlotW,
+  onTabTrackLayout,
+}) {
+  const filterCount = activeFilter ? 1 : 0;
+
+  return (
+    <View style={styles.headerWrap}>
+      <View style={styles.glassCapsule}>
+        <View style={styles.tabTrack} onLayout={onTabTrackLayout}>
+          {tabSlotW > 0 ? (
+            <Animated.View
+              style={[
+                styles.tabHighlight,
+                {
+                  width: tabSlotW,
+                  transform: [{ translateX: tabHighlightX }],
+                },
+              ]}
+            />
+          ) : null}
+
+          {MEAL_TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            const Icon = tab.Icon;
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                style={styles.tabSlot}
+                onPress={() => onTabChange(tab.id)}
+                activeOpacity={0.88}
+              >
+                <Icon color={active ? THEME.ink : 'rgba(92, 122, 104, 0.55)'} size={17} />
+                <Text style={[styles.tabSublabel, active && styles.tabSublabelActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity style={styles.filtersBtn} onPress={onToggleFilters} activeOpacity={0.88}>
+          <Text style={styles.filtersBtnText}>
+            Filters {filtersOpen ? '▴' : '▽'}
+            {filterCount ? ' ·' : ''}
+          </Text>
+          {filterCount ? <View style={styles.filtersDot} /> : null}
+        </TouchableOpacity>
+      </View>
+
+      {filtersOpen ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterPanel}
+          contentContainerStyle={styles.filterPanelContent}
+        >
+          <TouchableOpacity
+            style={[styles.filterChip, activeFilter === null && styles.filterChipActive]}
+            onPress={() => onFilterChange(null)}
+          >
+            <Text style={[styles.filterChipText, activeFilter === null && styles.filterChipTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          {KITCHEN_FILTERS.map((f) => {
+            const on = activeFilter === f.id;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[styles.filterChip, on && styles.filterChipActive]}
+                onPress={() => onFilterChange(on ? null : f.id)}
+              >
+                <Text style={[styles.filterChipText, on && styles.filterChipTextActive]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+function InstacartLogoMark() {
+  return (
+    <View style={styles.logoInstacart}>
+      <Text style={styles.logoInstacartText}>instacart</Text>
+    </View>
+  );
+}
+
+function AmazonFreshLogoMark() {
+  return (
+    <View style={styles.logoAmazonRow}>
+      <Text style={styles.logoAmazonText}>amazon</Text>
+      <Text style={styles.logoAmazonFresh}>fresh</Text>
+    </View>
+  );
+}
+
+function MealDetailSheet({
+  recipe,
+  visible,
+  onClose,
+  sheetAnim,
+  backdropAnim,
+  badgeAnim,
+  contentW,
+}) {
+  const [checked, setChecked] = useState(() => new Set());
+
+  useEffect(() => {
+    if (visible && recipe) setChecked(new Set());
+  }, [visible, recipe?.id]);
+
   if (!recipe) return null;
+
+  const toggleIngredient = (item) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(item)) next.delete(item);
+      else next.add(item);
+      return next;
+    });
+  };
 
   const openLink = (url) => {
     if (url) Linking.openURL(url).catch(() => {});
   };
 
+  const badgeScale = badgeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+  const useSideBySide = contentW >= 380;
+
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={onClose} />
-      <Animated.View style={[styles.sheetPanel, { transform: [{ translateY: sheetAnim }] }]}>
-        <View style={styles.sheetHandle} />
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sheetScrollContent}
+      <View style={styles.modalRoot}>
+        <Animated.View style={[styles.sheetBackdrop, { opacity: backdropAnim }]}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.sheetPanel,
+            {
+              opacity: backdropAnim,
+              transform: [{ translateY: sheetAnim }],
+            },
+          ]}
         >
-          <RecipeMealImage recipe={recipe} style={styles.sheetHeroImage} resizeMode="cover" />
-          <Text style={styles.sheetTitle}>{recipe.title}</Text>
-          <Text style={styles.sheetSub}>{recipe.subtitle}</Text>
-          <Text style={styles.sheetMeta}>
-            {recipe.prepMinutes} min · Serves {recipe.servings}
-          </Text>
+          <View style={styles.sheetHandle} />
 
-          <View style={styles.sheetOrderRow}>
-            <TouchableOpacity
-              style={styles.sheetAmazonBtn}
-              onPress={() => openLink(recipe.amazonUrl)}
-              activeOpacity={0.88}
-            >
-              <Text style={styles.sheetOrderBtnText}>Order on Amazon</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.sheetInstacartBtn}
-              onPress={() => openLink(recipe.instacartUrl)}
-              activeOpacity={0.88}
-            >
-              <Text style={styles.sheetOrderBtnText}>Shop Instacart</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.sheetSectionLabel}>Ingredients</Text>
-          {recipe.ingredients.map((item) => (
-            <View key={item} style={styles.sheetBulletRow}>
-              <View style={styles.sheetBulletDot} />
-              <Text style={styles.sheetBulletText}>{item}</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
+            {/* Header zone */}
+            <RecipeMealImage recipe={recipe} style={styles.sheetHero} />
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>{recipe.title}</Text>
+              <Animated.View style={[styles.prepBadge, { transform: [{ scale: badgeScale }] }]}>
+                <Text style={styles.prepBadgeText}>{recipe.prepMinutes} min prep</Text>
+              </Animated.View>
             </View>
-          ))}
 
-          <Text style={[styles.sheetSectionLabel, styles.sheetSectionSpaced]}>Instructions</Text>
-          {recipe.steps.map((step, index) => (
-            <View key={step} style={styles.sheetStepRow}>
-              <View style={styles.sheetStepNum}>
-                <Text style={styles.sheetStepNumText}>{index + 1}</Text>
+            {/* Content zone */}
+            <View style={[styles.contentZone, useSideBySide && styles.contentZoneRow]}>
+              <View style={[styles.contentCol, useSideBySide && styles.contentColHalf]}>
+                <Text style={styles.zoneLabel}>Ingredients</Text>
+                <View style={styles.zoneCard}>
+                  {recipe.ingredients.map((item) => {
+                    const done = checked.has(item);
+                    return (
+                      <TouchableOpacity
+                        key={item}
+                        style={styles.checkRow}
+                        onPress={() => toggleIngredient(item)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.checkBox, done && styles.checkBoxDone]}>
+                          {done ? <Text style={styles.checkMark}>✓</Text> : null}
+                        </View>
+                        <Text style={[styles.checkText, done && styles.checkTextDone]}>{item}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-              <Text style={styles.sheetStepText}>{step}</Text>
+
+              <View style={[styles.contentCol, useSideBySide && styles.contentColHalf]}>
+                <Text style={styles.zoneLabel}>Recipe Steps</Text>
+                <View style={styles.zoneCard}>
+                  {recipe.steps.map((step, i) => (
+                    <View key={step} style={styles.stepRow}>
+                      <View style={styles.stepTimeline}>
+                        <View style={styles.stepDot} />
+                        {i < recipe.steps.length - 1 ? <View style={styles.stepLine} /> : null}
+                      </View>
+                      <View style={styles.stepBody}>
+                        <Text style={styles.stepNum}>Step {i + 1}</Text>
+                        <Text style={styles.stepText}>{step}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
-          ))}
-        </ScrollView>
-        <TouchableOpacity style={styles.sheetCloseBtn} onPress={onClose} activeOpacity={0.88}>
-          <Text style={styles.sheetCloseBtnText}>Close recipe</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          </ScrollView>
+
+          {/* Integration footer */}
+          <View style={styles.sheetFooter}>
+            <Text style={styles.footerHeading}>Order Ingredients via:</Text>
+            <View style={styles.footerBtns}>
+              <TouchableOpacity
+                style={styles.shopBtnInstacart}
+                onPress={() => openLink(recipe.instacartUrl)}
+                activeOpacity={0.9}
+              >
+                <InstacartLogoMark />
+                <Text style={styles.shopBtnCaption}>Instacart</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shopBtnAmazon}
+                onPress={() => openLink(recipe.amazonUrl)}
+                activeOpacity={0.9}
+              >
+                <AmazonFreshLogoMark />
+                <Text style={styles.shopBtnCaption}>Amazon Fresh</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
-export default function MamasKitchenScreen({
-  timeOfDay,
-  onTimeOfDayChange,
-  therapeuticTags,
-  listHeaderPrefix = null,
-}) {
-  const activeTime = timeOfDay ?? getDefaultKitchenTimeOfDay();
+export default function MamasKitchenScreen({ therapeuticTags, listHeaderPrefix = null }) {
+  const { columns, cellW, contentW } = useGridLayout();
+  const [activeTab, setActiveTab] = useState(getDefaultKitchenTimeOfDay);
   const [activeFilter, setActiveFilter] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
-  const sheetTranslateY = useRef(new Animated.Value(480)).current;
+  const [tabTrackW, setTabTrackW] = useState(0);
 
-  const filteredRecipes = useMemo(() => {
-    let base = filterKitchenRecipes(MAMA_KITCHEN_RECIPES, activeFilter, activeTime);
+  const sheetTranslateY = useRef(new Animated.Value(500)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const prepBadgeAnim = useRef(new Animated.Value(0)).current;
+  const tabHighlightX = useRef(new Animated.Value(0)).current;
+
+  const tabIndex = MEAL_TABS.findIndex((t) => t.id === activeTab);
+  const tabSlotW = tabTrackW > 0 ? tabTrackW / MEAL_TABS.length : 0;
+
+  useEffect(() => {
+    if (tabSlotW <= 0) return;
+    Animated.spring(tabHighlightX, {
+      toValue: tabIndex * tabSlotW,
+      damping: 22,
+      stiffness: 260,
+      mass: 0.85,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [tabIndex, tabSlotW, tabHighlightX]);
+
+  const filteredMeals = useMemo(() => {
+    let base = filterKitchenRecipes(MAMA_KITCHEN_RECIPES, activeFilter, activeTab);
     if (therapeuticTags?.length) {
       base = getTherapeuticMeals(base, therapeuticTags, 150);
     }
     return base;
-  }, [activeFilter, activeTime, therapeuticTags]);
+  }, [activeFilter, activeTab, therapeuticTags]);
 
-  useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE);
-  }, [activeFilter, activeTime, therapeuticTags]);
+  const gridData = useMemo(() => {
+    const items = [...filteredMeals];
+    const rem = items.length % columns;
+    if (rem !== 0) {
+      for (let i = 0; i < columns - rem; i += 1) {
+        items.push({ id: `__pad_${i}`, __pad: true });
+      }
+    }
+    return items;
+  }, [filteredMeals, columns]);
 
-  const visibleRecipes = useMemo(
-    () => filteredRecipes.slice(0, visibleCount),
-    [filteredRecipes, visibleCount]
-  );
-
-  const gridRecipes = useMemo(() => {
-    if (visibleRecipes.length % 2 === 0) return visibleRecipes;
-    return [...visibleRecipes, { id: '__kitchen_grid_pad__', __pad: true }];
-  }, [visibleRecipes]);
-
-  const hasMore = visibleCount < filteredRecipes.length;
-  const activeFilterLabel = activeFilter
-    ? KITCHEN_FILTERS.find((f) => f.id === activeFilter)?.label
-    : null;
+  const handleTabChange = useCallback((tabId) => {
+    setActiveTab(tabId);
+  }, []);
 
   const openRecipe = useCallback(
     (recipe) => {
       setSelectedRecipe(recipe);
       setSheetOpen(true);
-      sheetTranslateY.setValue(480);
-      Animated.timing(sheetTranslateY, {
-        toValue: 0,
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }).start();
+      sheetTranslateY.setValue(500);
+      backdropOpacity.setValue(0);
+      prepBadgeAnim.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          damping: 24,
+          stiffness: 210,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.spring(prepBadgeAnim, {
+          toValue: 1,
+          delay: 160,
+          damping: 11,
+          stiffness: 170,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]).start();
     },
-    [sheetTranslateY]
+    [sheetTranslateY, backdropOpacity, prepBadgeAnim]
   );
 
-  const closeRecipe = () => {
-    Animated.timing(sheetTranslateY, {
-      toValue: 480,
-      duration: 380,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start(() => {
+  const closeRecipe = useCallback(() => {
+    prepBadgeAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: 500,
+        duration: 280,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+    ]).start(() => {
       setSheetOpen(false);
       setSelectedRecipe(null);
     });
-  };
+  }, [sheetTranslateY, backdropOpacity, prepBadgeAnim]);
 
-  const handleSelectTime = (slot) => {
-    onTimeOfDayChange?.(slot);
-  };
-
-  const handleAllRecipes = () => {
-    setActiveFilter(null);
-  };
-
-  const loadMoreRecipes = useCallback(() => {
-    if (!hasMore) return;
-    setVisibleCount((prev) => Math.min(prev + LOAD_MORE_STEP, filteredRecipes.length));
-  }, [hasMore, filteredRecipes.length]);
-
-  const renderRecipeCard = useCallback(
-    ({ item }) => <RecipeCard recipe={item} onPress={openRecipe} />,
-    [openRecipe]
-  );
-
-  const keyExtractor = useCallback((item) => item.id, []);
-
-  const listFooter = useMemo(() => {
-    if (filteredRecipes.length === 0) return null;
-    return (
-      <View style={styles.listFooterWrap}>
-        {hasMore ? (
-          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMoreRecipes} activeOpacity={0.88}>
-            <Text style={styles.loadMoreText}>
-              Load more recipes ({filteredRecipes.length - visibleCount} remaining)
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.kitchenEndCap}>
-            <Text style={styles.kitchenEndCapText}>
-              You&apos;ve explored all {filteredRecipes.length} gentle recipes for this season.
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  }, [filteredRecipes.length, hasMore, loadMoreRecipes, visibleCount]);
-
-  const listEmpty = (
-    <View style={styles.emptyWrap}>
-      <Text style={styles.emptyFilterText}>
-        No {TIME_LABELS[activeTime]?.toLowerCase()} recipes match — try All Recipes or another filter.
-      </Text>
-    </View>
+  const renderItem = useCallback(
+    ({ item }) => <GridMealTile recipe={item} cellW={cellW} onPress={openRecipe} />,
+    [cellW, openRecipe]
   );
 
   return (
-    <>
-      <View style={styles.kitchenShell}>
-        {listHeaderPrefix}
+    <View style={styles.root}>
+      {listHeaderPrefix}
 
-        <View style={styles.kitchenContent}>
-          <View style={styles.introCard}>
-            <Text style={styles.introEyebrow}>PREMIUM NOURISHMENT</Text>
-            <Text style={styles.introTitle}>Mama's Kitchen</Text>
-            <Text style={styles.introSub}>
-              Real recipes, village warmth, and gentle filters for your season.
-            </Text>
+      <HybridKitchenHeader
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        filtersOpen={filtersOpen}
+        onToggleFilters={() => setFiltersOpen((v) => !v)}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        tabHighlightX={tabHighlightX}
+        tabSlotW={tabSlotW}
+        onTabTrackLayout={(e) => setTabTrackW(e.nativeEvent.layout.width)}
+      />
 
-            <View style={styles.timeRow}>
-              {['morning', 'afternoon', 'night'].map((slot) => (
-                <TouchableOpacity
-                  key={slot}
-                  style={[styles.timeBtn, activeTime === slot && styles.timeBtnActive]}
-                  onPress={() => handleSelectTime(slot)}
-                  activeOpacity={0.88}
-                >
-                  <Text style={[styles.timeBtnText, activeTime === slot && styles.timeBtnTextActive]}>
-                    {TIME_LABELS[slot]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+      <FlatList
+        key={`kitchen-grid-${columns}-${activeTab}-${activeFilter ?? 'all'}`}
+        data={gridData}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        numColumns={columns}
+        columnWrapperStyle={styles.gridRow}
+        style={styles.feed}
+        contentContainerStyle={styles.feedContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>No meals for this time</Text>
+            <Text style={styles.emptySub}>Try another tab or adjust filters.</Text>
           </View>
+        }
+        initialNumToRender={columns * 4}
+        maxToRenderPerBatch={columns * 3}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS !== 'web'}
+      />
 
-          <View style={styles.glassPanelHeader}>
-            <View style={styles.filterWrap}>
-              <TouchableOpacity
-                style={[styles.filterPill, !activeFilter && styles.filterPillActive]}
-                onPress={handleAllRecipes}
-                activeOpacity={0.88}
-              >
-                <Text style={[styles.filterPillText, !activeFilter && styles.filterPillTextActive]}>
-                  All Recipes
-                </Text>
-              </TouchableOpacity>
-              {KITCHEN_FILTERS.map((filter) => {
-                const active = activeFilter === filter.id;
-                return (
-                  <TouchableOpacity
-                    key={filter.id}
-                    style={[styles.filterPill, active && styles.filterPillActive]}
-                    onPress={() => setActiveFilter(active ? null : filter.id)}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                      {filter.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={styles.filterResultLine}>
-              Showing {Math.min(visibleCount, filteredRecipes.length)} of {filteredRecipes.length}{' '}
-              {TIME_LABELS[activeTime]?.toLowerCase() || 'village'} recipes
-              {activeFilterLabel ? ` · ${activeFilterLabel}` : ''}
-              {therapeuticTags?.length ? ' · therapeutic focus' : ''}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.mealScrollViewport}>
-          <FlatList
-            data={gridRecipes}
-            key={gridRecipes.length > 0 ? `grid-${activeTime}-${activeFilter}-${visibleCount}` : 'grid-empty'}
-            keyExtractor={keyExtractor}
-            numColumns={2}
-            renderItem={renderRecipeCard}
-            ListFooterComponent={listFooter}
-            ListEmptyComponent={listEmpty}
-            style={styles.kitchenList}
-            contentContainerStyle={styles.recipeListContent}
-            columnWrapperStyle={visibleRecipes.length > 0 ? styles.recipeRow : undefined}
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled
-            initialNumToRender={8}
-            maxToRenderPerBatch={8}
-            windowSize={7}
-            removeClippedSubviews={Platform.OS !== 'web'}
-            onEndReached={loadMoreRecipes}
-            onEndReachedThreshold={0.35}
-          />
-        </View>
-      </View>
-
-      <RecipeDetailSheet
+      <MealDetailSheet
         recipe={selectedRecipe}
         visible={sheetOpen}
         onClose={closeRecipe}
         sheetAnim={sheetTranslateY}
+        backdropAnim={backdropOpacity}
+        badgeAnim={prepBadgeAnim}
+        contentW={contentW}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  kitchenShell: {
+  root: {
     flex: 1,
     minHeight: 0,
     width: '100%',
     maxWidth: PHONE_MAX_W,
     alignSelf: 'center',
-    overflow: 'hidden',
   },
-  kitchenContent: {
-    width: '100%',
-    maxWidth: KITCHEN_CONTENT_W,
-    alignSelf: 'center',
-    paddingHorizontal: KITCHEN_H_PAD,
+  headerWrap: {
     flexShrink: 0,
-  },
-  mealScrollViewport: {
-    flex: 1,
-    minHeight: 0,
-    width: '100%',
-    maxWidth: KITCHEN_CONTENT_W,
-    alignSelf: 'center',
-    marginTop: 0,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: THEME.glassBorder,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    backgroundColor: THEME.glass,
-    overflow: 'hidden',
+    zIndex: 30,
+    paddingHorizontal: H_PAD,
+    paddingTop: 8,
+    paddingBottom: 6,
     ...Platform.select({
-      web: {
-        maxHeight: '65vh',
-        overflowY: 'hidden',
-      },
-      default: {
-        maxHeight: MEAL_VIEWPORT_MAX_H,
-      },
-    }),
-  },
-  kitchenList: {
-    flex: 1,
-    minHeight: 0,
-    width: '100%',
-    ...Platform.select({
-      web: {
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-      },
+      web: { position: 'sticky', top: 0 },
       default: {},
     }),
   },
-  recipeListContent: {
-    paddingTop: 12,
-    paddingBottom: 16,
-    flexGrow: 0,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  listFooterWrap: {
-    width: '100%',
-    paddingHorizontal: KITCHEN_H_PAD,
-    paddingBottom: 8,
-  },
-  introCard: {
-    backgroundColor: 'rgba(255, 252, 248, 0.52)',
-    borderRadius: 18,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(186, 198, 188, 0.48)',
-    marginBottom: 12,
-    marginTop: 4,
-    ...Platform.select({
-      web: { boxShadow: '0 10px 26px rgba(92, 122, 104, 0.08)' },
-      default: { elevation: 3 },
-    }),
-  },
-  introEyebrow: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    color: THEME.sage,
-  },
-  introTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#2A382E',
-    marginTop: 6,
-    ...Platform.select({
-      web: { fontFamily: 'Georgia, "Palatino Linotype", serif', fontStyle: 'italic' },
-    }),
-  },
-  introSub: {
-    fontSize: 11,
-    color: '#4A5C50',
-    marginTop: 6,
-    lineHeight: 16,
-    fontStyle: 'italic',
-  },
-  timeRow: {
+  glassCapsule: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  timeBtn: {
-    flex: 1,
-    minWidth: 88,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(232, 218, 244, 0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(154, 122, 184, 0.28)',
     alignItems: 'center',
-  },
-  timeBtnActive: {
-    backgroundColor: THEME.sage,
-    borderColor: THEME.sage,
-  },
-  timeBtnText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#5E4878',
-  },
-  timeBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  glassPanelHeader: {
-    width: '100%',
-    alignSelf: 'center',
     backgroundColor: THEME.glass,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 999,
     borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: THEME.glassBorder,
-    overflow: 'hidden',
-    marginBottom: 0,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    paddingVertical: 4,
+    paddingLeft: 4,
+    paddingRight: 6,
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-        boxShadow: '0 8px 28px rgba(60, 80, 68, 0.1)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 4px 24px rgba(60, 80, 68, 0.1)',
       },
       default: {
         shadowColor: '#3C5044',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
         shadowRadius: 10,
         elevation: 4,
       },
     }),
   },
-  filterWrap: {
+  tabTrack: {
+    flex: 1,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
-    ...Platform.select({
-      web: { rowGap: 8, columnGap: 8 },
-      default: {},
-    }),
+    position: 'relative',
+    minHeight: 44,
   },
-  filterPill: {
-    paddingVertical: 8,
+  tabHighlight: {
+    position: 'absolute',
+    top: 2,
+    bottom: 2,
+    left: 0,
+    borderRadius: 999,
+    backgroundColor: THEME.goldSoft,
+    borderWidth: 1,
+    borderColor: THEME.goldGlow,
+  },
+  tabSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    zIndex: 1,
+  },
+  tabSublabel: {
+    marginTop: 3,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    color: 'rgba(92, 122, 104, 0.55)',
+    textTransform: 'uppercase',
+  },
+  tabSublabelActive: {
+    color: THEME.ink,
+  },
+  filtersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(92, 122, 104, 0.12)',
+    marginLeft: 4,
+  },
+  filtersBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.inkSoft,
+    letterSpacing: 0.2,
+  },
+  filtersDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: THEME.gold,
+    marginLeft: 4,
+  },
+  filterPanel: {
+    marginTop: 8,
+    maxHeight: 44,
+  },
+  filterPanelContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: H_PAD,
+  },
+  filterChip: {
+    paddingVertical: 7,
     paddingHorizontal: 14,
     borderRadius: 999,
-    backgroundColor: 'rgba(232, 218, 244, 0.55)',
+    backgroundColor: 'rgba(255,255,255,0.85)',
     borderWidth: 1,
-    borderColor: 'rgba(154, 122, 184, 0.28)',
+    borderColor: 'rgba(92, 122, 104, 0.14)',
+    marginRight: 8,
   },
-  filterPillActive: {
+  filterChipActive: {
     backgroundColor: THEME.sage,
     borderColor: THEME.sage,
   },
-  filterPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#5E4878',
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.inkSoft,
   },
-  filterPillTextActive: {
+  filterChipTextActive: {
     color: '#FFFFFF',
   },
-  filterResultLine: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#5C6E63',
-    fontStyle: 'italic',
-    paddingHorizontal: 14,
-    paddingBottom: 10,
-    textAlign: 'center',
+  feed: {
+    flex: 1,
+    minHeight: 0,
   },
-  recipeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    alignSelf: 'center',
-    width: '100%',
-    paddingHorizontal: KITCHEN_H_PAD,
-    paddingBottom: 12,
-    gap: KITCHEN_CARD_GAP,
-    ...Platform.select({
-      web: { rowGap: KITCHEN_CARD_GAP, columnGap: KITCHEN_CARD_GAP },
-      default: {},
-    }),
+  feedContent: {
+    paddingHorizontal: H_PAD,
+    paddingTop: 10,
+    paddingBottom: 28,
+    flexGrow: 1,
   },
-  recipeCardPad: {
-    width: CARD_W,
-    maxWidth: CARD_W,
-    height: 1,
-    opacity: 0,
+  gridRow: {
+    justifyContent: 'space-between',
+    marginBottom: GRID_GAP,
   },
-  recipeCard: {
-    width: CARD_W,
-    maxWidth: CARD_W,
-    flexGrow: 0,
-    flexShrink: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+  gridTile: {
+    alignItems: 'center',
+  },
+  gridImageWrap: {
     borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(186, 198, 188, 0.35)',
+    backgroundColor: 'rgba(92, 122, 104, 0.06)',
     ...Platform.select({
-      web: { boxShadow: '0 4px 14px rgba(80, 100, 88, 0.08)' },
+      web: { boxShadow: '0 3px 14px rgba(50, 70, 58, 0.1)' },
       default: { elevation: 2 },
     }),
   },
-  recipeImage: {
+  gridImage: {
     width: '100%',
-    height: 96,
-    backgroundColor: THEME.lavender,
+    height: '100%',
+  },
+  gridLabel: {
+    marginTop: 7,
+    fontSize: 11,
+    fontWeight: '600',
+    color: THEME.ink,
+    textAlign: 'center',
+    lineHeight: 14,
+    width: '100%',
   },
   imageFallback: {
-    width: '100%',
-    height: 96,
-    backgroundColor: 'rgba(232, 218, 244, 0.55)',
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  imageFallbackEmoji: {
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  imageFallbackLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#6B5588',
-    letterSpacing: 0.3,
-  },
-  recipeCardBody: {
-    padding: 10,
-  },
-  recipeTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#2A382E',
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  recipeSub: {
-    fontSize: 10,
-    color: '#5C6E63',
-    lineHeight: 14,
-    fontStyle: 'italic',
-    marginBottom: 6,
-  },
-  recipeMeta: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: THEME.sage,
-  },
-  loadMoreBtn: {
-    marginTop: 4,
-    marginBottom: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(92, 122, 104, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(92, 122, 104, 0.28)',
-    alignItems: 'center',
-  },
-  loadMoreText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: THEME.sage,
-  },
-  emptyWrap: {
-    alignSelf: 'center',
-    width: '100%',
-    paddingHorizontal: 12,
-    paddingVertical: 24,
-    marginBottom: 12,
-  },
-  emptyFilterText: {
-    width: '100%',
-    textAlign: 'center',
-    fontSize: 12,
-    color: '#5C6E63',
-    fontStyle: 'italic',
-  },
-  kitchenEndCap: {
-    marginTop: 4,
-    marginBottom: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 14,
     backgroundColor: 'rgba(232, 218, 244, 0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(154, 122, 184, 0.22)',
+  },
+  imageFallbackEmoji: { fontSize: 24 },
+  empty: {
+    paddingVertical: 48,
     alignItems: 'center',
   },
-  kitchenEndCapText: {
-    fontSize: 11,
-    lineHeight: 17,
-    fontWeight: '600',
-    color: '#5C6E63',
-    fontStyle: 'italic',
-    textAlign: 'center',
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: THEME.ink,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: THEME.inkSoft,
+    marginTop: 4,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   sheetBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(36, 48, 40, 0.45)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(16, 22, 19, 0.58)',
+    ...Platform.select({
+      web: { backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' },
+      default: {},
+    }),
   },
   sheetPanel: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    maxHeight: '78%',
-    backgroundColor: 'rgba(255, 252, 250, 0.98)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(186, 198, 188, 0.4)',
-    paddingBottom: Platform.OS === 'ios' ? 16 : 10,
+    maxHeight: '92%',
+    backgroundColor: THEME.cream,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    overflow: 'hidden',
   },
   sheetHandle: {
-    width: 44,
+    width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(154, 122, 184, 0.45)',
+    backgroundColor: 'rgba(92, 122, 104, 0.22)',
     alignSelf: 'center',
     marginTop: 10,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  sheetScrollContent: {
-    paddingHorizontal: 18,
+  sheetScroll: {
+    paddingHorizontal: H_PAD,
     paddingBottom: 12,
   },
-  sheetHeroImage: {
+  sheetHero: {
     width: '100%',
-    height: 160,
-    borderRadius: 14,
-    marginBottom: 12,
-    backgroundColor: THEME.lavender,
+    height: 196,
+    borderRadius: 18,
+    backgroundColor: 'rgba(92, 122, 104, 0.08)',
+    marginBottom: 14,
+  },
+  sheetTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 18,
   },
   sheetTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#2A382E',
-    lineHeight: 24,
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '700',
+    color: THEME.ink,
+    lineHeight: 28,
+    marginRight: 10,
     ...Platform.select({
       web: { fontFamily: 'Georgia, "Palatino Linotype", serif' },
     }),
   },
-  sheetSub: {
-    fontSize: 12,
-    color: '#5C6E63',
-    lineHeight: 18,
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  sheetMeta: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: THEME.sage,
-    marginTop: 8,
-    marginBottom: 14,
-  },
-  sheetOrderRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  sheetAmazonBtn: {
-    flex: 1,
+  prepBadge: {
     backgroundColor: THEME.sage,
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    marginTop: 2,
   },
-  sheetInstacartBtn: {
-    flex: 1,
-    backgroundColor: '#6B5588',
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  sheetOrderBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  sheetSectionLabel: {
+  prepBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
-    color: '#6B5588',
-    marginBottom: 8,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
-  sheetSectionSpaced: {
-    marginTop: 14,
+  contentZone: {
+    gap: 16,
   },
-  sheetBulletRow: {
+  contentZoneRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 6,
   },
-  sheetBulletDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: THEME.sage,
-    marginTop: 6,
+  contentCol: {
+    flex: 1,
+  },
+  contentColHalf: {
+    flex: 1,
     marginRight: 8,
   },
-  sheetBulletText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#3D5246',
+  zoneLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: THEME.sage,
+    marginBottom: 8,
   },
-  sheetStepRow: {
+  zoneCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(92, 122, 104, 0.08)',
+  },
+  checkRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 10,
   },
-  sheetStepNum: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: THEME.sageLight,
-    borderWidth: 1,
+  checkBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
     borderColor: 'rgba(92, 122, 104, 0.35)',
+    marginTop: 1,
+    marginRight: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    marginTop: 1,
+    backgroundColor: 'rgba(92, 122, 104, 0.06)',
   },
-  sheetStepNumText: {
+  checkBoxDone: {
+    backgroundColor: THEME.sage,
+    borderColor: THEME.sage,
+  },
+  checkMark: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  checkText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: THEME.ink,
+  },
+  checkTextDone: {
+    color: THEME.inkSoft,
+    textDecorationLine: 'line-through',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  stepTimeline: {
+    width: 16,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  stepDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: THEME.gold,
+    borderWidth: 2,
+    borderColor: THEME.goldSoft,
+  },
+  stepLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: 'rgba(196, 165, 116, 0.35)',
+    marginVertical: 4,
+    minHeight: 20,
+  },
+  stepBody: {
+    flex: 1,
+  },
+  stepNum: {
     fontSize: 10,
     fontWeight: '800',
-    color: THEME.sage,
+    color: THEME.gold,
+    letterSpacing: 0.5,
+    marginBottom: 3,
+    textTransform: 'uppercase',
   },
-  sheetStepText: {
+  stepText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: THEME.ink,
+  },
+  sheetFooter: {
+    paddingHorizontal: H_PAD,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(92, 122, 104, 0.12)',
+    backgroundColor: THEME.cream,
+  },
+  footerHeading: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.inkSoft,
+    marginBottom: 10,
+    letterSpacing: 0.3,
+  },
+  footerBtns: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  shopBtnInstacart: {
     flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#3D5246',
-  },
-  sheetCloseBtn: {
-    marginHorizontal: 18,
-    marginTop: 4,
-    backgroundColor: 'rgba(232, 218, 244, 0.65)',
-    borderRadius: 12,
-    paddingVertical: 11,
+    backgroundColor: THEME.instacart,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(154, 122, 184, 0.3)',
+    marginRight: 6,
   },
-  sheetCloseBtnText: {
+  shopBtnAmazon: {
+    flex: 1,
+    backgroundColor: THEME.amazon,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  shopBtnCaption: {
+    marginTop: 6,
     fontSize: 12,
     fontWeight: '700',
-    color: '#5E4878',
+    color: '#FFFFFF',
+  },
+  logoInstacart: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  logoInstacartText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#008000',
+    letterSpacing: -0.3,
+  },
+  logoAmazonRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  logoAmazonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  logoAmazonFresh: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.amazonSmile,
+    marginLeft: 3,
+    fontStyle: 'italic',
   },
 });

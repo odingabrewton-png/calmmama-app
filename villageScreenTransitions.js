@@ -11,33 +11,34 @@ export const VILLAGE_TAB_TRANSITION_EASING = Easing.out(Easing.cubic);
 export function getVillageTabFlowStyle(flowAnim) {
   return {
     opacity: flowAnim.interpolate({
-      inputRange: [0, 0.32, 1],
-      outputRange: [0, 0.58, 1],
+      inputRange: [0, 0.4, 1],
+      outputRange: [0, 0.72, 1],
     }),
     transform: [
       {
         translateY: flowAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [18, 0],
+          outputRange: [10, 0],
         }),
       },
       {
         scale: flowAnim.interpolate({
-          inputRange: [0, 0.55, 1],
-          outputRange: [0.962, 1.024, 1],
+          inputRange: [0, 1],
+          outputRange: [0.985, 1],
         }),
       },
     ],
   };
 }
 
+/** Fade-in only — used when journey/onboarding context changes without a tab press */
 export function animateVillageTabFlow(flowAnim, flowReadyRef) {
-  configureVillageLayoutTransition();
   if (!flowReadyRef.current) {
     flowReadyRef.current = true;
     flowAnim.setValue(1);
     return;
   }
+  flowAnim.stopAnimation();
   flowAnim.setValue(0);
   Animated.timing(flowAnim, {
     toValue: 1,
@@ -45,6 +46,34 @@ export function animateVillageTabFlow(flowAnim, flowReadyRef) {
     easing: VILLAGE_TAB_TRANSITION_EASING,
     useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
   }).start();
+}
+
+/** Two-phase tab switch: fade out → swap content → fade in (native-driver only, no LayoutAnimation) */
+export function runVillageTabTransition(flowAnim, flowReadyRef, swapTab) {
+  if (!flowReadyRef.current) {
+    flowReadyRef.current = true;
+    flowAnim.setValue(1);
+    swapTab?.();
+    return;
+  }
+
+  flowAnim.stopAnimation();
+  Animated.timing(flowAnim, {
+    toValue: 0,
+    duration: Math.round(VILLAGE_TAB_TRANSITION_MS * 0.34),
+    easing: Easing.in(Easing.cubic),
+    useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
+  }).start(({ finished }) => {
+    if (!finished) return;
+    swapTab?.();
+    flowAnim.setValue(0);
+    Animated.timing(flowAnim, {
+      toValue: 1,
+      duration: VILLAGE_TAB_TRANSITION_MS,
+      easing: VILLAGE_TAB_TRANSITION_EASING,
+      useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
+    }).start();
+  });
 }
 
 /** Smooth layout reflow — call right before state changes that show/hide panels */

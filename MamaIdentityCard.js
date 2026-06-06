@@ -30,10 +30,18 @@ const PROFILE_SERIF = Platform.select({
 });
 
 const DISCOVERY_FIELDS = [
-  { id: 'preoccupation', emoji: '📺', label: 'Preoccupation', tag: 'Comfort watch' },
-  { id: 'lateNightReads', emoji: '📚', label: 'Late-night reads', tag: 'Nightstand stack' },
-  { id: 'pastime', emoji: '🎨', label: 'Favorite pastime', tag: 'Gentle joy' },
-  { id: 'heartSpace', emoji: '✨', label: 'Heart-space', tag: 'Mama mantra' },
+  {
+    id: 'heartSpace',
+    emoji: '☕',
+    label: 'How are you truly filling your cup today, mama?',
+    placeholder: 'Rest, nourishment, joy — what’s refilling you right now?',
+  },
+  {
+    id: 'centerRitual',
+    emoji: '🕯️',
+    label: 'What small ritual brings you back to your center when things get chaotic?',
+    placeholder: 'A breath, a song, a warm shower — your reset button…',
+  },
 ];
 
 function getJourneyTrackLabel(userJourney, weeksPregnant) {
@@ -45,34 +53,17 @@ function getJourneyTrackLabel(userJourney, weeksPregnant) {
   return 'First trimester';
 }
 
-function PathPill({ label, value }) {
-  return (
-    <View style={styles.pathPill}>
-      <Text style={styles.pathPillLabel}>{label}</Text>
-      <Text style={[styles.pathPillValue, retroSoft]} numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 function DiscoveryInputBox({ field, value, onChange, onSave, saved }) {
   return (
-    <View style={[styles.discoveryInputBox, saved && styles.discoveryInputBoxSaved]}>
-      <View style={styles.discoveryInputHeader}>
-        <Text style={styles.discoveryInputEmoji}>{field.emoji}</Text>
-        <View style={styles.discoveryInputCopy}>
-          <Text style={[styles.discoveryInputTitle, retroAccent]}>{field.label}</Text>
-          <Text style={styles.discoveryInputTag}>{field.tag}</Text>
-        </View>
-      </View>
+    <View style={[styles.discoveryBlock, saved && styles.discoveryBlockSaved]}>
+      <Text style={[styles.discoveryQuestion, PROFILE_SERIF]}>{field.label}</Text>
       <TextInput
         style={[styles.discoveryInput, retroSoft]}
         value={value}
         onChangeText={onChange}
         multiline
-        placeholder={`Tell us about your ${field.label.toLowerCase()}…`}
-        placeholderTextColor="#8A9E92"
+        placeholder={field.placeholder}
+        placeholderTextColor="rgba(92, 110, 99, 0.55)"
         textAlignVertical="top"
       />
       <TouchableOpacity
@@ -280,22 +271,20 @@ export default function MamaIdentityCard({
 
         <BirthdayField birthday={mamaBirthday} onBirthdayChange={onBirthdayChange} />
 
-        <View style={styles.pathPillRow}>
-          <PathPill label={timelineLabel} value={timelineValue} />
-          <PathPill label="Village" value={approximateCity} />
-        </View>
-        <View style={styles.pathPillRow}>
-          <PathPill
-            label="Season"
-            value={userJourney === 'pregnant' ? `Week ${weeksPregnant}` : 'Postpartum'}
-          />
+        <View style={styles.metaStrip}>
+          <Text style={styles.metaStripText}>
+            {timelineLabel}: {timelineValue}
+          </Text>
+          <Text style={styles.metaStripDot}>·</Text>
+          <Text style={styles.metaStripText}>{approximateCity}</Text>
+          <Text style={styles.metaStripDot}>·</Text>
+          <Text style={styles.metaStripText}>
+            {userJourney === 'pregnant' ? `Week ${weeksPregnant}` : 'Postpartum'}
+          </Text>
         </View>
 
         <View style={styles.getToKnowSection}>
           <Text style={[styles.getToKnowTitle, PROFILE_SERIF]}>Get to Know Mama</Text>
-          <Text style={[styles.getToKnowSub, retroSoft]}>
-            Type your story — each box saves softly to your village profile.
-          </Text>
           {DISCOVERY_FIELDS.map((field) => (
             <DiscoveryInputBox
               key={field.id}
@@ -387,37 +376,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   identityCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
-    borderRadius: 22,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.48)',
-    marginBottom: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 24,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    marginBottom: 20,
     alignItems: 'center',
-    ...Platform.select({
-      web: { boxShadow: '0 10px 28px rgba(42, 56, 46, 0.1)' },
-      default: {
-        shadowColor: '#2A382E',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.1,
-        shadowRadius: 14,
-        elevation: 4,
-      },
-    }),
   },
   avatarRing: {
-    padding: 4,
-    borderRadius: AVATAR_SIZE / 2 + 6,
-    borderWidth: 2,
-    borderColor: 'rgba(163, 83, 56, 0.35)',
-    marginBottom: 4,
+    padding: 3,
+    borderRadius: AVATAR_SIZE / 2 + 4,
+    marginBottom: 6,
     position: 'relative',
   },
   avatarCircle: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -468,42 +444,32 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontStyle: 'italic',
   },
-  pathPillRow: {
+  metaStrip: {
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
     width: '100%',
-    marginBottom: 8,
-  },
-  pathPill: {
-    flex: 1,
-    backgroundColor: 'rgba(232, 218, 244, 0.45)',
-    borderRadius: 14,
+    marginBottom: 20,
     paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(154, 122, 184, 0.22)',
+    gap: 6,
   },
-  pathPillLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    color: '#6B5588',
-    textTransform: 'uppercase',
-    marginBottom: 3,
-  },
-  pathPillValue: {
+  metaStripText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2A382E',
+    color: 'rgba(42, 56, 46, 0.72)',
+    letterSpacing: 0.2,
+  },
+  metaStripDot: {
+    fontSize: 11,
+    color: 'rgba(92, 122, 104, 0.45)',
   },
   birthdayField: {
     width: '100%',
-    backgroundColor: 'rgba(232, 218, 244, 0.38)',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(154, 122, 184, 0.28)',
-    marginBottom: 10,
+    padding: 14,
+    marginBottom: 16,
   },
   birthdayHeaderRow: {
     flexDirection: 'row',
@@ -626,75 +592,40 @@ const styles = StyleSheet.create({
   },
   getToKnowSection: {
     width: '100%',
-    marginTop: 12,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(186, 198, 188, 0.35)',
+    marginTop: 4,
+    paddingTop: 20,
   },
   getToKnowTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     fontStyle: 'italic',
     color: '#2A382E',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 18,
   },
-  getToKnowSub: {
-    fontSize: 10,
-    color: '#5C6E63',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginBottom: 12,
-    lineHeight: 15,
-  },
-  discoveryInputBox: {
+  discoveryBlock: {
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
-    borderRadius: 16,
-    padding: 12,
+    marginBottom: 22,
+  },
+  discoveryBlockSaved: {},
+  discoveryQuestion: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2A382E',
+    lineHeight: 21,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(186, 198, 188, 0.4)',
-  },
-  discoveryInputBoxSaved: {
-    borderColor: 'rgba(92, 122, 104, 0.45)',
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
-  },
-  discoveryInputHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  discoveryInputEmoji: {
-    fontSize: 18,
-  },
-  discoveryInputCopy: {
-    flex: 1,
-  },
-  discoveryInputTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#1F2E24',
-  },
-  discoveryInputTag: {
-    fontSize: 9,
-    color: '#6B5588',
-    marginTop: 2,
-    fontStyle: 'italic',
+    textAlign: 'center',
   },
   discoveryInput: {
-    minHeight: 64,
-    maxHeight: 100,
-    fontSize: 12,
-    lineHeight: 18,
+    minHeight: 72,
+    maxHeight: 120,
+    fontSize: 14,
+    lineHeight: 21,
     color: '#2A382E',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(186, 198, 188, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 8,
   },
   discoverySaveBtn: {
@@ -717,17 +648,11 @@ const styles = StyleSheet.create({
     color: '#2A382E',
   },
   findVillageCard: {
-    backgroundColor: 'rgba(210, 190, 225, 0.38)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 116, 168, 0.32)',
+    padding: 20,
     alignItems: 'center',
-    marginBottom: 10,
-    ...Platform.select({
-      web: { boxShadow: '0 8px 22px rgba(139, 116, 168, 0.14)' },
-      default: { elevation: 3 },
-    }),
+    marginBottom: 14,
   },
   findVillageEmoji: {
     fontSize: 28,
@@ -754,17 +679,11 @@ const styles = StyleSheet.create({
     color: '#6B5588',
   },
   candleSanctumCard: {
-    backgroundColor: 'rgba(233, 168, 137, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(233, 168, 137, 0.38)',
+    padding: 20,
     alignItems: 'center',
-    marginBottom: 10,
-    ...Platform.select({
-      web: { boxShadow: '0 8px 22px rgba(233, 168, 137, 0.14)' },
-      default: { elevation: 3 },
-    }),
+    marginBottom: 14,
   },
   candleSanctumEyebrow: {
     fontSize: 9,

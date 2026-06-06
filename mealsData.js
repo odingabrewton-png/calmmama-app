@@ -5,9 +5,10 @@ import { assignKitchenImages } from './kitchenMealImages';
 
 export const KITCHEN_FILTERS = [
   { id: 'vegetarian', label: 'Vegetarian' },
-  { id: 'peanut-free', label: 'Peanut-Free' },
+  { id: 'vegan', label: 'Vegan' },
   { id: 'gluten-free', label: 'Gluten-Free' },
   { id: 'dairy-free', label: 'Dairy-Free' },
+  { id: 'peanut-free', label: 'Peanut-Free' },
   { id: 'shellfish-free', label: 'Shellfish-Free' },
 ];
 

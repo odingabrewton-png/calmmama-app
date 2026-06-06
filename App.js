@@ -31,7 +31,7 @@ import MamaIdentityCard from './MamaIdentityCard';
 import MamasKitchenScreen from './MamasKitchenScreen';
 import BirthdayBoutiqueModal from './BirthdayBoutiqueModal';
 import { isBirthdayToday } from './mamaBirthdayUtils';
-import { getDefaultKitchenTimeOfDay, MAMA_KITCHEN_RECIPES } from './mealsData';
+import { MAMA_KITCHEN_RECIPES } from './mealsData';
 import {
   collectTherapeuticTagsFromSymptoms,
   collectTherapeuticTagsFromVibes,
@@ -43,6 +43,7 @@ import {
   animateVillageTabFlow,
   configureVillageLayoutTransition,
   getVillageTabFlowStyle,
+  runVillageTabTransition,
   useVillagePressTransition,
 } from './villageScreenTransitions';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
@@ -543,14 +544,10 @@ function VillageCandleSanctumLayer({
 }
 
 const DEFAULT_MAMA_DISCOVERY = {
-  preoccupation:
-    'Comfort rewatches and nature documentaries — the gentle shows keeping me company during long nights.',
-  lateNightReads:
-    'Poetry, birth stories, and illustrated essays stacked on my nightstand for when sleep won’t come.',
-  pastime:
-    'Watercolor journaling, slow neighborhood walks, and baking banana bread when energy allows.',
   heartSpace:
-    'Learning to rest without guilt. My mantra: “Small, soft steps still move mountains.”',
+    'Slow mornings with honey tea, a chapter of fiction, and permission to nap without guilt.',
+  centerRitual:
+    'Three deep belly breaths at the kitchen window, then one song that always makes me feel held.',
 };
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -1466,8 +1463,6 @@ function renderMainTabContent({
   onToggleRegistryNotes,
   onOpenCandleSanctum,
   onAddToCart,
-  kitchenTimeOfDay,
-  onKitchenTimeOfDayChange,
   kitchenTherapeuticTags,
   onOpenKitchenTab,
   onSaveDiscoveryField,
@@ -1760,8 +1755,6 @@ function renderMainTabContent({
   if (activeTab === 'kitchen') {
     return (
       <MamasKitchenScreen
-        timeOfDay={kitchenTimeOfDay}
-        onTimeOfDayChange={onKitchenTimeOfDayChange}
         therapeuticTags={kitchenTherapeuticTags}
         listHeaderPrefix={kitchenListHeaderPrefix}
       />
@@ -2230,7 +2223,6 @@ export default function App() {
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [userJourney, setUserJourney] = useState('pregnant'); // 'pregnant' or 'postpartum'
   const [activeTab, setActiveTab] = useState('home');
-  const [kitchenTimeOfDay, setKitchenTimeOfDay] = useState(getDefaultKitchenTimeOfDay);
   const [inSoulSanctuary, setInSoulSanctuary] = useState(false);
   
   // USER FIELDS
@@ -2492,22 +2484,20 @@ export default function App() {
     }).start();
   }, [isOnboarded, shellEnterAnim]);
 
-  // Tab / journey panels — shared cross-fade + scale pop (see villageScreenTransitions)
+  // Journey / onboarding context — fade-in only (tab presses use runVillageTabTransition)
   useEffect(() => {
     if (!isOnboarded) return;
     animateVillageTabFlow(flowAnim, flowReady);
-  }, [activeTab, userJourney, isOnboarded, flowAnim]);
+  }, [userJourney, isOnboarded, flowAnim]);
 
   const runTabTransition = useCallback(
     (nextTab) => {
       if (nextTab === activeTab) return;
-      configureVillageLayoutTransition();
-      setInSoulSanctuary(false);
-      setInVillagePortal(false);
-      if (flowReady.current) {
-        flowAnim.setValue(0);
-      }
-      setActiveTab(nextTab);
+      runVillageTabTransition(flowAnim, flowReady, () => {
+        setInSoulSanctuary(false);
+        setInVillagePortal(false);
+        setActiveTab(nextTab);
+      });
     },
     [activeTab, flowAnim]
   );
@@ -3540,8 +3530,6 @@ export default function App() {
     onToggleRegistryNotes: handleToggleRegistryNotes,
     onOpenCandleSanctum: handleOpenCandleSanctum,
     onAddToCart: handleAddToCart,
-    kitchenTimeOfDay,
-    onKitchenTimeOfDayChange: setKitchenTimeOfDay,
     kitchenTherapeuticTags,
     onOpenKitchenTab: handleOpenKitchenTab,
     onSaveDiscoveryField: handleSaveDiscoveryField,
@@ -3590,38 +3578,35 @@ export default function App() {
                 selectedVillageMamaId={selectedVillageMamaId}
                 onSelectVillageMama={setSelectedVillageMamaId}
               />
-            ) : activeTab === 'kitchen' ? (
-              <View style={styles.kitchenTabShell}>
+            ) : (
+              <View style={styles.mainShell}>
                 <Animated.View
                   style={[
-                    styles.kitchenTabBody,
+                    styles.mainShellBody,
                     { opacity: shellOpacity, transform: [{ translateY: shellLift }] },
                   ]}
                 >
-                  <FlowPanel anim={flowAnim} embedded={false}>
-                    {renderMainTabContent(mainTabContentProps)}
-                  </FlowPanel>
+                  {activeTab === 'kitchen' ? (
+                    <FlowPanel anim={flowAnim} embedded={false}>
+                      {renderMainTabContent(mainTabContentProps)}
+                    </FlowPanel>
+                  ) : (
+                    <ScrollView
+                      style={styles.mainScroll}
+                      contentContainerStyle={styles.mainScrollContent}
+                      showsVerticalScrollIndicator={false}
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      {showSplitAppHeader
+                        ? renderSplitAppHeader(activeTab, pulseAnim, userJourney)
+                        : null}
+                      <FlowPanel anim={flowAnim} embedded>
+                        {renderMainTabContent(mainTabContentProps)}
+                      </FlowPanel>
+                    </ScrollView>
+                  )}
                 </Animated.View>
               </View>
-            ) : (
-              <ScrollView
-              style={styles.mainScroll}
-              contentContainerStyle={styles.mainScrollContent}
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-            >
-              <Animated.View
-                style={{ opacity: shellOpacity, transform: [{ translateY: shellLift }] }}
-              >
-                {showSplitAppHeader
-                  ? renderSplitAppHeader(activeTab, pulseAnim, userJourney)
-                  : null}
-
-                <FlowPanel anim={flowAnim} embedded>
-                  {renderMainTabContent(mainTabContentProps)}
-                </FlowPanel>
-              </Animated.View>
-            </ScrollView>
             )}
 
             {(activeTab === 'home' || activeTab === 'profile' || candleSanctumOpen) && !inVillagePortal ? (
@@ -3912,7 +3897,7 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
-  kitchenTabShell: {
+  mainShell: {
     flex: 1,
     minHeight: 0,
     backgroundColor: 'transparent',
@@ -3923,7 +3908,7 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
-  kitchenTabBody: {
+  mainShellBody: {
     flex: 1,
     minHeight: 0,
     backgroundColor: 'transparent',
