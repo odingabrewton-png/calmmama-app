@@ -10,7 +10,6 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
-import VillageBrandHeader from './VillageBrandHeader';
 import { injectNurseryWebFonts, retroSoft, retroAccent, retroHubTitle } from './nurseryRetroFonts';
 import {
   getBirthdayProfileSummary,
@@ -175,8 +174,6 @@ function BirthdayField({ birthday, onBirthdayChange }) {
 }
 
 export default function MamaIdentityCard({
-  logoUri,
-  pulseAnim,
   mamaName,
   mamaBirthday,
   onBirthdayChange,
@@ -233,18 +230,6 @@ export default function MamaIdentityCard({
 
   return (
     <View style={styles.root}>
-      <View style={styles.profileLogoHeader}>
-        <VillageBrandHeader
-          logoUri={logoUri}
-          pulseAnim={pulseAnim}
-          variant="sanctuary"
-          sanctuaryMode
-          compact
-          profileMode
-          notchSafe
-        />
-      </View>
-
       <View style={styles.identityCard}>
         <TouchableOpacity
           style={styles.avatarRing}
@@ -369,11 +354,6 @@ export default function MamaIdentityCard({
 const styles = StyleSheet.create({
   root: {
     paddingBottom: 8,
-  },
-  profileLogoHeader: {
-    paddingTop: 8,
-    marginBottom: 8,
-    backgroundColor: 'transparent',
   },
   identityCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.18)',

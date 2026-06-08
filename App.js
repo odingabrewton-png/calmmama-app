@@ -1352,35 +1352,17 @@ function RegistryNestListItem({ item, registryVouches, expandedRegistryNotes, on
   );
 }
 
-function getShowSplitAppHeader(activeTab, inSoulSanctuary, userJourney) {
-  return (
-    !(activeTab === 'sanctuary' && inSoulSanctuary) &&
-    activeTab !== 'profile' &&
-    (activeTab !== 'nursery' || userJourney === 'postpartum')
-  );
+function getShowSplitAppHeader(activeTab, inSoulSanctuary) {
+  return !(activeTab === 'sanctuary' && inSoulSanctuary);
 }
 
-function renderSplitAppHeader(activeTab, pulseAnim, userJourney) {
-  const useOfficialLogo =
-    activeTab === 'home' ||
-    (activeTab === 'nursery' && userJourney === 'postpartum');
-
-  if (useOfficialLogo) {
-    return (
-      <VillageBrandHeader
-        logoUri={CALMMAMA_OFFICIAL_LOGO}
-        pulseAnim={pulseAnim}
-        variant="sanctuary"
-        sanctuaryMode
-        notchSafe
-      />
-    );
-  }
+function renderSplitAppHeader(pulseAnim) {
   return (
     <VillageBrandHeader
-      logoUri={CALMMAMA_VILLAGE_BADGE}
+      logoUri={CALMMAMA_OFFICIAL_LOGO}
       pulseAnim={pulseAnim}
-      variant="badge"
+      variant="sanctuary"
+      sanctuaryMode
       notchSafe
     />
   );
@@ -1765,8 +1747,6 @@ function renderMainTabContent({
     return (
       <View style={panelStyle}>
         <MamaIdentityCard
-          logoUri={CALMMAMA_OFFICIAL_LOGO}
-          pulseAnim={pulseAnim}
           mamaName={mamaName}
           mamaBirthday={mamaBirthday}
           onBirthdayChange={onBirthdayChange}
@@ -2335,7 +2315,7 @@ export default function App() {
   const communityPostIdRef = useRef(10);
   const basketListingIdRef = useRef(10);
 
-  const showSplitAppHeader = getShowSplitAppHeader(activeTab, inSoulSanctuary, userJourney);
+  const showSplitAppHeader = getShowSplitAppHeader(activeTab, inSoulSanctuary);
   const isMobileWeb = useMobileWebLayout();
   const webWrapperStyle = getWebWrapperStyle();
   const iphoneFrameStyle = getIphoneFrameStyle(isMobileWeb);
@@ -3534,7 +3514,7 @@ export default function App() {
     onOpenKitchenTab: handleOpenKitchenTab,
     onSaveDiscoveryField: handleSaveDiscoveryField,
     kitchenListHeaderPrefix: showSplitAppHeader
-      ? renderSplitAppHeader(activeTab, pulseAnim, userJourney)
+      ? renderSplitAppHeader(pulseAnim)
       : null,
   };
 
@@ -3598,7 +3578,7 @@ export default function App() {
                       showsHorizontalScrollIndicator={false}
                     >
                       {showSplitAppHeader
-                        ? renderSplitAppHeader(activeTab, pulseAnim, userJourney)
+                        ? renderSplitAppHeader(pulseAnim)
                         : null}
                       <FlowPanel anim={flowAnim} embedded>
                         {renderMainTabContent(mainTabContentProps)}
