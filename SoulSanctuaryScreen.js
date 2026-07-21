@@ -718,8 +718,8 @@ const styles = StyleSheet.create({
   },
   timelineBody: {
     ...SANCTUARY_ZEN,
-    fontSize: 22,
-    lineHeight: 32,
+    fontSize: 17,
+    lineHeight: 26,
     color: 'rgba(255,255,255,0.94)',
     fontStyle: 'italic',
     marginBottom: 16,
