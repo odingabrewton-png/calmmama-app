@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -276,6 +277,233 @@ function InstallPill({ label, onPress, glowing = false, style, contentStyle, pul
   );
 }
 
+const EMPTY_GIFT_FORM = {
+  giverName: '',
+  giverEmail: '',
+  recipientName: '',
+  recipientEmail: '',
+  giftMessage: '',
+};
+
+function portalGiftOverlay(node) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || !document.body) {
+    return node;
+  }
+  try {
+    // eslint-disable-next-line global-require
+    const { createPortal } = require('react-dom');
+    return createPortal(node, document.body);
+  } catch (_) {
+    return node;
+  }
+}
+
+function GiftMamaModal({ visible, isSubmitting, onClose, onSubmit }) {
+  const [giftForm, setGiftForm] = useState(EMPTY_GIFT_FORM);
+  const [canDismissBackdrop, setCanDismissBackdrop] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setCanDismissBackdrop(false);
+      return undefined;
+    }
+    // Mobile Safari can re-fire the open tap onto the new overlay; delay dismiss.
+    const timer = setTimeout(() => setCanDismissBackdrop(true), 450);
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  const updateField = useCallback((field, value) => {
+    setGiftForm((current) => ({ ...current, [field]: value }));
+  }, []);
+
+  const handleGiftSubmit = useCallback(() => {
+    const normalized = Object.fromEntries(
+      Object.entries(giftForm).map(([key, value]) => [key, String(value || '').trim()]),
+    );
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (
+      !normalized.giverName ||
+      !normalized.giverEmail ||
+      !normalized.recipientName ||
+      !normalized.recipientEmail
+    ) {
+      Alert.alert(
+        'A few details are missing',
+        'Please add both names and email addresses before continuing to checkout.',
+      );
+      return;
+    }
+    if (!emailPattern.test(normalized.giverEmail) || !emailPattern.test(normalized.recipientEmail)) {
+      Alert.alert('Check the email addresses', 'Please enter a valid email for you and your mama.');
+      return;
+    }
+
+    onSubmit({ checkout: 'gift', gift: normalized });
+  }, [giftForm, onSubmit]);
+
+  const dismiss = useCallback(() => {
+    if (!isSubmitting && canDismissBackdrop) onClose();
+  }, [canDismissBackdrop, isSubmitting, onClose]);
+
+  if (!visible) return null;
+
+  const overlay = (
+    <View
+      style={styles.giftModalPortal}
+      pointerEvents="box-none"
+      accessibilityViewIsModal
+      accessibilityLabel="Gift a Mama"
+    >
+      <Pressable
+        style={styles.giftModalBackdrop}
+        onPress={dismiss}
+        accessibilityRole="button"
+        accessibilityLabel="Close Gift a Mama form"
+      />
+      <View style={styles.giftModalCard} pointerEvents="auto">
+        <ScrollView
+          style={styles.giftModalScroll}
+          contentContainerStyle={styles.giftModalContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.giftModalHeader}>
+            <View style={styles.giftModalHeadingWrap}>
+              <Text style={[styles.giftModalEyebrow, SANS]}>A $15 GIFT OF VILLAGE CARE</Text>
+              <Text style={[styles.giftModalTitle, SERIF]}>Gift a Mama 🎁</Text>
+            </View>
+            <Pressable
+              onPress={isSubmitting ? undefined : onClose}
+              disabled={isSubmitting}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              style={styles.giftModalClose}
+            >
+              <Text style={styles.giftModalCloseText}>×</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.giftPriceCard}>
+            <Text style={[styles.giftPrice, SERIF]}>$15</Text>
+            <Text style={[styles.giftPriceLabel, SANS]}>one-time gift</Text>
+          </View>
+
+          <Text style={[styles.giftModalDescription, SANS]}>
+            Your gift grants her full Founding 40 Club status, launch-day gifts, and full Village
+            access—including premium oracle and registry perks.
+          </Text>
+
+          <View style={styles.giftBenefits}>
+            {[
+              'Full Founding 40 Club status',
+              'Launch-day Founding Mother gifts',
+              'Full Village, oracle, and registry access',
+            ].map((benefit) => (
+              <View key={benefit} style={styles.giftBenefitRow}>
+                <Text style={styles.giftBenefitCheck}>✓</Text>
+                <Text style={[styles.giftBenefitText, SANS]}>{benefit}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={[styles.giftFormSectionTitle, SANS]}>Your details</Text>
+          <View style={styles.giftFieldRow}>
+            <TextInput
+              value={giftForm.giverName}
+              onChangeText={(value) => updateField('giverName', value)}
+              placeholder="Giver’s name"
+              placeholderTextColor="rgba(110, 126, 101, 0.55)"
+              editable={!isSubmitting}
+              style={[styles.giftInput, styles.giftInputHalf, SANS]}
+              accessibilityLabel="Giver's name"
+            />
+            <TextInput
+              value={giftForm.giverEmail}
+              onChangeText={(value) => updateField('giverEmail', value)}
+              placeholder="Giver’s email"
+              placeholderTextColor="rgba(110, 126, 101, 0.55)"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
+              style={[styles.giftInput, styles.giftInputHalf, SANS]}
+              accessibilityLabel="Giver's email"
+            />
+          </View>
+
+          <Text style={[styles.giftFormSectionTitle, SANS]}>Recipient mama</Text>
+          <View style={styles.giftFieldRow}>
+            <TextInput
+              value={giftForm.recipientName}
+              onChangeText={(value) => updateField('recipientName', value)}
+              placeholder="Mama’s name"
+              placeholderTextColor="rgba(110, 126, 101, 0.55)"
+              editable={!isSubmitting}
+              style={[styles.giftInput, styles.giftInputHalf, SANS]}
+              accessibilityLabel="Recipient mama's name"
+            />
+            <TextInput
+              value={giftForm.recipientEmail}
+              onChangeText={(value) => updateField('recipientEmail', value)}
+              placeholder="Mama’s email"
+              placeholderTextColor="rgba(110, 126, 101, 0.55)"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isSubmitting}
+              style={[styles.giftInput, styles.giftInputHalf, SANS]}
+              accessibilityLabel="Recipient mama's email"
+            />
+          </View>
+
+          <Text style={[styles.giftFormSectionTitle, SANS]}>Gift note (optional)</Text>
+          <TextInput
+            value={giftForm.giftMessage}
+            onChangeText={(value) => updateField('giftMessage', value)}
+            placeholder="Add a loving note for her…"
+            placeholderTextColor="rgba(110, 126, 101, 0.55)"
+            multiline
+            maxLength={500}
+            editable={!isSubmitting}
+            style={[styles.giftInput, styles.giftMessageInput, SANS]}
+            accessibilityLabel="Optional gift message"
+          />
+
+          <InstallPill
+            label={isSubmitting ? 'Preparing her gift…' : 'Continue to $15 Gift Checkout 🎁'}
+            onPress={isSubmitting ? undefined : handleGiftSubmit}
+            pulsing={!isSubmitting}
+            style={styles.giftCheckoutButton}
+          />
+          <Text style={[styles.giftCheckoutNote, SANS]}>
+            Her Founding status is saved before you continue securely to Stripe.
+          </Text>
+        </ScrollView>
+      </View>
+    </View>
+  );
+
+  // Web: portal to body so mobile ScrollView overflow/transform cannot hide it.
+  if (Platform.OS === 'web') {
+    return portalGiftOverlay(overlay);
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => {
+        if (!isSubmitting) onClose();
+      }}
+    >
+      {overlay}
+    </Modal>
+  );
+}
+
 function WaitlistFormCard({
   signupTier,
   setSignupTier,
@@ -285,6 +513,7 @@ function WaitlistFormCard({
   setIsSubmitted,
   isSubmitting = false,
   onSubmit,
+  onOpenGift,
   compact = false,
 }) {
   const isFounding = signupTier === 'founding40';
@@ -398,7 +627,7 @@ function WaitlistFormCard({
             style={styles.waitlistBtn}
           />
           <Pressable
-            onPress={isSubmitting ? undefined : () => onSubmit('gift')}
+            onPress={isSubmitting ? undefined : onOpenGift}
             disabled={isSubmitting}
             accessibilityRole="button"
             style={styles.giftButton}
@@ -437,6 +666,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   const [signupTier, setSignupTier] = useState('general');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGiftModalVisible, setIsGiftModalVisible] = useState(false);
   const installPrimaryRef = useRef(() => {});
 
   const bindInstallPrimary = useCallback((handler) => {
@@ -566,7 +796,16 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   const handleWaitlistSubmit = useCallback(async (checkoutOverride) => {
     if (isSubmitting) return;
 
-    const value = String(contactInfo || '').trim();
+    const giftSubmission =
+      checkoutOverride && typeof checkoutOverride === 'object' ? checkoutOverride.gift : null;
+    const requestedCheckout = giftSubmission
+      ? 'gift'
+      : typeof checkoutOverride === 'string'
+        ? checkoutOverride
+        : signupTier === 'founding40'
+          ? 'annual'
+          : 'monthly';
+    const value = String(giftSubmission?.recipientEmail || contactInfo || '').trim();
     if (!value) {
       Alert.alert('Almost there', 'Please enter your email address to save your spot.');
       return;
@@ -581,12 +820,6 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
       return;
     }
 
-    const requestedCheckout =
-      typeof checkoutOverride === 'string'
-        ? checkoutOverride
-        : signupTier === 'founding40'
-          ? 'annual'
-          : 'monthly';
     const activeTagId =
       signupTier === 'founding40' || requestedCheckout === 'gift'
         ? TAG_FOUNDING_ID
@@ -612,6 +845,9 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
           body: JSON.stringify({
             api_secret: '-xoTOTkQ7noQ46t6HWj9D71o-FNL06yC_11_o6j1ONc',
             email: value,
+            ...(giftSubmission?.recipientName
+              ? { first_name: giftSubmission.recipientName }
+              : {}),
             skip_incentive: true,
           }),
         },
@@ -644,10 +880,29 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
         tier: signupTier,
         checkout: requestedCheckout,
       });
-      setContactInfo('');
+      if (!giftSubmission) {
+        setContactInfo('');
+      }
 
       if (typeof window !== 'undefined') {
-        window.location.href = STRIPE_LINKS[requestedCheckout];
+        if (giftSubmission) {
+          try {
+            window.sessionStorage?.setItem(
+              'calmmama.pendingGift',
+              JSON.stringify({
+                ...giftSubmission,
+                createdAt: new Date().toISOString(),
+              }),
+            );
+          } catch (_) {
+            // Checkout still works if browser storage is unavailable.
+          }
+        }
+        const checkoutUrl = new URL(STRIPE_LINKS[requestedCheckout]);
+        if (giftSubmission?.giverEmail) {
+          checkoutUrl.searchParams.set('prefilled_email', giftSubmission.giverEmail);
+        }
+        window.location.href = checkoutUrl.toString();
         return;
       }
 
@@ -684,7 +939,17 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     setIsSubmitted,
     isSubmitting,
     onSubmit: handleWaitlistSubmit,
+    onOpenGift: () => setIsGiftModalVisible(true),
   };
+
+  const giftModal = (
+    <GiftMamaModal
+      visible={isGiftModalVisible}
+      isSubmitting={isSubmitting}
+      onClose={() => setIsGiftModalVisible(false)}
+      onSubmit={handleWaitlistSubmit}
+    />
+  );
 
   // —— Mobile browser: edge-to-edge marketing + waitlist ——
   if (!isDesktop) {
@@ -766,6 +1031,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
 
         {/* iOS Share opt-in slide-up — absolute, separate from scroll CTA */}
         <PWAInstallPrompt onBindPrimary={bindInstallPrimary} autoOpenIosSheet />
+        {giftModal}
       </View>
     );
   }
@@ -865,6 +1131,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
           </FrostCard>
         </View>
       </ScrollView>
+      {giftModal}
     </View>
   );
 }
@@ -1308,6 +1575,202 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  giftModalPortal: {
+    ...Platform.select({
+      web: {
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        zIndex: 100000,
+      },
+      default: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 100000,
+      },
+    }),
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  giftModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(35, 40, 33, 0.64)',
+  },
+  giftModalCard: {
+    width: '100%',
+    maxWidth: 620,
+    maxHeight: '92%',
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.72)',
+    backgroundColor: '#fbfaf5',
+    zIndex: 1,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 28px 80px rgba(35, 40, 33, 0.34)',
+        cursor: 'default',
+        maxHeight: 'min(92vh, 920px)',
+      },
+      default: {
+        shadowColor: '#232821',
+        shadowOpacity: 0.3,
+        shadowRadius: 30,
+        shadowOffset: { width: 0, height: 18 },
+        elevation: 24,
+      },
+    }),
+  },
+  giftModalScroll: {
+    width: '100%',
+    maxHeight: '100%',
+  },
+  giftModalContent: {
+    paddingVertical: 24,
+    paddingHorizontal: 22,
+  },
+  giftModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 14,
+  },
+  giftModalHeadingWrap: {
+    flex: 1,
+  },
+  giftModalEyebrow: {
+    color: '#8a6a1a',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+  giftModalTitle: {
+    color: CHARCOAL,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700',
+  },
+  giftModalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(110, 126, 101, 0.1)',
+  },
+  giftModalCloseText: {
+    color: CHARCOAL,
+    fontSize: 27,
+    lineHeight: 29,
+    fontWeight: '400',
+  },
+  giftPriceCard: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(138, 106, 26, 0.24)',
+    backgroundColor: 'rgba(212, 175, 55, 0.14)',
+  },
+  giftPrice: {
+    color: '#8a6a1a',
+    fontSize: 25,
+    fontWeight: '800',
+  },
+  giftPriceLabel: {
+    color: SAGE_TEXT,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  giftModalDescription: {
+    color: CHARCOAL,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  giftBenefits: {
+    gap: 7,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    marginBottom: 20,
+    backgroundColor: 'rgba(230, 244, 226, 0.68)',
+  },
+  giftBenefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  giftBenefitCheck: {
+    color: '#8a6a1a',
+    width: 16,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  giftBenefitText: {
+    flex: 1,
+    color: CHARCOAL,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  giftFormSectionTitle: {
+    color: CHARCOAL,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    marginBottom: 7,
+  },
+  giftFieldRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  giftInput: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 117, 213, 0.25)',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    color: CHARCOAL,
+    fontSize: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    ...Platform.select({
+      web: { outlineStyle: 'none' },
+      default: {},
+    }),
+  },
+  giftInputHalf: {
+    flexGrow: 1,
+    flexBasis: 240,
+  },
+  giftMessageInput: {
+    minHeight: 88,
+    marginBottom: 16,
+    textAlignVertical: 'top',
+  },
+  giftCheckoutButton: {
+    alignSelf: 'stretch',
+  },
+  giftCheckoutNote: {
+    color: SAGE_TEXT,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 10,
   },
   successBlock: {
     paddingVertical: 8,
