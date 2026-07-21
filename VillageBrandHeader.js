@@ -1,31 +1,71 @@
 import React, { useMemo, useState } from 'react';
-import { View, Image, Animated, StyleSheet, Platform } from 'react-native';
+import { View, Animated, Image, StyleSheet, Platform, Dimensions } from 'react-native';
+import { BrandLogoStack, LOGO_HEART_BLEED } from './brandLogoShine';
+import { DESKTOP_BREAKPOINT, DESKTOP_PHONE } from './mobileWebLayout';
+
+const LOGO_ASPECT = 323 / 1024;
+const ONBOARDING_LOGO_RATIO = 0.55;
+const ONBOARDING_LOGO_MAX = 210;
+
+/** Content width inside the app surface — never the desktop marketing viewport. */
+function getAppContentWidth() {
+  const windowW = Dimensions.get('window').width;
+  if (Platform.OS === 'web' && windowW > DESKTOP_BREAKPOINT) {
+    return DESKTOP_PHONE.width;
+  }
+  return windowW;
+}
+
+function getOnboardingLogoSize() {
+  return Math.min(getAppContentWidth() * ONBOARDING_LOGO_RATIO, ONBOARDING_LOGO_MAX);
+}
 
 const LOGO_FIT = {
-  sanctuary: { widthScale: 0.72, maxHeight: 72 },
+  sanctuary: { widthScale: 0.68, maxHeight: 72, safeWidthRatio: 0.86 },
   badge: { widthScale: 0.88, maxHeight: 132 },
-  onboarding: { widthScale: 0.98, maxHeight: 196 },
+  onboarding: { viewportWidthRatio: ONBOARDING_LOGO_RATIO },
 };
 
 const FALLBACK_ASPECT = {
-  sanctuary: 115 / 257,
+  sanctuary: LOGO_ASPECT,
   badge: 1,
   onboarding: 1,
 };
 
+const SANCTUARY_HEADER_SHELL = {
+  notchTop: 44,
+  logoMaxHeight: LOGO_FIT.sanctuary.maxHeight,
+  heartBleedTop: LOGO_HEART_BLEED.top,
+  bottomPad: 2,
+};
+SANCTUARY_HEADER_SHELL.minHeight =
+  SANCTUARY_HEADER_SHELL.notchTop +
+  SANCTUARY_HEADER_SHELL.logoMaxHeight +
+  SANCTUARY_HEADER_SHELL.heartBleedTop +
+  SANCTUARY_HEADER_SHELL.bottomPad;
+
 function fitLogoToHeader(boxWidth, naturalW, naturalH, variant) {
   const fit = LOGO_FIT[variant] || LOGO_FIT.badge;
-  const aspect = naturalW > 0 && naturalH > 0 ? naturalH / naturalW : FALLBACK_ASPECT[variant] || 1;
+  const aspect =
+    naturalW > 0 && naturalH > 0 ? naturalH / naturalW : FALLBACK_ASPECT[variant] || LOGO_ASPECT;
+
+  if (variant === 'onboarding') {
+    const size = getOnboardingLogoSize();
+    return { width: size, height: size };
+  }
 
   if (!boxWidth) {
-    const w = 260 * fit.widthScale;
+    const w = 260 * (fit.widthScale ?? 0.88);
     return { width: w, height: w * aspect };
   }
 
-  let width = boxWidth * fit.widthScale;
+  let width = boxWidth * (fit.widthScale ?? 0.88);
+  if (fit.safeWidthRatio) {
+    width = Math.min(width, boxWidth * fit.safeWidthRatio);
+  }
   let height = width * aspect;
 
-  if (height > fit.maxHeight) {
+  if (fit.maxHeight && height > fit.maxHeight) {
     height = fit.maxHeight;
     width = height / aspect;
   }
@@ -33,6 +73,7 @@ function fitLogoToHeader(boxWidth, naturalW, naturalH, variant) {
   return { width, height };
 }
 
+/** Static logo header — onboarding only (no Reanimated shine). */
 export default function VillageBrandHeader({
   logoUri,
   pulseAnim,
@@ -43,19 +84,38 @@ export default function VillageBrandHeader({
   notchSafe = false,
 }) {
   const [wrapWidth, setWrapWidth] = useState(0);
-  const [natural, setNatural] = useState({ w: 0, h: 0 });
+  const [natural] = useState({ w: 1024, h: 323 });
+
+  const isOnboarding = variant === 'onboarding';
+  const onboardingLogoSize = useMemo(() => getOnboardingLogoSize(), []);
 
   const { width: logoWidth, height: logoHeight } = useMemo(
     () => fitLogoToHeader(wrapWidth, natural.w, natural.h, variant),
     [wrapWidth, natural.w, natural.h, variant]
   );
 
-  const handleLogoLoad = (e) => {
-    const source = e?.nativeEvent?.source;
-    if (source?.width && source?.height) {
-      setNatural({ w: source.width, h: source.height });
-    }
-  };
+  if (isOnboarding) {
+    return (
+      <Animated.View
+        style={[
+          styles.onboardingLogoWrap,
+          pulseAnim ? { transform: [{ scale: pulseAnim }] } : null,
+        ]}
+        pointerEvents="none"
+      >
+        <Image
+          source={{ uri: logoUri }}
+          style={{
+            width: onboardingLogoSize,
+            height: onboardingLogoSize,
+            alignSelf: 'center',
+          }}
+          resizeMode="contain"
+          accessibilityLabel="Calm Mama Village"
+        />
+      </Animated.View>
+    );
+  }
 
   return (
     <View
@@ -65,6 +125,7 @@ export default function VillageBrandHeader({
         sanctuaryMode && styles.wrapSanctuary,
         sanctuaryMode && compact && styles.wrapSanctuaryCompact,
         sanctuaryMode && profileMode && styles.wrapProfileHeader,
+        sanctuaryMode && notchSafe && !compact && styles.wrapSanctuaryShellLocked,
         notchSafe && !sanctuaryMode && styles.wrapNotchSafe,
         notchSafe && sanctuaryMode && !compact && styles.wrapSanctuaryNotchSafe,
         notchSafe && sanctuaryMode && profileMode && styles.wrapProfileNotchSafe,
@@ -73,22 +134,14 @@ export default function VillageBrandHeader({
       pointerEvents="box-none"
     >
       <Animated.View
-        style={[
-          styles.logoWrap,
-          sanctuaryMode && styles.logoWrapSanctuary,
-          { transform: pulseAnim ? [{ scale: pulseAnim }] : [] },
-        ]}
+        style={[styles.logoPulseWrap, { transform: pulseAnim ? [{ scale: pulseAnim }] : [] }]}
         pointerEvents="none"
       >
-        <Image
-          source={{ uri: logoUri }}
-          style={[
-            styles.logo,
-            { width: logoWidth, height: logoHeight, maxWidth: '100%' },
-          ]}
-          resizeMode="contain"
-          onLoad={handleLogoLoad}
-          accessibilityLabel="Calm Mama Village"
+        <BrandLogoStack
+          logoUri={logoUri}
+          logoWidth={logoWidth}
+          logoHeight={logoHeight}
+          enableShine={false}
         />
       </Animated.View>
     </View>
@@ -98,17 +151,30 @@ export default function VillageBrandHeader({
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingTop: 4,
     paddingBottom: 2,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     backgroundColor: 'transparent',
     width: '100%',
-    borderWidth: 0,
+    overflow: 'visible',
   },
   wrapOnboarding: {
-    paddingTop: 8,
-    paddingBottom: 16,
-    marginBottom: 4,
+    paddingTop: 0,
+    paddingBottom: 0,
+    marginBottom: 0,
+    minHeight: 0,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  onboardingLogoWrap: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    marginBottom: 0,
+    paddingBottom: 0,
   },
   wrapNotchSafe: {
     paddingTop: 36,
@@ -117,8 +183,8 @@ const styles = StyleSheet.create({
   wrapSanctuary: {
     paddingTop: 38,
     paddingBottom: 2,
-    paddingHorizontal: 0,
-    backgroundColor: 'transparent',
+    paddingHorizontal: 14,
+    overflow: 'visible',
   },
   wrapSanctuaryNotchSafe: {
     paddingTop: 44,
@@ -134,27 +200,19 @@ const styles = StyleSheet.create({
   wrapProfileNotchSafe: {
     paddingTop: 42,
   },
-  logoWrap: {
+  wrapSanctuaryShellLocked: {
+    minHeight: SANCTUARY_HEADER_SHELL.minHeight,
+  },
+  logoPulseWrap: {
+    overflow: 'visible',
+    paddingRight: 12,
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    maxWidth: '100%',
-    borderWidth: 0,
-    overflow: 'visible',
+    alignSelf: 'center',
     ...Platform.select({
       web: { boxShadow: 'none' },
-      default: {
-        shadowColor: 'transparent',
-        shadowOpacity: 0,
-        elevation: 0,
-      },
+      default: { shadowColor: 'transparent', shadowOpacity: 0, elevation: 0 },
     }),
-  },
-  logoWrapSanctuary: {
-    backgroundColor: 'transparent',
-  },
-  logo: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
   },
 });

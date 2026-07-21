@@ -1,7 +1,12 @@
 /** Mock local village data — privacy-safe distances only */
 
-export const VILLAGE_PRIVACY_BANNER =
-  '🔒 Private & Secured: Exact locations are hidden behind the Village Shield. Contact lines remain fully encrypted inside the sanctuary walls.';
+export const VILLAGE_PRIVACY_TITLE = '🔒 Private & Secure';
+
+export const VILLAGE_PRIVACY_DESCRIPTION =
+  'Exact locations are hidden behind the Village Shield. Contact lines remain fully encrypted inside the sanctuary walls.';
+
+/** @deprecated Use VILLAGE_PRIVACY_TITLE + VILLAGE_PRIVACY_DESCRIPTION */
+export const VILLAGE_PRIVACY_BANNER = `${VILLAGE_PRIVACY_TITLE}: ${VILLAGE_PRIVACY_DESCRIPTION}`;
 
 export const ICEBREAKER_HINTS = [
   'What show is keeping you preoccupied right now?',

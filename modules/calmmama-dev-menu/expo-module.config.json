@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["CalmmamaDevMenuModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.calmmamadevmenu.CalmmamaDevMenuModule"]
+  }
+}

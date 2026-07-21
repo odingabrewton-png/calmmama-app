@@ -10,60 +10,132 @@ import {
   Platform,
   ScrollView,
   Image,
-  Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
-import {
-  SANCTUARY_MOODS,
-  CLOUD_IMAGES,
-  getFriendOpeningLine,
-  getFriendFollowUp,
-  getDerivedAssistance,
-} from './soulSanctuaryData';
-import { useVillageReveal } from './villageScreenTransitions';
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  interpolate,
+} from 'react-native-reanimated';
+import { SANCTUARY_MOODS, CLOUD_IMAGES, getFriendOpeningLine } from './soulSanctuaryData';
+import { buildVentingGuidance, createVentingEntry } from './ventingSanctuaryEngine';
+import { useVillageReveal, useVillageGentleReveal, VILLAGE_SNAPPY_REANIMATED } from './villageScreenTransitions';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import SanctuaryStarsLayer from './SanctuaryStarsLayer';
+import TextDissolveRelease, { runTextReleaseFlow } from './TextDissolveRelease';
+import { SANCTUARY_ZEN } from './designTypography';
 
+const JOURNAL_SPRING = VILLAGE_SNAPPY_REANIMATED;
+const JOURNAL_SPRING_GENTLE = { damping: 20, stiffness: 68 };
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
+/** Spaced cloud grid — room to breathe between mood pills */
+const CLOUD_W = 100;
+const CLOUD_H = 58;
+const CLOUD_GAP_X = 22;
+const CLOUD_GAP_Y = 26;
+const CLOUD_CLUSTER_W = CLOUD_W * 3 + CLOUD_GAP_X * 2;
+const CLOUD_CLUSTER_H = CLOUD_H * 3 + CLOUD_GAP_Y * 2;
+const COL = {
+  left: 0,
+  mid: CLOUD_W + CLOUD_GAP_X,
+  right: (CLOUD_W + CLOUD_GAP_X) * 2,
+};
+const ROW = [0, CLOUD_H + CLOUD_GAP_Y, (CLOUD_H + CLOUD_GAP_Y) * 2];
+const PAIR_INSET = (CLOUD_W + CLOUD_GAP_X) / 2;
+
 const CLOUD_LAYOUT = [
-  { top: 16, left: 0, width: 128, height: 76 },
-  { top: 88, right: 0, width: 124, height: 74 },
-  { top: 178, left: 28, width: 130, height: 78 },
-  { top: 36, left: 102, width: 118, height: 70 },
-  { top: 248, right: 4, width: 122, height: 72 },
+  // Row 1 — Happy, Stressed, Overwhelmed
+  { top: ROW[0], left: COL.left, width: CLOUD_W, height: CLOUD_H },
+  { top: ROW[0], left: COL.mid, width: CLOUD_W, height: CLOUD_H },
+  { top: ROW[0], left: COL.right, width: CLOUD_W, height: CLOUD_H },
+  // Row 2 — Exhausted, Grateful, Anxious
+  { top: ROW[1], left: COL.left, width: CLOUD_W, height: CLOUD_H },
+  { top: ROW[1], left: COL.mid, width: CLOUD_W, height: CLOUD_H },
+  { top: ROW[1], left: COL.right, width: CLOUD_W, height: CLOUD_H },
+  // Row 3 — Hopeful, Lonely (centered pair)
+  { top: ROW[2], left: COL.left + PAIR_INSET, width: CLOUD_W, height: CLOUD_H },
+  { top: ROW[2], left: COL.mid + PAIR_INSET, width: CLOUD_W, height: CLOUD_H },
 ];
 
-const CHAT_DRAWER_HEIGHT = 268;
+function TimelineCard({ entry, isLast, expanded, onPress }) {
+  const when = new Date(entry.timestamp);
+  const timeLabel = when.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
-let messageId = 0;
-const nextId = () => {
-  messageId += 1;
-  return messageId;
-};
+  return (
+    <TouchableOpacity
+      style={styles.timelineItem}
+      onPress={onPress}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={
+        expanded ? 'Collapse journal entry' : 'Review your entry and mama-friend note'
+      }
+    >
+      <View style={styles.timelineRail}>
+        <View style={styles.timelineDot} />
+        {!isLast ? <View style={styles.timelineLine} /> : null}
+      </View>
+      <View style={[styles.timelineCard, expanded && styles.timelineCardExpanded]}>
+        <Text style={styles.timelineMeta}>
+          {entry.moodLabel} · {timeLabel}
+        </Text>
+        {expanded ? (
+          <>
+            <Text style={styles.timelineBody}>{entry.text}</Text>
+            {entry.guidance ? (
+              <View style={styles.friendNoteWrap}>
+                <Text style={styles.friendNoteLabel}>{entry.guidance.title}</Text>
+                <View style={styles.friendNoteBox}>
+                  <Text style={styles.friendNoteBody}>{entry.guidance.body}</Text>
+                </View>
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.timelineLockedHint}>
+            Tap to read your words & a note from a mama friend
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function SoulSanctuaryScreen({
   mamaName = 'Mama',
   onExit,
-  journalLogs = [],
-  onSaveJournalEntry,
+  ventingHistory = [],
+  onAppendVentingEntry,
+  isSubscribed = false,
+  onRequestUpgrade,
+  gentleEnter = false,
+  loungeSubView = false,
 }) {
   const [phase, setPhase] = useState('clouds');
   const [selectedMood, setSelectedMood] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [journalText, setJournalText] = useState('');
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [assistancePopup, setAssistancePopup] = useState(null);
-  const [showChat, setShowChat] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [expandedEntryId, setExpandedEntryId] = useState(null);
+  const [openingPrompt, setOpeningPrompt] = useState('');
 
   const othersFade = useRef(new Animated.Value(1)).current;
-  const panelSlide = useRef(new Animated.Value(0)).current;
-  const chatSlide = useRef(new Animated.Value(0)).current;
-  const popupAnim = useRef(new Animated.Value(0)).current;
+  const journalReveal = useSharedValue(0);
   const cloudDrifts = useRef(SANCTUARY_MOODS.map(() => new Animated.Value(0))).current;
   const cloudScales = useRef(SANCTUARY_MOODS.map(() => new Animated.Value(1))).current;
   const cloudFloats = useRef(SANCTUARY_MOODS.map(() => new Animated.Value(0))).current;
-  const screenReveal = useVillageReveal(true);
+  const gentleReveal = useVillageGentleReveal(gentleEnter);
+  const standardReveal = useVillageReveal(!gentleEnter);
+  const screenReveal = gentleEnter ? gentleReveal : standardReveal;
+  const scrollRef = useRef(null);
+  const releaseRef = useRef(null);
 
   useEffect(() => {
     const floatLoops = cloudFloats.map((anim, index) => {
@@ -90,32 +162,53 @@ export default function SoulSanctuaryScreen({
     return () => floatLoops.forEach((loop) => loop.stop());
   }, [cloudFloats]);
 
+  useEffect(() => {
+    if (phase === 'journal' && selectedMood) {
+      journalReveal.value = 0;
+      journalReveal.value = withSpring(1, gentleEnter ? JOURNAL_SPRING_GENTLE : JOURNAL_SPRING);
+    } else {
+      journalReveal.value = 0;
+    }
+  }, [phase, selectedMood, journalReveal, gentleEnter]);
+
+  const journalAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: journalReveal.value,
+    transform: [
+      {
+        translateY: interpolate(journalReveal.value, [0, 1], [20, 0]),
+      },
+    ],
+  }));
+
   const resetSanctuary = () => {
     setPhase('clouds');
     setSelectedMood(null);
     setSelectedIndex(null);
     setJournalText('');
-    setChatInput('');
-    setMessages([]);
-    setAssistancePopup(null);
-    setShowChat(false);
-    popupAnim.setValue(0);
+    setExpandedEntryId(null);
+    setOpeningPrompt('');
     othersFade.setValue(1);
-    panelSlide.setValue(0);
-    chatSlide.setValue(0);
+    journalReveal.value = 0;
     cloudDrifts.forEach((d) => d.setValue(0));
     cloudScales.forEach((s) => s.setValue(1));
+  };
+
+  const handleTimelineEntryPress = (entryId) => {
+    if (expandedEntryId === entryId) {
+      setExpandedEntryId(null);
+      return;
+    }
+
+    setExpandedEntryId(entryId);
   };
 
   const handleMoodSelect = (mood, index) => {
     if (phase !== 'clouds') return;
     setSelectedMood(mood);
     setSelectedIndex(index);
-    setMessages([{ id: nextId(), role: 'friend', text: getFriendOpeningLine(mood.id) }]);
+    setJournalText('');
+    setOpeningPrompt(getFriendOpeningLine(mood.id, mamaName));
     setPhase('journal');
-    setShowChat(true);
-    panelSlide.setValue(0);
-    chatSlide.setValue(0);
 
     Animated.parallel([
       Animated.timing(cloudScales[index], {
@@ -136,318 +229,262 @@ export default function SoulSanctuaryScreen({
         easing: Easing.out(Easing.cubic),
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
-      Animated.timing(panelSlide, {
-        toValue: 1,
-        duration: 640,
-        delay: 120,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
-      Animated.timing(chatSlide, {
-        toValue: 1,
-        duration: 520,
-        delay: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: USE_NATIVE_DRIVER,
-      }),
     ]).start();
   };
 
-  const sendChat = () => {
-    const trimmed = chatInput.trim();
-    if (!trimmed || !selectedMood) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: nextId(), role: 'user', text: trimmed },
-      { id: nextId(), role: 'friend', text: getFriendFollowUp(selectedMood.id, mamaName) },
-    ]);
-    setChatInput('');
-  };
-
-  const handleShare = () => {
-    if (!selectedMood) return;
-    const trimmed = journalText.trim();
-    if (!trimmed) return;
-
-    const assistance = getDerivedAssistance(selectedMood.id, trimmed);
-    const entry = {
-      id: Date.now(),
+  const archiveEntry = async (trimmed) => {
+    const guidance = buildVentingGuidance({
+      text: trimmed,
       moodId: selectedMood.id,
       moodLabel: selectedMood.label,
-      derivedMood: assistance.derivedMood,
+      priorEntries: ventingHistory,
+      mamaName,
+    });
+    const entry = createVentingEntry({
       text: trimmed,
-      messages: [...messages],
-      timestamp: new Date().toISOString(),
-    };
-
-    onSaveJournalEntry?.(entry);
-    setAssistancePopup(assistance);
-
-    popupAnim.setValue(0);
-    Animated.spring(popupAnim, {
-      toValue: 1,
-      friction: 7,
-      tension: 48,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
+      mood: selectedMood,
+      guidance,
+    });
+    onAppendVentingEntry?.(entry);
+    setJournalText('');
+    setExpandedEntryId(null);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 220);
   };
 
-  const dismissPopup = () => {
-    Animated.timing(popupAnim, {
-      toValue: 0,
-      duration: 220,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start(() => setAssistancePopup(null));
+  const handleRelease = async () => {
+    const trimmed = journalText.trim();
+    if (!trimmed || !selectedMood || releasing) return;
+
+    setReleasing(true);
+    // Always archive to the timeline so companion insight is reviewable.
+    // Soft upsell may still fire for free members after the save.
+    await runTextReleaseFlow({
+      releaseRef,
+      text: trimmed,
+      isSubscribed: true,
+      onRequestUpgrade,
+      onArchive: async () => {
+        await archiveEntry(trimmed);
+      },
+    });
+    if (!isSubscribed) {
+      onRequestUpgrade?.();
+    }
+    setReleasing(false);
   };
 
-  const panelOpacity = panelSlide.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 0.85, 1],
-  });
-  const panelTranslateY = panelSlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [36, 0],
-  });
-  const chatTranslateY = chatSlide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [CHAT_DRAWER_HEIGHT, 0],
-  });
-  const chatOpacity = chatSlide.interpolate({
-    inputRange: [0, 0.15, 1],
-    outputRange: [0, 0.92, 1],
-  });
-  const popupScale = popupAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
-  });
+  const handleDoneEmpty = () => {
+    if (journalText.trim()) {
+      handleRelease();
+      return;
+    }
+    resetSanctuary();
+  };
+
+  const sortedHistory = [...ventingHistory].sort(
+    (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+  );
 
   return (
-    <Animated.View style={[styles.root, { opacity: screenReveal.opacity, transform: screenReveal.transform }]}>
-      <SanctuaryStarsLayer />
+    <KeyboardAvoidingView
+      style={[styles.flex, loungeSubView && styles.loungeFlex]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
+      <Animated.View
+        style={[
+          styles.root,
+          gentleEnter ? { opacity: screenReveal.opacity, transform: screenReveal.transform } : null,
+        ]}
+      >
+        <SanctuaryStarsLayer />
 
-      <TouchableOpacity style={styles.backBtn} onPress={onExit}>
-        <Text style={styles.backBtnText}>← Sanctuary Home</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.backBtn} onPress={onExit}>
+          <Text style={styles.backBtnText}>← Sanctuary Home</Text>
+        </TouchableOpacity>
 
-      <Text style={styles.retroTitle}>The Soul Sanctuary</Text>
-      <Text style={styles.pageSubtitle}>How is your heart, mama?</Text>
+        <Text style={styles.retroTitle}>The Soul Sanctuary</Text>
+        <Text style={styles.pageSubtitle}>How is your heart, {mamaName}?</Text>
 
-      <View style={styles.stage}>
-        <View
-          style={styles.cloudCluster}
-          pointerEvents={phase === 'clouds' ? 'auto' : 'none'}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
         >
-          {SANCTUARY_MOODS.map((mood, index) => {
-              const layout = CLOUD_LAYOUT[index];
-              const isSelected = selectedIndex === index;
-              const floatY = cloudFloats[index].interpolate({
-                inputRange: [0, 0.5, 1],
-                outputRange: [-18, 0, 18],
-              });
-              const driftY = cloudDrifts[index].interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, -340],
-              });
-              const driftX = cloudDrifts[index].interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 56],
-              });
-              const driftOpacity = cloudDrifts[index].interpolate({
-                inputRange: [0, 0.65, 1],
-                outputRange: [1, 0.75, 0],
-              });
-              const cloudOpacity =
-                selectedIndex === null ? 1 : isSelected ? driftOpacity : othersFade;
-
-              return (
-                <Animated.View
-                  key={mood.id}
-                  style={[
-                    styles.cloudWrap,
-                    {
-                      top: layout.top,
-                      left: layout.left,
-                      right: layout.right,
-                      width: layout.width,
-                      height: layout.height,
-                    },
-                    {
-                      opacity: cloudOpacity,
-                      transform: [
-                        { translateY: Animated.add(floatY, driftY) },
-                        { translateX: driftX },
-                        { scale: cloudScales[index] },
-                      ],
-                    },
-                  ]}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.9}
-                    onPress={() => handleMoodSelect(mood, index)}
-                    style={styles.cloudTouchable}
-                  >
-                    <Image
-                      source={CLOUD_IMAGES[mood.cloudKey]}
-                      style={[
-                        styles.cloudImage,
-                        { width: layout.width, height: Math.round(layout.height * 0.78) },
-                      ]}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.cloudLabel}>{mood.label}</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
-        </View>
-
-        {selectedMood && (
-          <Animated.View
-            style={[
-              styles.hybridPanel,
-              { opacity: panelOpacity, transform: [{ translateY: panelTranslateY }] },
-            ]}
-          >
-            <View style={styles.diarySection}>
-              <Text style={styles.diaryTitle}>Mama's Heartfelt Words</Text>
-              <TextInput
-                style={styles.diaryInput}
-                placeholder="Pour every thought here, love…"
-                placeholderTextColor="rgba(220, 210, 235, 0.55)"
-                multiline
-                scrollEnabled
-                textAlignVertical="top"
-                value={journalText}
-                onChangeText={setJournalText}
-              />
-            </View>
-
-            <View
-              style={[
-                styles.chatDrawerClip,
-                selectedMood ? styles.chatDrawerClipOpen : styles.chatDrawerClipClosed,
-              ]}
-              pointerEvents={selectedMood && showChat ? 'auto' : 'none'}
-            >
-              <Animated.View
-                style={[
-                  styles.chatDrawer,
-                  {
-                    opacity: chatOpacity,
-                    transform: [{ translateY: chatTranslateY }],
-                  },
-                ]}
-              >
-                <View style={styles.chatSection}>
-                  <Text style={styles.chatTitle}>Your village companion</Text>
-                  <ScrollView
-                    style={styles.chatLog}
-                    contentContainerStyle={styles.chatLogContent}
-                    showsVerticalScrollIndicator={false}
-                  >
-                    {messages.map((msg) => (
-                      <View
-                        key={msg.id}
-                        style={[
-                          styles.bubble,
-                          msg.role === 'user' ? styles.userBubble : styles.friendBubble,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.bubbleText,
-                            msg.role === 'user' ? styles.userBubbleText : styles.friendBubbleText,
-                          ]}
-                        >
-                          {msg.text}
-                        </Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-
-                  <View style={styles.chatInputRow}>
-                    <TextInput
-                      style={styles.chatInput}
-                      placeholder="Talk to your friend…"
-                      placeholderTextColor="rgba(200, 190, 220, 0.6)"
-                      value={chatInput}
-                      onChangeText={setChatInput}
-                      onSubmitEditing={sendChat}
-                      returnKeyType="send"
-                    />
-                    <TouchableOpacity style={styles.sendBtn} onPress={sendChat}>
-                      <Text style={styles.sendBtnText}>Send</Text>
-                    </TouchableOpacity>
-                  </View>
+          {phase === 'journal' && selectedMood ? (
+            <Reanimated.View style={[styles.journalAnchor, journalAnimatedStyle]}>
+              <View style={styles.diarySection}>
+                <Text style={styles.diaryTitle}>
+                  {selectedMood.label} — pour your heart here
+                </Text>
+                {openingPrompt ? (
+                  <Text style={styles.openingPrompt}>{openingPrompt}</Text>
+                ) : null}
+                <View style={styles.releaseStage}>
+                  <TextInput
+                    style={[styles.diaryInput, releasing && styles.diaryInputReleasing]}
+                    placeholder="Write freely… then Release Thoughts when you are ready."
+                    placeholderTextColor="rgba(220, 210, 235, 0.55)"
+                    multiline
+                    scrollEnabled
+                    textAlignVertical="top"
+                    value={journalText}
+                    onChangeText={setJournalText}
+                    editable={!releasing}
+                  />
+                  <TextDissolveRelease
+                    ref={releaseRef}
+                    textStyle={styles.diaryInput}
+                    tint="rgba(232, 224, 242, 0.95)"
+                  />
                 </View>
-              </Animated.View>
-            </View>
-
-            <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-              <Text style={styles.shareBtnText}>Share with your village friend</Text>
-            </TouchableOpacity>
-
-            {journalLogs.length > 0 && (
-              <View style={styles.logsSection}>
-                <Text style={styles.logsTitle}>Chronological soul entries</Text>
-                {journalLogs.slice(-3).reverse().map((log) => (
-                  <View key={log.id} style={styles.logRow}>
-                    <Text style={styles.logMeta}>
-                      {log.moodLabel} · {new Date(log.timestamp).toLocaleDateString()}
-                    </Text>
-                    <Text style={styles.logSnippet} numberOfLines={2}>
-                      {log.text}
-                    </Text>
-                  </View>
-                ))}
+                <TouchableOpacity
+                  style={[styles.releaseBtn, releasing && styles.releaseBtnDisabled]}
+                  onPress={handleDoneEmpty}
+                  activeOpacity={0.88}
+                  disabled={releasing}
+                >
+                  <Text style={styles.releaseBtnText}>
+                    {journalText.trim() ? 'Release Thoughts' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            )}
 
-            <TouchableOpacity style={styles.resetLink} onPress={resetSanctuary}>
-              <Text style={styles.resetLinkText}>Choose a different mood cloud →</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </View>
-
-      <View style={styles.privacyBanner}>
-        <Text style={styles.privacyIcon}>🛡️</Text>
-        <View style={styles.privacyCopy}>
-          <Text style={styles.privacyTitle}>Private & Secured</Text>
-          <Text style={styles.privacyBody}>
-            End-to-End On-Device Encryption Active. Your personal thoughts remain yours alone.
-          </Text>
-        </View>
-      </View>
-
-      <Modal visible={!!assistancePopup} transparent animationType="fade" onRequestClose={dismissPopup}>
-        <View style={styles.popupOverlay}>
-          <TouchableOpacity style={styles.popupScrim} activeOpacity={1} onPress={dismissPopup} />
-          {assistancePopup && (
-            <Animated.View
-              style={[styles.popupCard, { opacity: popupAnim, transform: [{ scale: popupScale }] }]}
-            >
-              <Text style={styles.popupEyebrow}>Kind affirmation for you</Text>
-              <Text style={styles.popupAffirmation}>{assistancePopup.affirmation}</Text>
-              <Text style={styles.popupTipLabel}>Derived village tip</Text>
-              <Text style={styles.popupTip}>{assistancePopup.tip}</Text>
-              <TouchableOpacity style={styles.popupBtn} onPress={dismissPopup}>
-                <Text style={styles.popupBtnText}>Hold this warmth close</Text>
+              <TouchableOpacity style={styles.resetLink} onPress={resetSanctuary}>
+                <Text style={styles.resetLinkText}>Choose a different mood cloud →</Text>
               </TouchableOpacity>
-            </Animated.View>
-          )}
+            </Reanimated.View>
+          ) : null}
+
+          {phase === 'clouds' ? (
+          <View style={styles.stage}>
+            <View style={styles.cloudCluster} pointerEvents="auto">
+              {SANCTUARY_MOODS.map((mood, index) => {
+                const layout = CLOUD_LAYOUT[index];
+                const isSelected = selectedIndex === index;
+                const floatY = cloudFloats[index].interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [-8, 0, 8],
+                });
+                const driftY = cloudDrifts[index].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -340],
+                });
+                const driftX = cloudDrifts[index].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 56],
+                });
+                const driftOpacity = cloudDrifts[index].interpolate({
+                  inputRange: [0, 0.65, 1],
+                  outputRange: [1, 0.75, 0],
+                });
+                const cloudOpacity =
+                  selectedIndex === null ? 1 : isSelected ? driftOpacity : othersFade;
+
+                return (
+                  <Animated.View
+                    key={mood.id}
+                    style={[
+                      styles.cloudWrap,
+                      {
+                        top: layout.top,
+                        left: layout.left,
+                        width: layout.width,
+                        height: layout.height,
+                      },
+                      {
+                        opacity: cloudOpacity,
+                        transform: [
+                          { translateY: Animated.add(floatY, driftY) },
+                          { translateX: driftX },
+                          { scale: cloudScales[index] },
+                        ],
+                      },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => handleMoodSelect(mood, index)}
+                      style={styles.cloudTouchable}
+                    >
+                      <Image
+                        source={CLOUD_IMAGES[mood.cloudKey]}
+                        style={[
+                          styles.cloudImage,
+                          { width: layout.width, height: Math.round(layout.height * 0.78) },
+                        ]}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.cloudLabel}>{mood.label}</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </View>
+          ) : null}
+
+          {sortedHistory.length > 0 ? (
+            <View style={styles.timelineSection}>
+              <Text style={styles.timelineTitle}>Your venting timeline</Text>
+              <Text style={styles.timelineHint}>
+                Tap an entry to unlock your words and a soft note from a mama friend.
+              </Text>
+              {sortedHistory.map((entry, idx) => (
+                <TimelineCard
+                  key={entry.id}
+                  entry={entry}
+                  isLast={idx === sortedHistory.length - 1}
+                  expanded={expandedEntryId === entry.id}
+                  onPress={() => handleTimelineEntryPress(entry.id)}
+                />
+              ))}
+            </View>
+          ) : null}
+        </ScrollView>
+
+        <View style={styles.privacyBanner}>
+          <Text style={styles.privacyIcon}>🕊️</Text>
+          <View style={styles.privacyCopy}>
+            <Text style={styles.privacyTitle}>Your quiet corner</Text>
+            <Text style={styles.privacyBody}>
+              These thoughts stay on your device — a soft place just for you.
+            </Text>
+          </View>
         </View>
-      </Modal>
-    </Animated.View>
+      </Animated.View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  loungeFlex: {
+    backgroundColor: '#14121C',
+  },
   root: {
+    flex: 1,
     paddingHorizontal: 14,
     paddingBottom: 12,
     position: 'relative',
     overflow: 'visible',
+    justifyContent: 'flex-start',
+  },
+  scroll: { flex: 1, flexShrink: 1 },
+  scrollContent: {
+    paddingBottom: 24,
+    justifyContent: 'flex-start',
+    flexGrow: 1,
+  },
+  journalAnchor: {
+    marginTop: 24,
+    justifyContent: 'flex-start',
+    width: '100%',
+    zIndex: 10,
+    flexShrink: 0,
   },
   backBtn: {
     alignSelf: 'flex-start',
@@ -468,8 +505,7 @@ const styles = StyleSheet.create({
     color: '#FFF5FA',
     textAlign: 'center',
     letterSpacing: 1.2,
-    marginTop: 0,
-    marginBottom: 8,
+    marginBottom: 4,
     textShadowColor: 'rgba(233, 168, 137, 0.55)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 14,
@@ -482,21 +518,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'rgba(248, 244, 255, 0.88)',
     textAlign: 'center',
-    marginBottom: 14,
+    marginBottom: 6,
     fontStyle: 'italic',
-    letterSpacing: 0.3,
     ...Platform.select({
       web: { fontFamily: 'Georgia, "Palatino Linotype", serif' },
     }),
   },
   stage: {
-    minHeight: 380,
+    minHeight: CLOUD_CLUSTER_H + 48,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
     position: 'relative',
     overflow: 'visible',
     zIndex: 1,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   cloudCluster: {
-    height: 360,
+    width: CLOUD_CLUSTER_W,
+    height: CLOUD_CLUSTER_H,
+    alignSelf: 'center',
     position: 'relative',
     marginBottom: 10,
     overflow: 'visible',
@@ -521,18 +563,14 @@ const styles = StyleSheet.create({
   },
   cloudLabel: {
     position: 'absolute',
-    bottom: 6,
-    fontSize: 12,
+    bottom: 4,
+    fontSize: 11,
     fontWeight: '700',
     color: '#F8F4FF',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
-  },
-  hybridPanel: {
-    marginTop: 4,
-    zIndex: 2,
   },
   diarySection: {
     borderRadius: 18,
@@ -554,169 +592,51 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 4,
   },
+  openingPrompt: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255, 236, 246, 0.88)',
+    textAlign: 'center',
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+    ...SANCTUARY_ZEN,
+  },
   diaryInput: {
     minHeight: 140,
     maxHeight: 200,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 16,
     color: '#FFF9FC',
     fontStyle: 'italic',
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 16,
     backgroundColor: 'transparent',
+    ...SANCTUARY_ZEN,
   },
-  chatDrawerClip: {
-    overflow: 'hidden',
-    width: '100%',
-    ...Platform.select({
-      web: {
-        willChange: 'transform',
-      },
-      default: {},
-    }),
+  diaryInputReleasing: {
+    opacity: 0,
   },
-  chatDrawerClipClosed: {
-    height: 0,
-    marginBottom: 0,
+  releaseStage: {
+    position: 'relative',
+    minHeight: 140,
   },
-  chatDrawerClipOpen: {
-    height: CHAT_DRAWER_HEIGHT,
-    marginBottom: 12,
-  },
-  chatDrawer: {
-    height: CHAT_DRAWER_HEIGHT,
-    width: '100%',
-  },
-  chatSection: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    padding: 12,
-    ...Platform.select({
-      web: { backdropFilter: 'blur(10px)' },
-    }),
-  },
-  chatTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: 'rgba(255, 255, 255, 0.65)',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  chatLog: {
-    flex: 1,
-    minHeight: 88,
-    maxHeight: 150,
-    marginBottom: 10,
-  },
-  chatLogContent: {
-    paddingBottom: 4,
-  },
-  bubble: {
+  releaseBtn: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 14,
     borderRadius: 14,
-    padding: 10,
-    marginBottom: 8,
-    maxWidth: '92%',
-  },
-  friendBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(233, 168, 137, 0.38)',
-    borderWidth: 1,
-    borderColor: 'rgba(233, 168, 137, 0.55)',
-  },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.28)',
-  },
-  bubbleText: {
-    fontSize: 13,
-    lineHeight: 19,
-    fontStyle: 'italic',
-  },
-  friendBubbleText: {
-    color: '#FFF5F8',
-  },
-  userBubbleText: {
-    color: '#F8F4FF',
-  },
-  chatInputRow: {
-    flexDirection: 'row',
+    backgroundColor: 'rgba(233, 168, 137, 0.88)',
     alignItems: 'center',
-  },
-  chatInput: {
-    flex: 1,
-    marginRight: 8,
-    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: '#F8F4FF',
-    fontStyle: 'italic',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
-  sendBtn: {
-    backgroundColor: 'rgba(233, 168, 137, 0.85)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  releaseBtnDisabled: {
+    opacity: 0.55,
   },
-  sendBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  shareBtn: {
-    backgroundColor: 'rgba(140, 119, 71, 0.9)',
-    borderRadius: 14,
-    paddingVertical: 13,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  shareBtnText: {
-    color: '#fff',
-    fontSize: 13,
+  releaseBtnText: {
+    color: '#FFF8F4',
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.2,
-  },
-  logsSection: {
-    marginBottom: 10,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  logsTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 1,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  logRow: {
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  logMeta: {
-    fontSize: 10,
-    color: 'rgba(233, 184, 212, 0.9)',
-    marginBottom: 2,
-  },
-  logSnippet: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
-    fontStyle: 'italic',
-    lineHeight: 17,
   },
   resetLink: {
     marginBottom: 12,
@@ -725,6 +645,110 @@ const styles = StyleSheet.create({
   resetLinkText: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
+    fontStyle: 'italic',
+  },
+  timelineSection: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+  timelineTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(255, 248, 252, 0.92)',
+    marginBottom: 6,
+    fontStyle: 'italic',
+  },
+  timelineHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(230, 220, 240, 0.62)',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  timelineRail: {
+    width: 24,
+    alignItems: 'center',
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(233, 184, 212, 0.9)',
+    marginTop: 6,
+  },
+  timelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginTop: 4,
+    minHeight: 24,
+  },
+  timelineCard: {
+    flex: 1,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  timelineCardExpanded: {
+    borderColor: 'rgba(233, 184, 212, 0.45)',
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  timelineLockedHint: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.55)',
+    fontStyle: 'italic',
+    letterSpacing: 0.2,
+  },
+  timelineMeta: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(233, 184, 212, 0.95)',
+    marginBottom: 12,
+    letterSpacing: 0.3,
+  },
+  timelineBody: {
+    ...SANCTUARY_ZEN,
+    fontSize: 22,
+    lineHeight: 32,
+    color: 'rgba(255,255,255,0.94)',
+    fontStyle: 'italic',
+    marginBottom: 16,
+  },
+  friendNoteWrap: {
+    marginTop: 4,
+  },
+  friendNoteLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: 'rgba(233, 184, 212, 0.88)',
+    marginBottom: 8,
+  },
+  friendNoteBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(255, 252, 248, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 96,
+  },
+  friendNoteBody: {
+    ...SANCTUARY_ZEN,
+    fontSize: 17,
+    lineHeight: 26,
+    color: 'rgba(255, 248, 244, 0.94)',
     fontStyle: 'italic',
   },
   privacyBanner: {
@@ -756,64 +780,5 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.72)',
     marginTop: 3,
     fontStyle: 'italic',
-  },
-  popupOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  popupScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 11, 31, 0.72)',
-  },
-  popupCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(233, 168, 137, 0.45)',
-    zIndex: 2,
-  },
-  popupEyebrow: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#8C7747',
-    letterSpacing: 1.1,
-    textAlign: 'center',
-  },
-  popupAffirmation: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#3d4a42',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 14,
-  },
-  popupTipLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#6b7d72',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  popupTip: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#5a6e62',
-    marginTop: 4,
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  popupBtn: {
-    backgroundColor: '#8C7747',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  popupBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
   },
 });

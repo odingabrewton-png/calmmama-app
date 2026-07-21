@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { enableScreens } from 'react-native-screens';
+
+// Custom keep-alive tabs — native screen containers fight our off-screen show/hide.
+enableScreens(false);
+
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   Image,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   StatusBar,
@@ -14,24 +18,84 @@ import {
   Platform,
   Alert,
   Linking,
+  Modal,
+  Pressable,
+  InteractionManager,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // Official transparent logo — offline Base64 data URI (generated in calmmamaLogoBase64.js)
 import {
   CALMMAMA_OFFICIAL_LOGO,
   CALMMAMA_VILLAGE_BADGE,
 } from './calmmamaLogoBase64';
-import WeeklyBloomScreen from './WeeklyBloomScreen';
-import VillageBrandHeader from './VillageBrandHeader';
-import CosmicNebulaBackdrop from './CosmicNebulaBackdrop';
-import CalmMamaOmbreBackdrop from './CalmMamaOmbreBackdrop';
-import SoulSanctuaryScreen from './SoulSanctuaryScreen';
+import WeeklyBloomScreen from './WeeklyBloomScreen'; // layout locked — pregnantBloomLayoutConfig.js
+import AppBrandHeader from './AppBrandHeader';
+import VillageOmbreBackdrop from './VillageOmbreBackdrop';
+import PWAInstallPrompt from './PWAInstallPrompt';
+import { CALM_MAMA_PASTEL } from './calmMamaPastelPalette';
 import CloudNurseryScreen from './CloudNurseryScreen';
-import VillageCommunityPortal from './VillageCommunityPortal';
-import MamaIdentityCard from './MamaIdentityCard';
+import LittleHorizonsScreen from './LittleHorizonsScreen';
+import SubscriptionScreen from './SubscriptionScreen';
+import VillageCommunityPortal from './src/VillageCommunityPortal';
 import MamasKitchenScreen from './MamasKitchenScreen';
+import HomeScreen from './HomeScreen';
 import BirthdayBoutiqueModal from './BirthdayBoutiqueModal';
+import TabFreezeBoundary from './TabFreezeBoundary';
+import { TAB_NAV_PERF } from './tabShellConfig';
+import LegalComplianceModal from './LegalComplianceModal';
+import AnimatedLogoHeader from './AnimatedLogoHeader';
+import OnboardingStageScreen from './OnboardingStageScreen';
+import WelcomeDashboardView from './WelcomeDashboardView';
+import {
+  applyProfileSnapshot,
+  buildProfileSnapshot,
+  clearAllVillageStorage,
+  loadBootState,
+  saveVillageProfile,
+  setHasCompletedOnboarding,
+} from './villageStorage';
+import { normalizeTimeCapsuleEntries, normalizeTimeCapsuleEntry } from './timeCapsuleStorage';
+import { NOTIFICATION_ROUTES } from './notificationConfig';
+/* RESTORE (Apple Developer): re-enable village notification scheduler imports
+import {
+  cancelAllVillageNotifications,
+  bootstrapVillageNotifications,
+  consumeInitialNotificationRoute,
+  isKnownNotificationRoute,
+  subscribeToNotificationResponses,
+  syncVillageNotificationSchedule,
+} from './villageNotificationScheduler';
+*/
+import { isKnownNotificationRoute } from './villageNotificationScheduler';
+import { getHomeJourneyPhase, showsLittleBitesKitchen } from './homeJourneyUtils';
+import {
+  fetchFoundingGiftsClaimCount,
+  submitFoundingGiftClaim,
+  isFoundingGiftsAvailable,
+  hasUserClaimedFoundingGift,
+} from './foundingGiftsEngine';
+import {
+  getSubscriptionProductId,
+  isYearlyFoundingGiftTier,
+  isPremiumSubscribed,
+} from './subscriptionConfig';
+import LotusFlowerButton from './LotusFlowerButton';
+
+import MidnightLoungeScreen from './MidnightLoungeScreen'; // layout locked — midnightLoungeLayoutConfig.js
+const PostpartumInfantHome = lazy(() => import('./PostpartumInfantHome'));
+const VillageTimeCapsule = lazy(() => import('./VillageTimeCapsule'));
+import PostpartumHomePollModal from './PostpartumHomePollModal';
+
+function AppStatusBar() {
+  return (
+    <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+  );
+}
 import { isBirthdayToday } from './mamaBirthdayUtils';
 import { MAMA_KITCHEN_RECIPES } from './mealsData';
+import { getPostpartumDailyWins, getPostpartumWinsDayKey } from './postpartumDailyWins';
+import { getPostpartumVibeMeals } from './postpartumVibeKitchen';
+import { getPregnantSymptomMeals } from './pregnantSymptomKitchen';
 import {
   collectTherapeuticTagsFromSymptoms,
   collectTherapeuticTagsFromVibes,
@@ -40,21 +104,37 @@ import {
   getTherapeuticHeadlineForVibes,
 } from './mealsTherapeuticMap';
 import {
+  animateBottomNavHide,
+  animateBottomNavShow,
+  animateMidnightLoungeClose,
+  animateMidnightLoungeOpen,
   animateVillageTabFlow,
-  configureVillageLayoutTransition,
+  getPregnantVillageTabFlowStyle,
   getVillageTabFlowStyle,
+  runNativeOpacitySceneSwap,
+  runPregnantVillageTabTransition,
   runVillageTabTransition,
+  suppressVillageLayoutAnimation,
   useVillagePressTransition,
 } from './villageScreenTransitions';
-import { VILLAGE_IN_OUT_SIN } from './villageEasing';
+import { logNativeCheckpoint, guardPromise } from './nativeRuntimeGuard';
+import { warmMidnightLounge } from './midnightLoungePreload';
+import { warmBloomVideos } from './bloomVideoPlayerPool';
+import { warmPregnantKitchenImages, warmAllPregnantKitchenImages } from './pregnantKitchenImagePreload';
+import { warmPostpartumHome } from './postpartumHomePreload';
+import { warmPregnantHome } from './pregnantHomePreload';
+import {
+  PREGNANT_DAILY_CARDS,
+  PREGNANT_DAILY_LAYOUT,
+  PREGNANT_DAILY_LAYOUT_LOCKED,
+  PREGNANT_DAILY_STACK,
+} from './pregnantDailyLayoutConfig';
 import {
   getBottomNavStyle,
-  getIphoneFrameStyle,
-  getShellFooterLinksStyle,
-  getWebWrapperStyle,
   injectMobileWebViewport,
   useMobileWebLayout,
 } from './mobileWebLayout';
+import AppLayout from './AppLayout';
 import { injectNurseryWebFonts, retroHubTitle } from './nurseryRetroFonts';
 import { getVillageRemedy } from './villageRemedyTips';
 import { REGISTRY_CURATED_PRODUCTS } from './registryData';
@@ -64,8 +144,6 @@ import {
   BASKET_SEEKING,
 } from './villageCommunityData';
 
-const AMAZON_ASSOCIATE_TAG = 'calmmamavilla-20';
-const VILLAGE_CHOICE_THRESHOLD = 3;
 const REGISTRY_ASSET_PLACEHOLDERS = [
   require('./assets/soul-cloud-sage.png'),
   require('./assets/soul-cloud-peach.png'),
@@ -82,20 +160,6 @@ const REGISTRY_INVENTORY = REGISTRY_CURATED_PRODUCTS.map((item, index) => ({
   ...item,
   imageSource: resolveRegistryImageSource(item, index),
 }));
-
-function buildAmazonAffiliateUrl(url) {
-  if (!url) return url;
-  // Amazon associate tag is `tag=xxxx-20` for most URLs. Keep it safe & non-destructive.
-  try {
-    const u = new URL(url);
-    u.searchParams.set('tag', AMAZON_ASSOCIATE_TAG);
-    return u.toString();
-  } catch {
-    const stripped = url.replace(/([?&])tag=[^&]*&?/g, '$1').replace(/[?&]$/, '');
-    const hasQuery = stripped.includes('?');
-    return `${stripped}${hasQuery ? '&' : '?'}tag=${AMAZON_ASSOCIATE_TAG}`;
-  }
-}
 
 function safeOpenUrl(url) {
   if (!url) return;
@@ -546,26 +610,29 @@ function VillageCandleSanctumLayer({
 const DEFAULT_MAMA_DISCOVERY = {
   heartSpace:
     'Slow mornings with honey tea, a chapter of fiction, and permission to nap without guilt.',
-  centerRitual:
-    'Three deep belly breaths at the kitchen window, then one song that always makes me feel held.',
+  groundedActivities:
+    'Gentle walks, watercolor journaling, and ten minutes of quiet on the porch.',
+  villageShares:
+    'The Midnight Library, Call the Midwife, and any podcast that made me feel less alone.',
 };
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+/**
+ * TEMP layout audit — forces intake → feature highlights on every cold start.
+ * Set to `false` before production release.
+ */
+const FORCE_ONBOARDING_LAYOUT_AUDIT =
+  typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 
 const ONBOARDING_SERIF = Platform.select({
   web: { fontFamily: 'Georgia, "Palatino Linotype", "Times New Roman", serif' },
   default: {},
 });
 
-const ONBOARDING_WELCOME_FONT = {
-  ...retroHubTitle,
-  fontSize: 34,
-  lineHeight: 46,
-  letterSpacing: 0.4,
-};
-
 function startLogoPulseLoop(pulseAnim, loopRef) {
-  loopRef.current?.stop();
+  // Don't snap the logo to 0.95 on every Home/journey enter — that reads as a header glitch.
+  if (loopRef.current) return;
   pulseAnim.setValue(0.95);
   loopRef.current = Animated.loop(
     Animated.sequence([
@@ -614,6 +681,21 @@ const DEFAULT_MAMA_WINS = [
   { id: 4, text: 'Take postpartum recovery care / vitamins 💊', done: false },
 ];
 
+const TODDLER_VIBES = [
+  { id: 'whirlwind', emoji: '🌀', label: 'Whirlwind Energy' },
+  { id: 'teething', emoji: '🦷', label: 'Teething/Fussy' },
+  { id: 'calm', emoji: '✨', label: 'Calm Exploration' },
+  { id: 'emotions', emoji: '😮‍💨', label: 'Big Emotions' },
+];
+
+const DEFAULT_TODDLER_WINS = [
+  { id: 1, text: 'Nap Window Secured 💤', done: false },
+  { id: 2, text: 'Real Food / Solid Hydration Check 🥦', done: false },
+  { id: 3, text: 'Energy Release (Outdoor Play) ☀️', done: false },
+  { id: 4, text: 'Drank a hot beverage in peace ☕', done: false },
+  { id: 5, text: 'Logged a funny quote or win to the Time Capsule ✏️', done: false },
+];
+
 function getPregnancyTrimester(weeksPregnant) {
   const week = parseInt(String(weeksPregnant), 10);
   if (Number.isNaN(week) || week < 14) return 1;
@@ -629,6 +711,17 @@ function formatKickElapsed(ms) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function therapeuticMealImageSource(meal) {
+  if (meal?.image != null && typeof meal.image !== 'string') return meal.image;
+  if (typeof meal?.imageUrl === 'string' && meal.imageUrl.length > 0) {
+    return { uri: meal.imageUrl };
+  }
+  if (typeof meal?.image === 'string' && meal.image.length > 0) {
+    return { uri: meal.image };
+  }
+  return null;
+}
+
 function TherapeuticMealFeed({ meals, headline, onOpenKitchen }) {
   if (!meals?.length) return null;
 
@@ -642,15 +735,24 @@ function TherapeuticMealFeed({ meals, headline, onOpenKitchen }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.therapeuticFeedRow}
       >
-        {meals.map((meal) => (
-          <View key={meal.id} style={styles.therapeuticMealTile}>
-            <Image source={{ uri: meal.imageUrl }} style={styles.therapeuticMealImage} resizeMode="cover" />
-            <Text style={styles.therapeuticMealTitle} numberOfLines={2}>
-              {meal.title}
-            </Text>
-            <Text style={styles.therapeuticMealMeta}>{meal.prepMinutes} min · {meal.servings} servings</Text>
-          </View>
-        ))}
+        {meals.map((meal) => {
+          const source = therapeuticMealImageSource(meal);
+          return (
+            <View key={meal.id} style={styles.therapeuticMealTile}>
+              {source ? (
+                <Image source={source} style={styles.therapeuticMealImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.therapeuticMealImage, styles.therapeuticMealImageFallback]} />
+              )}
+              <Text style={styles.therapeuticMealTitle} numberOfLines={2}>
+                {meal.title}
+              </Text>
+              <Text style={styles.therapeuticMealMeta}>
+                {meal.prepMinutes ?? 20} min · {meal.servings ?? 2} servings
+              </Text>
+            </View>
+          );
+        })}
       </ScrollView>
       {onOpenKitchen ? (
         <TouchableOpacity style={styles.therapeuticKitchenLink} onPress={onOpenKitchen} activeOpacity={0.88}>
@@ -710,8 +812,7 @@ function SoulSanctuaryEntryCard({ onEnter }) {
   );
 }
 
-function VillageRemedyPopup({ symptom, visible, onDismissed }) {
-  const remedy = symptom ? getVillageRemedy(symptom.id) : null;
+function VillageRemedyPopup({ symptom, remedy, visible, onDismissed }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(28)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
@@ -822,12 +923,13 @@ function VillageRemedyPopup({ symptom, visible, onDismissed }) {
   );
 }
 
-/** Pregnant Daily tab — symptom, kick counter, nesting checklist */
+/** Pregnant Daily tab — layout locked (pregnantDailyLayoutConfig.js). Say "UNLOCK DAILY LAYOUT" to edit structure. */
 function renderPregnantDailyTracker({
   panelStyle,
   weeksPregnant,
   selectedSymptoms,
   onToggleSymptom,
+  onDeselectSymptom,
   symptomHistory,
   kickSession,
   kickSessionLog,
@@ -853,15 +955,22 @@ function renderPregnantDailyTracker({
     kickSession.startedAt != null ? Date.now() - kickSession.startedAt : 0;
 
   return (
-    <View style={panelStyle}>
-      <View style={styles.dailyTabHeader}>
+    <ScrollView
+      style={styles.pregnantDailyScroll}
+      contentContainerStyle={[panelStyle, styles.pregnantDailyScrollContent]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      nestedScrollEnabled
+    >
+      <View style={styles.dailyTabHeader} nativeID={PREGNANT_DAILY_STACK[0]}>
         <Text style={styles.dailyTabTitle}>✨ Daily Village</Text>
         <Text style={styles.dailyTabSub}>Symptoms, kicks & nesting — all in one gentle place</Text>
       </View>
 
-      <View style={styles.homeGlassCard}>
+      <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.symptom}>
         <Text style={styles.homeCardTitle}>🤰 Quick Daily Symptom Tracker</Text>
-        <Text style={styles.homeCardHint}>Tap how you're feeling today — saved softly to your log</Text>
+        <Text style={styles.homeCardHint}>Tap for a village remedy — tap again for another tip. Long-press to remove.</Text>
         <View style={styles.symptomRow}>
           {SANCTUARY_SYMPTOMS.map((symptom) => {
             const active = selectedSymptoms.includes(symptom.id);
@@ -870,6 +979,7 @@ function renderPregnantDailyTracker({
                 key={symptom.id}
                 style={[styles.symptomChip, active && styles.symptomChipActive]}
                 onPress={() => onToggleSymptom(symptom.id)}
+                onLongPress={() => onDeselectSymptom?.(symptom.id)}
                 activeOpacity={0.85}
               >
                 <Text style={styles.symptomEmoji}>{symptom.emoji}</Text>
@@ -899,7 +1009,7 @@ function renderPregnantDailyTracker({
         />
       </View>
 
-      <View style={styles.homeGlassCard}>
+      <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.kick}>
         <Text style={styles.homeCardTitle}>👣 The Kick Counter</Text>
         <Text style={styles.homeCardHint}>{trimesterLabels[trimester]}</Text>
         <View style={styles.kickMetaRow}>
@@ -952,7 +1062,7 @@ function renderPregnantDailyTracker({
         ) : null}
       </View>
 
-      <View style={styles.homeGlassCard}>
+      <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.nesting}>
         <Text style={styles.homeCardTitle}>📝 Nesting Intentions Checklist</Text>
         <Text style={styles.homeCardHint}>Check off cozy preparations at your own pace</Text>
         {nestingTasks.map((task) => (
@@ -983,7 +1093,7 @@ function renderPregnantDailyTracker({
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -1017,86 +1127,82 @@ function MamaWinRow({ task, onToggle }) {
   );
 }
 
-const WIN_CELEBRATION_SPARKLES = ['✨', '🌸', '💐', '🦋', '🌷', '💖', '☀️', '🌿', '⭐', '🎀', '💫', '🌼'];
+const FLOWER_FIREWORK_EMOJIS = ['🌸', '🌷', '🌼', '💐', '🪷', '🌺', '🏵️', '💮', '🌻', '🌿'];
 
-const FIREWORK_PARTICLES = WIN_CELEBRATION_SPARKLES.map((emoji, index) => {
-  const spread = (index - (WIN_CELEBRATION_SPARKLES.length - 1) / 2) * 0.48;
-  const angle = -Math.PI / 2 + spread;
-  const power = 52 + (index % 5) * 14;
-  const endX = Math.cos(angle) * power;
-  const endY = Math.sin(angle) * power - 18;
-  const peakX = endX * 0.45;
-  const peakY = endY - 42 - (index % 4) * 10;
-  return { emoji, endX, endY, peakX, peakY, spin: index % 2 === 0 ? 12 : -10 };
+function buildFlowerParticles(emojis, { spread = 0.48, powerBase = 52, powerStep = 14, lift = 42 }) {
+  return emojis.map((emoji, index) => {
+    const spreadOffset = (index - (emojis.length - 1) / 2) * spread;
+    const angle = -Math.PI / 2 + spreadOffset;
+    const power = powerBase + (index % 5) * powerStep;
+    const endX = Math.cos(angle) * power;
+    const endY = Math.sin(angle) * power - 18;
+    const peakX = endX * 0.45;
+    const peakY = endY - lift - (index % 4) * 10;
+    return { emoji, endX, endY, peakX, peakY, spin: index % 2 === 0 ? 14 : -12 };
+  });
+}
+
+const FLOWER_BURST_INNER = buildFlowerParticles(FLOWER_FIREWORK_EMOJIS.slice(0, 6), {
+  spread: 0.5,
+  powerBase: 72,
+  lift: 58,
+});
+const FLOWER_BURST_OUTER = buildFlowerParticles(FLOWER_FIREWORK_EMOJIS, {
+  spread: 0.62,
+  powerBase: 98,
+  powerStep: 14,
+  lift: 78,
 });
 
 const FIREWORK_BURST_EASING = Easing.bezier(0.22, 0.85, 0.18, 1);
 
-/** Prevents dev Strict Mode (and re-renders) from firing the celebration twice */
-let lastWinsCelebrationKey = '';
+function renderFlowerParticles(burstProgress, particles, fontSize) {
+  return particles.map((particle, index) => {
+    const tx = burstProgress.interpolate({
+      inputRange: [0, 0.22, 0.48, 0.78, 1],
+      outputRange: [0, particle.peakX * 0.4, particle.peakX, particle.endX * 0.94, particle.endX],
+    });
+    const ty = burstProgress.interpolate({
+      inputRange: [0, 0.22, 0.48, 0.78, 1],
+      outputRange: [0, particle.peakY * 0.3, particle.peakY, particle.endY * 0.9, particle.endY],
+    });
+    const opacity = burstProgress.interpolate({
+      inputRange: [0, 0.06, 0.2, 0.55, 0.82, 1],
+      outputRange: [0, 1, 1, 1, 0.65, 0],
+    });
+    const scale = burstProgress.interpolate({
+      inputRange: [0, 0.12, 0.35, 0.65, 1],
+      outputRange: [0.15, 1.2, 1.08, 0.95, 0.4],
+    });
+    const rotate = burstProgress.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', `${particle.spin}deg`],
+    });
 
-function FireworksBurst({ burstProgress, celebrationMessage, messageFade }) {
-  const messageOpacity = messageFade;
-  const messageScale = messageFade.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
+    return (
+      <Animated.View
+        key={`${particle.emoji}-${fontSize}-${index}`}
+        style={[
+          styles.fireworkParticleWrap,
+          {
+            opacity,
+            transform: [{ translateX: tx }, { translateY: ty }, { scale }, { rotate }],
+          },
+        ]}
+      >
+        <Text style={[styles.fireworkParticleEmoji, { fontSize }]}>{particle.emoji}</Text>
+      </Animated.View>
+    );
   });
+}
 
+function FireworksBurst({ burstProgress, bloomProgress }) {
   return (
-    <View style={styles.fireworksStage} pointerEvents="none">
-      <View style={styles.fireworksOrigin}>
-        {FIREWORK_PARTICLES.map((particle, index) => {
-          const tx = burstProgress.interpolate({
-            inputRange: [0, 0.28, 0.52, 0.8, 1],
-            outputRange: [0, particle.peakX * 0.35, particle.peakX, particle.endX * 0.92, particle.endX],
-          });
-          const ty = burstProgress.interpolate({
-            inputRange: [0, 0.28, 0.52, 0.8, 1],
-            outputRange: [0, particle.peakY * 0.25, particle.peakY, particle.endY * 0.88, particle.endY],
-          });
-          const opacity = burstProgress.interpolate({
-            inputRange: [0, 0.1, 0.35, 0.62, 0.88, 1],
-            outputRange: [0, 0.85, 1, 1, 0.45, 0],
-          });
-          const scale = burstProgress.interpolate({
-            inputRange: [0, 0.18, 0.42, 0.72, 1],
-            outputRange: [0.35, 1.08, 1.02, 0.88, 0.4],
-          });
-          const rotate = burstProgress.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['0deg', `${particle.spin}deg`],
-          });
-
-          return (
-            <Animated.Text
-              key={`${particle.emoji}-${index}`}
-              style={[
-                styles.fireworkParticle,
-                {
-                  opacity,
-                  transform: [{ translateX: tx }, { translateY: ty }, { scale }, { rotate }],
-                },
-              ]}
-            >
-              {particle.emoji}
-            </Animated.Text>
-          );
-        })}
+    <View style={styles.fireworksStage} pointerEvents="none" collapsable={false}>
+      <View style={styles.fireworksOrigin} collapsable={false}>
+        {renderFlowerParticles(burstProgress, FLOWER_BURST_INNER, 36)}
+        {renderFlowerParticles(bloomProgress, FLOWER_BURST_OUTER, 42)}
       </View>
-      {celebrationMessage ? (
-        <View style={styles.fireworksMessageStack}>
-          <Animated.Text
-            style={[
-              celebrationMessage === 'cheer' ? styles.fireworksPopText : styles.fireworksPopSubtext,
-              { opacity: messageOpacity, transform: [{ scale: messageScale }] },
-            ]}
-          >
-            {celebrationMessage === 'cheer'
-              ? 'Way to go, Mama!'
-              : 'Take time to celebrate yourself.'}
-          </Animated.Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1112,14 +1218,17 @@ function PostpartumDailyTracker({
   therapeuticMeals,
   therapeuticHeadline,
   onOpenKitchen,
+  dailySub = 'Vibes & mama-first wins — all in one gentle place',
+  vibeSectionTitle = '🌸 Postpartum Daily Vibe Check',
+  vibeSectionHint = 'How is your heart today? Tap softly — we remember.',
+  vibesList = POSTPARTUM_VIBES,
+  winsSectionTitle = '📝 Mama-First Daily Wins',
+  winsSectionHint = 'Micro-intentions that honor you, not just output',
 }) {
   const [showFireworks, setShowFireworks] = useState(false);
-  const [celebrationMessage, setCelebrationMessage] = useState(null);
   const burstAnim = useRef(new Animated.Value(0)).current;
-  const messageFade = useRef(new Animated.Value(0)).current;
+  const bloomAnim = useRef(new Animated.Value(0)).current;
   const celebrationTimers = useRef([]);
-  const allWinsDone =
-    mamaWinsTasks.length > 0 && mamaWinsTasks.every((task) => task.done);
 
   const clearCelebrationTimers = () => {
     celebrationTimers.current.forEach(clearTimeout);
@@ -1131,80 +1240,73 @@ function PostpartumDailyTracker({
     celebrationTimers.current.push(id);
   };
 
-  const fadeCelebrationMessage = (toValue, durationMs = 650, onDone) => {
-    Animated.timing(messageFade, {
-      toValue,
-      duration: durationMs,
-      easing: toValue ? Easing.out(Easing.cubic) : VILLAGE_IN_OUT_SIN,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start(({ finished }) => {
-      if (finished && onDone) onDone();
-    });
-  };
-
-  useEffect(() => {
-    if (!allWinsDone) {
-      lastWinsCelebrationKey = '';
-      clearCelebrationTimers();
-      setShowFireworks(false);
-      setCelebrationMessage(null);
-      burstAnim.setValue(0);
-      messageFade.setValue(0);
-      return undefined;
-    }
-
-    const celebrationKey = mamaWinsTasks.map((t) => `${t.id}:${t.done}`).join('|');
-    if (lastWinsCelebrationKey === celebrationKey) return undefined;
-    lastWinsCelebrationKey = celebrationKey;
-
-    setShowFireworks(true);
-    setCelebrationMessage('cheer');
+  const startWinsCelebration = useCallback(() => {
+    clearCelebrationTimers();
+    burstAnim.stopAnimation();
+    bloomAnim.stopAnimation();
     burstAnim.setValue(0);
-    messageFade.setValue(0);
-    fadeCelebrationMessage(1, 750);
+    bloomAnim.setValue(0);
+    setShowFireworks(true);
 
-    Animated.timing(burstAnim, {
-      toValue: 1,
-      duration: 4800,
-      easing: FIREWORK_BURST_EASING,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
+    const startId = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(burstAnim, {
+          toValue: 1,
+          duration: 2800,
+          easing: FIREWORK_BURST_EASING,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.sequence([
+          Animated.delay(160),
+          Animated.timing(bloomAnim, {
+            toValue: 1,
+            duration: 2600,
+            easing: FIREWORK_BURST_EASING,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]),
+      ]).start();
+    }, 48);
+    celebrationTimers.current.push(startId);
 
-    scheduleCelebration(() => {
-      fadeCelebrationMessage(0, 600, () => setCelebrationMessage(null));
-    }, 2800);
+    scheduleCelebration(() => setShowFireworks(false), 4000);
+  }, [burstAnim, bloomAnim]);
 
-    scheduleCelebration(() => {
-      setCelebrationMessage('rest');
-      fadeCelebrationMessage(1, 750);
-    }, 3550);
+  const handleWinToggle = useCallback(
+    (taskId) => {
+      const task = mamaWinsTasks.find((item) => item.id === taskId);
+      const completesLastWin =
+        task &&
+        !task.done &&
+        mamaWinsTasks.every((item) => item.id === taskId || item.done);
 
-    scheduleCelebration(() => {
-      fadeCelebrationMessage(0, 700, () => {
-        setCelebrationMessage(null);
-        setShowFireworks(false);
-      });
-    }, 6900);
+      onToggleMamaWin(taskId);
 
-    return () => {
-      clearCelebrationTimers();
-      burstAnim.stopAnimation();
-      messageFade.stopAnimation();
-    };
-  }, [allWinsDone, mamaWinsTasks, burstAnim, messageFade]);
+      if (completesLastWin) {
+        startWinsCelebration();
+      }
+    },
+    [mamaWinsTasks, onToggleMamaWin, startWinsCelebration]
+  );
+
+  useEffect(() => () => {
+    clearCelebrationTimers();
+    burstAnim.stopAnimation();
+    bloomAnim.stopAnimation();
+  }, [burstAnim, bloomAnim]);
 
   return (
     <View style={panelStyle}>
       <View style={styles.dailyTabHeader}>
         <Text style={styles.dailyTabTitle}>✨ Daily Village</Text>
-        <Text style={styles.dailyTabSub}>Vibes & mama-first wins — all in one gentle place</Text>
+        <Text style={styles.dailyTabSub}>{dailySub}</Text>
       </View>
 
       <View style={styles.homeGlassCard}>
-        <Text style={styles.homeCardTitle}>🌸 Postpartum Daily Vibe Check</Text>
-        <Text style={styles.homeCardHint}>How is your heart today? Tap softly — we remember.</Text>
+        <Text style={styles.homeCardTitle}>{vibeSectionTitle}</Text>
+        <Text style={styles.homeCardHint}>{vibeSectionHint}</Text>
         <View style={styles.symptomRow}>
-          {POSTPARTUM_VIBES.map((vibe) => {
+          {vibesList.map((vibe) => {
             const active = selectedVibes.includes(vibe.id);
             return (
               <TouchableOpacity
@@ -1240,148 +1342,140 @@ function PostpartumDailyTracker({
       </View>
 
       <View style={[styles.homeGlassCard, styles.winsCard]}>
-        <Text style={styles.homeCardTitle}>📝 Mama-First Daily Wins</Text>
-        <Text style={styles.homeCardHint}>Micro-intentions that honor you, not just output</Text>
+        <Text style={styles.homeCardTitle}>{winsSectionTitle}</Text>
+        <Text style={styles.homeCardHint}>{winsSectionHint}</Text>
         <View style={styles.winsCardBody}>
           {mamaWinsTasks.map((task) => (
             <MamaWinRow
               key={task.id}
               task={task}
-              onToggle={() => onToggleMamaWin(task.id)}
+              onToggle={() => handleWinToggle(task.id)}
             />
           ))}
-          {showFireworks ? (
-            <FireworksBurst
-              burstProgress={burstAnim}
-              celebrationMessage={celebrationMessage}
-              messageFade={messageFade}
-            />
-          ) : null}
         </View>
       </View>
+
+      <Modal
+        visible={showFireworks}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => setShowFireworks(false)}
+      >
+        <View style={styles.fireworkModalRoot} pointerEvents="none">
+          <FireworksBurst burstProgress={burstAnim} bloomProgress={bloomAnim} />
+        </View>
+      </Modal>
     </View>
   );
 }
 
-function RegistryItemImage({ item, style, emojiStyle, resizeMode = 'cover' }) {
-  const [failed, setFailed] = useState(false);
-
-  if (!item?.imageSource || failed) {
-    return <Text style={emojiStyle}>{item?.imageEmoji || '🎁'}</Text>;
-  }
-
+function renderSplitAppHeader(pulseAnim, { notchInsetExtra = 0, enableShine = true } = {}) {
   return (
-    <Image
-      source={item.imageSource}
-      style={style}
-      resizeMode={resizeMode}
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-/** Home → script wordmark; everything else → village badge */
-function RegistryNestListItem({ item, registryVouches, expandedRegistryNotes, onToggleRegistryNotes }) {
-  const v = registryVouches?.[item.id] || { count: 0, notes: [] };
-  const hasNotes = (v.notes || []).length > 0;
-  const isChoice = v.count >= VILLAGE_CHOICE_THRESHOLD;
-  const notesOpen = !!expandedRegistryNotes?.[item.id];
-
-  return (
-    <View style={styles.registryGridCard}>
-      <View style={styles.registryGridThumb}>
-        <RegistryItemImage
-          item={item}
-          style={styles.registryThumbImage}
-          emojiStyle={styles.registryGridThumbEmoji}
-        />
-      </View>
-      <Text style={styles.registryGridCategory}>{item.category}</Text>
-      <Text style={styles.registryGridTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-
-      <View style={styles.registryLinksRow}>
-        <TouchableOpacity
-          style={[styles.registryLinkPill, styles.registryLinkAmazon]}
-          onPress={() => safeOpenUrl(buildAmazonAffiliateUrl(item.links?.amazon))}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.registryLinkText}>📦 Amazon</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.registryLinkPill, styles.registryLinkTarget]}
-          onPress={() => safeOpenUrl(item.links?.target)}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.registryLinkText}>🎯 Target</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.registryLinkPill, styles.registryLinkBabylist]}
-          onPress={() => safeOpenUrl(item.links?.babylist)}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.registryLinkText}>👶 Baby Registry</Text>
-        </TouchableOpacity>
-      </View>
-
-      {hasNotes ? (
-        <TouchableOpacity
-          style={styles.villageChoiceBadge}
-          onPress={() => onToggleRegistryNotes(item.id)}
-          activeOpacity={0.88}
-        >
-          <Text style={styles.villageChoiceText}>
-            {isChoice ? 'Village Choice ✨' : 'Postpartum wisdom ✨'}
-          </Text>
-          <Text style={styles.villageChoiceChevron}>{notesOpen ? '▾' : '▸'}</Text>
-        </TouchableOpacity>
-      ) : null}
-
-      {hasNotes && notesOpen ? (
-        <View style={styles.villageChoiceNotes}>
-          {(v.notes || []).slice(0, 4).map((n) => (
-            <View key={n.id} style={styles.villageChoiceNoteRow}>
-              <Text style={styles.villageChoiceNoteAuthor}>{n.author}:</Text>
-              <Text style={styles.villageChoiceNoteText}>{n.text}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function getShowSplitAppHeader(activeTab, inSoulSanctuary) {
-  return !(activeTab === 'sanctuary' && inSoulSanctuary);
-}
-
-function renderSplitAppHeader(pulseAnim) {
-  return (
-    <VillageBrandHeader
+    <AppBrandHeader
       logoUri={CALMMAMA_OFFICIAL_LOGO}
       pulseAnim={pulseAnim}
       variant="sanctuary"
       sanctuaryMode
       notchSafe
+      notchInsetExtra={notchInsetExtra}
+      enableShine={enableShine}
     />
   );
 }
 
-function FlowPanel({ anim, children, embedded }) {
-  const flowStyle = getVillageTabFlowStyle(anim);
-
+const FlowPanel = React.memo(function FlowPanel({
+  anim,
+  children,
+  embedded,
+  pregnantFlow,
+}) {
+  const style = embedded ? styles.flowEmbedded : styles.flowFill;
+  if (!anim) {
+    return <View style={style}>{children}</View>;
+  }
+  const flowStyle = pregnantFlow
+    ? getPregnantVillageTabFlowStyle(anim)
+    : getVillageTabFlowStyle(anim) || {};
   return (
-    <Animated.View
-      style={[embedded ? styles.flowEmbedded : styles.flowFill, flowStyle]}
-    >
+    <Animated.View style={[style, flowStyle]}>
       {children}
     </Animated.View>
   );
-}
+});
+
+const TabPane = React.memo(function TabPane({
+  tabFlowAnim,
+  tabContent,
+  embedded,
+  pregnantFlow,
+}) {
+  return (
+    <View style={styles.tabPane}>
+      <FlowPanel
+        anim={tabFlowAnim}
+        embedded={embedded}
+        pregnantFlow={pregnantFlow}
+      >
+        {tabContent}
+      </FlowPanel>
+    </View>
+  );
+});
+
+/** Keep-alive tab — skips re-render while inactive unless props/journey change */
+const KeptAliveTab = React.memo(
+  function KeptAliveTab({
+    tabId,
+    isActive,
+    userJourney,
+    mainTabContentProps,
+    flowAnim,
+  }) {
+    const isKitchen = tabId === 'kitchen';
+    // Pregnant journey: no shared flow animation on any tab — show/hide only.
+    // Animated tab fades were blanking the stack and flashing Home.
+    const tabFlowAnim =
+      userJourney === 'pregnant'
+        ? null
+        : userJourney === 'postpartum' && (tabId === 'home' || isKitchen)
+          ? flowAnim
+          : isActive && tabId !== 'home'
+            ? flowAnim
+            : null;
+
+    const tabContent = renderMainTabContent({
+      ...mainTabContentProps,
+      tabId,
+      embedded: !isKitchen,
+      isActive,
+    });
+
+    return (
+      <TabFreezeBoundary
+        isActive={isActive}
+        freezeOnBlur={false}
+      >
+        <TabPane
+          tabFlowAnim={tabFlowAnim}
+          tabContent={tabContent}
+          embedded={!isKitchen}
+          pregnantFlow={false}
+        />
+      </TabFreezeBoundary>
+    );
+  },
+  (prev, next) => {
+    if (prev.tabId !== next.tabId) return false;
+    if (prev.isActive !== next.isActive) return false;
+    if (prev.userJourney !== next.userJourney) return false;
+    if (prev.mainTabContentProps !== next.mainTabContentProps) return false;
+    return true;
+  }
+);
 
 function renderMainTabContent({
-  activeTab,
+  tabId,
   userJourney,
   mamaName,
   weeksPregnant,
@@ -1394,22 +1488,18 @@ function renderMainTabContent({
   hydrationOz,
   hydrationGoal,
   onHydrationChange,
-  recoveryChecks,
-  onToggleRecoveryCheck,
   minutesForMe,
   onMinutesForMeChange,
+  goldenHourKeepsakes,
+  onAddGoldenHourKeepsake,
   weightEntries,
   setWeeksPregnant,
   setWeightEntries,
   onOpenBirthPrompt,
   embedded,
-  inSoulSanctuary,
-  onEnterSoulSanctuary,
-  onExitSoulSanctuary,
-  journalLogs,
-  onSaveJournalEntry,
   selectedSymptoms,
   onToggleSymptom,
+  onDeselectSymptom,
   symptomHistory,
   kickSession,
   kickSessionLog,
@@ -1423,240 +1513,94 @@ function renderMainTabContent({
   selectedPostpartumVibes,
   onTogglePostpartumVibe,
   postpartumVibeHistory,
+  selectedToddlerVibes,
+  onToggleToddlerVibe,
+  toddlerVibeHistory,
   mamaWinsTasks,
   onToggleMamaWin,
-  onOpenVillagePortal,
+  toddlerWinsTasks,
+  onToggleToddlerWin,
+  littleHorizonsHistory,
+  onSaveLittleHorizonsEntry,
   pulseAnim,
-  mamaBirthday,
-  onBirthdayChange,
-  approximateCity,
-  mamaDiscovery,
-  profilePhotoUri,
-  onPickProfilePhoto,
-  registryDeck,
-  registryWishlist,
-  onRegistrySkip,
-  onRegistrySave,
-  registryVouches,
-  registryVouchDraft,
-  onRegistryVouchDraftChange,
-  onRegistryVouch,
-  expandedRegistryNotes,
-  onToggleRegistryNotes,
-  onOpenCandleSanctum,
-  onAddToCart,
   kitchenTherapeuticTags,
   onOpenKitchenTab,
-  onSaveDiscoveryField,
-  kitchenListHeaderPrefix,
+  milestoneScrapbook,
+  onSaveMilestoneEntry,
+  timeCapsuleEntries,
+  onSaveTimeCapsuleMonth,
+  isSubscribed,
+  isYearlyMember = false,
+  onReleaseUpgradePrompt,
+  onOpenSubscription,
+  isActive = true,
 }) {
   const panelStyle = embedded ? styles.scrollContent : styles.scrollContentFlex;
 
   const therapeuticMeals =
-    kitchenTherapeuticTags?.length > 0
-      ? getTherapeuticMeals(MAMA_KITCHEN_RECIPES, kitchenTherapeuticTags, 6)
-      : [];
+    userJourney === 'postpartum' && selectedPostpartumVibes.length > 0
+      ? getPostpartumVibeMeals(selectedPostpartumVibes, 6)
+      : userJourney === 'pregnant' && selectedSymptoms.length > 0
+        ? getPregnantSymptomMeals(selectedSymptoms, 6)
+        : kitchenTherapeuticTags?.length > 0
+          ? getTherapeuticMeals(MAMA_KITCHEN_RECIPES, kitchenTherapeuticTags, 6)
+          : [];
   const pregnantTherapeuticHeadline = getTherapeuticHeadlineForSymptoms(selectedSymptoms);
   const postpartumTherapeuticHeadline = getTherapeuticHeadlineForVibes(selectedPostpartumVibes);
+  const homePhase = getHomeJourneyPhase(userJourney, babyAge);
 
-  if (activeTab === 'home') {
-    const currentRegistry = registryDeck?.[0] || null;
-    const currentVouch = currentRegistry ? registryVouches?.[currentRegistry.id] : null;
-    const currentVouchCount = currentVouch?.count || 0;
+  if (tabId === 'home') {
+    if (homePhase === 'pregnant') {
+      return <HomeScreen />;
+    }
 
-    return (
-      <View style={panelStyle}>
-        <VillagePulseBar userJourney={userJourney} />
-
-        <View style={styles.homeSectionCard}>
-          <Text style={styles.homeSectionTitle}>
-            {userJourney === 'postpartum' ? '💬 Mamas Seeking Village Wisdom' : '👶 Village Baby Registry Game'}
-          </Text>
-          <Text style={styles.homeSectionSub}>
-            {userJourney === 'postpartum'
-              ? 'Pregnant mamas are asking for your real-world advice — vouch and leave a loving note on each item.'
-              : 'Postpartum mamas vouch + leave love notes. Pregnant mamas unlock essentials into the Nest below.'}
-          </Text>
-
-          {currentRegistry ? (
-            userJourney === 'postpartum' ? (
-              <View style={styles.registryPostpartumCard}>
-                <View style={styles.registryPostpartumBanner}>
-                  <Text style={styles.registryPostpartumBannerText}>A pregnant mama is asking for your wisdom</Text>
-                </View>
-                <View style={styles.registryWidgetTopRow}>
-                  <View style={styles.registryPostpartumImage}>
-                    <RegistryItemImage
-                      item={currentRegistry}
-                      style={styles.registryPostpartumImageFill}
-                      emojiStyle={styles.registryWidgetEmoji}
-                    />
-                  </View>
-                  <View style={styles.registryWidgetMeta}>
-                    <Text style={styles.registryWidgetCategory}>{currentRegistry.category}</Text>
-                    <Text style={styles.registryWidgetTitle}>{currentRegistry.title}</Text>
-                    <Text style={styles.registryWidgetRating}>
-                      {currentVouchCount > 0
-                        ? `${currentVouchCount} postpartum mamas vouched`
-                        : 'Be the first to share your real-world tip ✨'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.registryPostpartumNote}>
-                  <Text style={styles.registryWidgetNoteLabel}>
-                    From Postpartum Mama {currentRegistry.curatedBy}
-                  </Text>
-                  <Text style={styles.registryWidgetNoteText}>
-                    “{currentRegistry.tip}”
-                  </Text>
-                </View>
-
-                <View style={styles.registryVouchBox}>
-                  <Text style={styles.registryVouchTitle}>Leave a loving note</Text>
-                  <TextInput
-                    style={styles.registryVouchInput}
-                    value={registryVouchDraft}
-                    onChangeText={onRegistryVouchDraftChange}
-                    placeholder="Your postpartum tip (kind + specific)…"
-                    placeholderTextColor="#6E8578"
-                    multiline
-                  />
-                  <TouchableOpacity
-                    style={styles.registryVouchBtn}
-                    onPress={() => onRegistryVouch(currentRegistry.id)}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={styles.registryVouchBtnText}>Vouch for this item ✨</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.registryPregnantCard}>
-                <View style={styles.registryPregnantHero}>
-                  <RegistryItemImage
-                    item={currentRegistry}
-                    style={styles.registryPregnantHeroImg}
-                    emojiStyle={styles.registryPregnantHeroEmoji}
-                  />
-                </View>
-                <Text style={styles.registryPregnantCategory}>{currentRegistry.category}</Text>
-                <Text style={styles.registryPregnantTitle}>{currentRegistry.title}</Text>
-                <Text style={styles.registryPregnantVouchLine}>
-                  {currentVouchCount > 0
-                    ? `Vouched by ${currentVouchCount} postpartum mamas in the village`
-                    : 'Fresh on the deck — unlock if it feels right for your nest'}
-                </Text>
-
-                <View style={styles.registryPregnantNote}>
-                  <Text style={styles.registryPregnantNoteLabel}>
-                    Village wisdom from {currentRegistry.curatedBy}
-                  </Text>
-                  <Text style={styles.registryPregnantNoteText} numberOfLines={4}>
-                    “{currentRegistry.tip}”
-                  </Text>
-                </View>
-
-                <View style={styles.registryActionRow}>
-                  <TouchableOpacity
-                    style={[styles.registryActionBtn, styles.registrySkipBtn]}
-                    onPress={() => onRegistrySkip(currentRegistry.id)}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={styles.registrySkipIcon}>✕</Text>
-                    <Text style={styles.registryActionLabel}>Skip</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.registryActionBtn, styles.registryUnlockBtn]}
-                    onPress={() => onRegistrySave(currentRegistry)}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={styles.registryUnlockIcon}>♥</Text>
-                    <Text style={styles.registryActionLabel}>Unlock</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )
-          ) : (
-            <View style={styles.homeEmptyNote}>
-              <Text style={styles.homeEmptyNoteText}>
-                {userJourney === 'postpartum'
-                  ? 'You\'ve shared wisdom on every item today. New mama questions will bloom here soon.'
-                  : 'You\'ve explored the village registry deck. Your Nest below keeps everything you unlocked.'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {userJourney === 'pregnant' ? (
-        <View style={styles.registryNestWrap}>
-          <Text style={styles.registryNestTitle}>My Village Registry Nest</Text>
-          <Text style={styles.registryNestSub}>
-            Your unlocked essentials — scroll inside the nest window. Village Choice items include postpartum notes.
-          </Text>
-
-          {registryWishlist?.length ? (
-            <View style={styles.registryNestScrollWindow}>
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                contentContainerStyle={styles.registryNestListContent}
-              >
-                {registryWishlist.map((item) => (
-                  <RegistryNestListItem
-                    key={String(item.id)}
-                    item={item}
-                    registryVouches={registryVouches}
-                    expandedRegistryNotes={expandedRegistryNotes}
-                    onToggleRegistryNotes={onToggleRegistryNotes}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-          ) : (
-            <View style={styles.registryNestEmpty}>
-              <Text style={styles.registryNestEmptyText}>
-                Tap ♥ on the game card to unlock items into your Nest.
-              </Text>
-            </View>
-          )}
-
-          <Text style={styles.registryFtcDisclosure}>
-            Disclosure: As an Amazon Associate, CalmMama Village earns a small commission from qualifying purchases.
-          </Text>
-        </View>
-        ) : null}
-
-      </View>
-    );
-  }
-
-  if (activeTab === 'sanctuary') {
-    if (inSoulSanctuary) {
+    if (homePhase === 'infant') {
+      // Layout locked — postpartumInfantHomeLayoutConfig.js (newborn – under 1 yr)
       return (
-        <SoulSanctuaryScreen
-          mamaName={mamaName}
-          onExit={onExitSoulSanctuary}
-          journalLogs={journalLogs}
-          onSaveJournalEntry={onSaveJournalEntry}
-        />
+        <Suspense fallback={<View style={styles.tabSuspenseFallback} />}>
+          <PostpartumInfantHome
+            babyAge={babyAge}
+            mamaName={mamaName}
+            entries={milestoneScrapbook}
+            onSaveEntry={onSaveMilestoneEntry}
+          />
+        </Suspense>
       );
     }
 
     return (
-      <View style={panelStyle}>
-        <SoulSanctuaryEntryCard onEnter={onEnterSoulSanctuary} />
-      </View>
+      <Suspense fallback={<View style={styles.tabSuspenseFallback} />}>
+        <>
+          <ScrollView
+            style={styles.embeddedTabScroll}
+            contentContainerStyle={styles.embeddedTabScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            <VillageTimeCapsule
+              babyAge={babyAge}
+              entries={timeCapsuleEntries}
+              onSaveMonth={onSaveTimeCapsuleMonth}
+              isSubscribed={isSubscribed}
+              onRequestUpgrade={onReleaseUpgradePrompt}
+              onOpenSubscription={onOpenSubscription}
+            />
+          </ScrollView>
+          <PostpartumHomePollModal active babyAge={babyAge} />
+        </>
+      </Suspense>
     );
   }
 
-  if (activeTab === 'daily' && userJourney === 'pregnant') {
+  if (tabId === 'daily' && userJourney === 'pregnant') {
+    // Layout locked — pregnantDailyLayoutConfig.js
     return renderPregnantDailyTracker({
       panelStyle,
       weeksPregnant,
       selectedSymptoms,
       onToggleSymptom,
+      onDeselectSymptom,
       symptomHistory,
       kickSession,
       kickSessionLog,
@@ -1673,9 +1617,45 @@ function renderMainTabContent({
     });
   }
 
-  if (activeTab === 'daily' && userJourney === 'postpartum') {
+  if (tabId === 'daily' && userJourney === 'postpartum' && homePhase === 'toddler') {
     return (
-      <View style={panelStyle}>
+      <ScrollView
+        style={styles.postpartumDailyScroll}
+        contentContainerStyle={styles.postpartumDailyScrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
+        <PostpartumDailyTracker
+          panelStyle={styles.postpartumDailyInner}
+          selectedVibes={selectedToddlerVibes}
+          onToggleVibe={onToggleToddlerVibe}
+          vibeHistory={toddlerVibeHistory}
+          mamaWinsTasks={toddlerWinsTasks}
+          onToggleMamaWin={onToggleToddlerWin}
+          therapeuticMeals={therapeuticMeals}
+          therapeuticHeadline={postpartumTherapeuticHeadline}
+          onOpenKitchen={onOpenKitchenTab}
+          dailySub="Toddler routines & mama-first intentions"
+          vibeSectionTitle="🌸 Mood Vibe Check"
+          vibeSectionHint="How is your toddler day unfolding? Tap what feels true."
+          vibesList={TODDLER_VIBES}
+          winsSectionTitle="📝 Daily Toddler Anchors"
+          winsSectionHint="Gentle anchors for busy toddler days — check what you claimed."
+        />
+      </ScrollView>
+    );
+  }
+
+  if (tabId === 'daily' && userJourney === 'postpartum') {
+    return (
+      <ScrollView
+        style={styles.postpartumDailyScroll}
+        contentContainerStyle={styles.postpartumDailyScrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
         <PostpartumDailyTracker
           panelStyle={styles.postpartumDailyInner}
           selectedVibes={selectedPostpartumVibes}
@@ -1687,85 +1667,79 @@ function renderMainTabContent({
           therapeuticHeadline={postpartumTherapeuticHeadline}
           onOpenKitchen={onOpenKitchenTab}
         />
-      </View>
+      </ScrollView>
     );
   }
 
-  if (activeTab === 'tracker' && userJourney === 'pregnant') {
+  if (tabId === 'tracker' && userJourney === 'pregnant') {
+    // Layout locked — pregnantBloomLayoutConfig.js
     return (
-      <View style={panelStyle}>
-        <WeeklyBloomScreen
-          embedded={embedded}
-          initialWeek={weeksPregnant}
-          mamaName={mamaName}
-          dueDate={dueDate}
-          weightEntries={weightEntries}
-          onWeekChange={setWeeksPregnant}
-          onOpenBirthPrompt={onOpenBirthPrompt}
-          onAddWeight={(entry) =>
-            setWeightEntries((prev) => {
-              const rest = prev.filter((e) => e.week !== entry.week);
-              return [...rest, entry].sort((a, b) => a.week - b.week);
-            })
-          }
-        />
-      </View>
-    );
-  }
-
-  if (activeTab === 'nursery' && userJourney === 'postpartum') {
-    return (
-      <View style={panelStyle}>
-        <CloudNurseryScreen
-          babyAge={babyAge}
-          nurseryLogs={nurseryLogs}
-          nurseryPerspective={nurseryPerspective}
-          onPerspectiveChange={onNurseryPerspectiveChange}
-          onAddLog={onAddNurseryLog}
-          hydrationOz={hydrationOz}
-          hydrationGoal={hydrationGoal}
-          onHydrationChange={onHydrationChange}
-          recoveryChecks={recoveryChecks}
-          onToggleRecoveryCheck={onToggleRecoveryCheck}
-          minutesForMe={minutesForMe}
-          onMinutesForMeChange={onMinutesForMeChange}
-        />
-      </View>
-    );
-  }
-
-  if (activeTab === 'kitchen') {
-    return (
-      <MamasKitchenScreen
-        therapeuticTags={kitchenTherapeuticTags}
-        listHeaderPrefix={kitchenListHeaderPrefix}
+      <WeeklyBloomScreen
+        embedded={embedded}
+        initialWeek={weeksPregnant}
+        mamaName={mamaName}
+        dueDate={dueDate}
+        weightEntries={weightEntries}
+        onWeekChange={setWeeksPregnant}
+        onOpenBirthPrompt={onOpenBirthPrompt}
+        onLogMeals={onOpenKitchenTab}
+        isActive={isActive}
+        onAddWeight={(entry) =>
+          setWeightEntries((prev) => {
+            const rest = prev.filter((e) => e.week !== entry.week);
+            return [...rest, entry].sort((a, b) => a.week - b.week);
+          })
+        }
       />
     );
   }
 
-  if (activeTab === 'profile') {
+  if (tabId === 'nursery' && userJourney === 'postpartum') {
+    if (homePhase === 'toddler') {
+      return (
+        <View style={[panelStyle, styles.postpartumNurseryShell]}>
+          <LittleHorizonsScreen
+            babyAge={babyAge}
+            history={littleHorizonsHistory}
+            onSaveEntry={onSaveLittleHorizonsEntry}
+            isSubscribed={isSubscribed}
+            isYearlyMember={isYearlyMember}
+            onRequestUpgrade={onReleaseUpgradePrompt}
+            onOpenSubscription={onOpenSubscription}
+          />
+        </View>
+      );
+    }
+
     return (
-      <View style={panelStyle}>
-        <MamaIdentityCard
-          mamaName={mamaName}
-          mamaBirthday={mamaBirthday}
-          onBirthdayChange={onBirthdayChange}
-          approximateCity={approximateCity}
-          userJourney={userJourney}
-          weeksPregnant={weeksPregnant}
-          dueDate={dueDate}
+      <ScrollView
+        style={styles.postpartumNurseryScroll}
+        contentContainerStyle={styles.postpartumNurseryScrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+      >
+        <CloudNurseryScreen
           babyAge={babyAge}
-          discovery={mamaDiscovery}
-          onSaveDiscoveryField={onSaveDiscoveryField}
-          profilePhotoUri={profilePhotoUri}
-          onPickProfilePhoto={onPickProfilePhoto}
-          onOpenVillagePortal={onOpenVillagePortal}
-          onOpenCandleSanctum={onOpenCandleSanctum}
-          candles={APOTHECARY_CANDLES}
-          onGraduation={() => {}}
-          showGraduation={false}
+          nurseryLogs={nurseryLogs}
+          onAddLog={onAddNurseryLog}
+          goldenHourKeepsakes={goldenHourKeepsakes}
+          onAddGoldenHourKeepsake={onAddGoldenHourKeepsake}
         />
-      </View>
+      </ScrollView>
+    );
+  }
+
+  if (tabId === 'kitchen') {
+    return (
+      <MamasKitchenScreen
+        therapeuticTags={kitchenTherapeuticTags}
+        isToddlerKitchen={userJourney !== 'pregnant' && showsLittleBitesKitchen(babyAge)}
+        isPostpartumKitchen={userJourney === 'postpartum'}
+        isPregnantKitchen={userJourney === 'pregnant'}
+        isSubscribed={isSubscribed}
+        onRequestUpgrade={onOpenSubscription}
+      />
     );
   }
 
@@ -1782,23 +1756,167 @@ function renderMainTabContent({
 const ABOUT_VILLAGE_COPY =
   'Welcome to your sacred maternal sanctuary. CalmMama Village was built by a community of hearts to guide, protect, and uplift you through every single step of your pregnancy and postpartum blooming journey. You are seen, you are safe, and you are never alone.';
 
+const CALMMAMA_INSTAGRAM_URL = 'https://www.instagram.com/calmmama_village/';
+
 const CONTACT_VILLAGE_COPY =
   'Have a question or need a direct ear? Our village support lines are always open. Reach out to us anytime at founder.calmmamavillage@gmail.com or tap below to send an encrypted village message panel note.';
 
-const LEGAL_PRIVACY_COPY =
-  'All wellness tracking notes, journal entries, and sanctuary data utilize secure local device encryption. Your heart-data is never sold to third-party ad networks or data brokers.';
-
-const LEGAL_TERMS_COPY =
-  'CalmMama Village maintains a zero-tolerance policy for harassment, hate speech, bullying, and predatory behavior on every community board and village thread. Each post includes 🚨 User Blocking & Reporting flag tools so mamas can shield themselves while moderation reviews reports. By using this app you agree to our End User License Agreement and to treat every mama with dignity.';
-
-const LEGAL_MEDICAL_COPY =
-  'CalmMama Village provides wellness tracking and community support. It does not replace professional medical advice, diagnosis, or treatment.';
+const SHELL_SCROLL_FOOTER_CLEARANCE = 150;
 
 const INFO_MODAL_TITLES = {
   about: '🌸 About Us',
   contact: '📬 Contact Us',
   legal: '🛡️ Legal & Safety',
 };
+
+function ShellFooterLinks({ onOpenAbout, onOpenContact, onOpenLegal }) {
+  return (
+    <View style={styles.shellFooterLinks} pointerEvents="box-none">
+      <TouchableOpacity onPress={onOpenAbout} activeOpacity={0.75}>
+        <Text style={styles.shellFooterLinkText}>About Us</Text>
+      </TouchableOpacity>
+      <Text style={styles.shellFooterDot}>•</Text>
+      <TouchableOpacity onPress={onOpenContact} activeOpacity={0.75}>
+        <Text style={styles.shellFooterLinkText}>Contact Us</Text>
+      </TouchableOpacity>
+      <Text style={styles.shellFooterDot}>•</Text>
+      <TouchableOpacity onPress={onOpenLegal} activeOpacity={0.75}>
+        <Text style={styles.shellFooterLinkText}>Legal & Safety</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const AppBottomTabBar = React.memo(function AppBottomTabBar({
+  activeTab,
+  userJourney,
+  bottomNavStyle,
+  midnightLoungeOpen,
+  onTabPress,
+  onOpenMidnightLounge,
+}) {
+  const handleHomePress = useCallback(() => onTabPress('home'), [onTabPress]);
+  const handleKitchenPress = useCallback(() => onTabPress('kitchen'), [onTabPress]);
+  const handleDailyPress = useCallback(() => onTabPress('daily'), [onTabPress]);
+  const handleBloomPress = useCallback(() => onTabPress('tracker'), [onTabPress]);
+  const handleNurseryPress = useCallback(() => onTabPress('nursery'), [onTabPress]);
+
+  return (
+    <View style={[styles.bottomNav, bottomNavStyle]}>
+      <TouchableOpacity style={styles.navItem} onPress={handleHomePress}>
+        <Text style={[styles.navIcon, activeTab === 'home' && styles.activeText]}>🏡</Text>
+        <Text style={[styles.navText, activeTab === 'home' && styles.activeText]}>Home</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.navItem} onPress={handleKitchenPress}>
+        <Text style={[styles.navIcon, activeTab === 'kitchen' && styles.activeText]}>🍳</Text>
+        <Text style={[styles.navText, activeTab === 'kitchen' && styles.activeText]}>Kitchen</Text>
+      </TouchableOpacity>
+
+      <View style={styles.navLotusCenterSlot}>
+        <LotusFlowerButton
+          variant="lavender"
+          hideLabel
+          midnightLoungeOpen={midnightLoungeOpen}
+          subtleBloom={userJourney === 'postpartum'}
+          onPress={onOpenMidnightLounge}
+        />
+      </View>
+
+      <TouchableOpacity style={styles.navItem} onPress={handleDailyPress}>
+        <Text style={[styles.navIcon, activeTab === 'daily' && styles.activeText]}>✨</Text>
+        <Text style={[styles.navText, activeTab === 'daily' && styles.activeText]}>Daily</Text>
+      </TouchableOpacity>
+
+      {userJourney === 'pregnant' ? (
+        <TouchableOpacity style={styles.navItem} onPress={handleBloomPress}>
+          <Text style={[styles.navIcon, activeTab === 'tracker' && styles.activeText]}>🌱</Text>
+          <Text style={[styles.navText, activeTab === 'tracker' && styles.activeText]}>Bloom</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.navItem} onPress={handleNurseryPress}>
+          <Text style={[styles.navIcon, activeTab === 'nursery' && styles.activeText]}>☁️</Text>
+          <Text style={[styles.navText, activeTab === 'nursery' && styles.activeText]}>Nursery</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
+
+const MainTabShell = React.memo(function MainTabShell({
+  activeTab,
+  userJourney,
+  mainTabContentProps,
+  flowAnim,
+  pulseAnim,
+  tabSceneOpacity,
+}) {
+  const { babyAge } = mainTabContentProps;
+  const journeyTab = userJourney === 'pregnant' ? 'tracker' : 'nursery';
+  const tabIds = useMemo(
+    () => ['home', 'kitchen', 'daily', journeyTab],
+    [journeyTab]
+  );
+  // Keep Bloom (tracker) warm for pregnant mamas so the video never cold-mounts on tab enter.
+  const [visitedTabs, setVisitedTabs] = useState(() => {
+    const seed = new Set(['home', activeTab]);
+    if (userJourney === 'pregnant') seed.add('tracker');
+    return seed;
+  });
+  useEffect(() => {
+    if (userJourney === 'pregnant') {
+      setVisitedTabs((prev) => {
+        if (prev.has('tracker') && prev.has(activeTab)) return prev;
+        const next = new Set(prev);
+        next.add('tracker');
+        next.add(activeTab);
+        return next;
+      });
+      return;
+    }
+    setVisitedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab, userJourney]);
+
+  const mountedTabIds = useMemo(() => {
+    return tabIds.filter((id) => id === activeTab || visitedTabs.has(id));
+  }, [tabIds, activeTab, visitedTabs]);
+
+  const sharedHeader = useMemo(
+    () =>
+      renderSplitAppHeader(pulseAnim, {
+        notchInsetExtra: userJourney === 'pregnant' ? 18 : 0,
+      }),
+    [pulseAnim, userJourney],
+  );
+
+  return (
+    <View style={styles.mainShell}>
+      <View style={styles.mainShellBody}>
+        {sharedHeader}
+        <Animated.View
+          style={[styles.tabStage, { opacity: tabSceneOpacity }]}
+          collapsable={false}
+        >
+          {mountedTabIds.map((tabId) => (
+            <KeptAliveTab
+              key={tabId}
+              tabId={tabId}
+              isActive={activeTab === tabId}
+              userJourney={userJourney}
+              mainTabContentProps={mainTabContentProps}
+              flowAnim={flowAnim}
+            />
+          ))}
+        </Animated.View>
+      </View>
+    </View>
+  );
+});
 
 function SanctuaryCartDrawer({
   visible,
@@ -2111,14 +2229,12 @@ function VillageInfoModal({
   contactHeartNote,
   onContactHeartNoteChange,
   onSendHeartNote,
-  onDestroyAccount,
   anim,
   onClose,
 }) {
   if (!type) return null;
 
   const isContact = type === 'contact';
-  const isLegal = type === 'legal';
   const isAbout = type === 'about';
 
   return (
@@ -2149,7 +2265,23 @@ function VillageInfoModal({
           showsVerticalScrollIndicator={false}
           showsHorizontalScrollIndicator={false}
         >
-          {isAbout ? <Text style={styles.infoModalBody}>{ABOUT_VILLAGE_COPY}</Text> : null}
+          {isAbout ? (
+            <>
+              <Text style={styles.infoModalBody}>{ABOUT_VILLAGE_COPY}</Text>
+              <TouchableOpacity
+                style={styles.infoModalInstagramBtn}
+                onPress={() => {
+                  Linking.openURL(CALMMAMA_INSTAGRAM_URL).catch(() => {});
+                }}
+                activeOpacity={0.88}
+                accessibilityRole="link"
+                accessibilityLabel="Open CalmMama Village on Instagram"
+              >
+                <Text style={styles.infoModalInstagramBtnText}>Follow us on Instagram</Text>
+                <Text style={styles.infoModalInstagramHandle}>@calmmama_village</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
 
           {isContact ? (
             <>
@@ -2168,26 +2300,6 @@ function VillageInfoModal({
               </TouchableOpacity>
             </>
           ) : null}
-
-          {isLegal ? (
-            <View style={styles.infoModalLegalSections}>
-              <View style={styles.infoModalLegalBlock}>
-                <Text style={styles.infoModalLegalHeading}>Privacy Policy</Text>
-                <Text style={styles.infoModalBody}>{LEGAL_PRIVACY_COPY}</Text>
-              </View>
-              <View style={styles.infoModalLegalBlock}>
-                <Text style={styles.infoModalLegalHeading}>Terms of Service & EULA</Text>
-                <Text style={styles.infoModalBody}>{LEGAL_TERMS_COPY}</Text>
-              </View>
-              <View style={styles.infoModalLegalBlock}>
-                <Text style={styles.infoModalLegalHeading}>Medical Disclaimer</Text>
-                <Text style={styles.infoModalBody}>{LEGAL_MEDICAL_COPY}</Text>
-              </View>
-              <TouchableOpacity onPress={onDestroyAccount} activeOpacity={0.85}>
-                <Text style={styles.infoModalDeleteText}>Permanently Delete My Account & Wipe Data</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
         </ScrollView>
 
         <TouchableOpacity style={styles.infoModalDismissBtn} onPress={onClose} activeOpacity={0.88}>
@@ -2198,17 +2310,70 @@ function VillageInfoModal({
   );
 }
 
+function UpgradeOfferSheet({ visible, onClose, onViewPlans }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.upgradeBackdrop} onPress={onClose}>
+        <Pressable style={styles.upgradeSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.upgradeHandle} />
+          <Text style={styles.upgradeEyebrow}>MENTAL RELEASE COMPLETE</Text>
+          <Text style={styles.upgradeTitle}>Save your words to the village archive</Text>
+          <Text style={styles.upgradeBody}>
+            You still get the full dissolve release. Upgrading unlocks saving to your timeline,
+            toddler capsule, and Little Horizons history.
+          </Text>
+          <TouchableOpacity
+            style={styles.upgradePrimaryBtn}
+            onPress={() => {
+              onClose();
+              onViewPlans?.();
+            }}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.upgradePrimaryText}>View membership plans</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.upgradeGhostBtn} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.upgradeGhostText}>Maybe later</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+if (__DEV__ && !PREGNANT_DAILY_LAYOUT_LOCKED) {
+  console.warn('[App] PREGNANT_DAILY_LAYOUT_LOCKED is false — daily tab layout edits allowed');
+}
+
 export default function App() {
-  // STATE MANAGEMENT
   const [isOnboarded, setIsOnboarded] = useState(false);
-  const [userJourney, setUserJourney] = useState('pregnant'); // 'pregnant' or 'postpartum'
+  const [bootHydrated, setBootHydrated] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState('intake');
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [userSubscriptionType, setUserSubscriptionType] = useState(null);
+  const [subscriptionProductId, setSubscriptionProductId] = useState(null);
+  const [upgradeSheetOpen, setUpgradeSheetOpen] = useState(false);
+  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
+  const [userJourney, setUserJourney] = useState('pregnant'); // TEMP: advice list on Home registry; switch to postpartum + 1yo for poll popup
   const [activeTab, setActiveTab] = useState('home');
-  const [inSoulSanctuary, setInSoulSanctuary] = useState(false);
+  const [inMidnightLounge, setInMidnightLounge] = useState(false);
+  const [midnightLoungeMounted, setMidnightLoungeMounted] = useState(false);
+  const [postpartumLoungeOverlayActive, setPostpartumLoungeOverlayActive] = useState(false);
+  const midnightLoungeOpacity = useRef(new Animated.Value(0)).current;
+  const midnightLoungeScale = useRef(new Animated.Value(0.07)).current;
+  const midnightLoungeTranslateY = useRef(new Animated.Value(110)).current;
+  const midnightLoungeAnimatingRef = useRef(false);
+  const bottomNavOpacity = useRef(new Animated.Value(1)).current;
+  const bottomNavTranslateY = useRef(new Animated.Value(0)).current;
+  const [guidanceHistory, setGuidanceHistory] = useState([]);
   
   // USER FIELDS
   const [mamaName, setMamaName] = useState('Mama');
   const [mamaBirthday, setMamaBirthday] = useState(null);
   const [approximateCity, setApproximateCity] = useState('Greater Austin area');
+  const [usState, setUsState] = useState('TX');
+  const [villageLatitude] = useState(30.2672);
+  const [villageLongitude] = useState(-97.7431);
   const [profilePhotoUri, setProfilePhotoUri] = useState(null);
   const [mamaDiscovery, setMamaDiscovery] = useState(DEFAULT_MAMA_DISCOVERY);
   const [registryDeck, setRegistryDeck] = useState(() => REGISTRY_INVENTORY.map((item) => ({ ...item })));
@@ -2253,7 +2418,14 @@ export default function App() {
   const [birthPromptDismissed, setBirthPromptDismissed] = useState(false);
   const [birthdayBoutiqueOpen, setBirthdayBoutiqueOpen] = useState(false);
   const [birthdayModalDismissedYear, setBirthdayModalDismissedYear] = useState(null);
+  const [foundingGiftsClaimCount, setFoundingGiftsClaimCount] = useState(0);
+  const [foundingGiftsUserClaimed, setFoundingGiftsUserClaimed] = useState(() =>
+    hasUserClaimedFoundingGift()
+  );
+  const [foundingGiftsClaiming, setFoundingGiftsClaiming] = useState(false);
   const [remedyPopupSymptomId, setRemedyPopupSymptomId] = useState(null);
+  const [remedyPopupPickIndex, setRemedyPopupPickIndex] = useState(0);
+  const remedyPickRef = useRef({});
 
   const [infoModalType, setInfoModalType] = useState(null);
   const [contactHeartNote, setContactHeartNote] = useState('');
@@ -2263,17 +2435,11 @@ export default function App() {
   const infoModalTranslateY = useRef(new Animated.Value(42)).current;
   const [weeksPregnant, setWeeksPregnant] = useState('24');
   const [dueDate, setDueDate] = useState('October 2026');
-  const [babyAge, setBabyAge] = useState('2 Months');
+  const [babyAge, setBabyAge] = useState('1 Year Old'); // TEMP preview: registry poll popup on postpartum Home
   const [nurseryLogs, setNurseryLogs] = useState([]);
   const [nurseryPerspective, setNurseryPerspective] = useState('baby');
   const [hydrationOz, setHydrationOz] = useState(0);
   const [hydrationGoal] = useState(64);
-  const [recoveryChecks, setRecoveryChecks] = useState({
-    hydration: false,
-    sitzBath: false,
-    vitamins: false,
-    meds: false,
-  });
   const [minutesForMe, setMinutesForMe] = useState(0);
   const nurseryLogIdRef = useRef(0);
   const [weightEntries, setWeightEntries] = useState([
@@ -2281,7 +2447,15 @@ export default function App() {
     { week: 22, weight: 145 },
     { week: 24, weight: 148 },
   ]);
-  const [journalLogs, setJournalLogs] = useState([]);
+
+  const handleOpenSubscription = useCallback(() => {
+    setSubscriptionOpen(true);
+  }, []);
+
+  const handleReleaseUpgradePrompt = useCallback(() => {
+    setUpgradeSheetOpen(true);
+  }, []);
+  const [ventingHistory, setVentingHistory] = useState([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [symptomHistory, setSymptomHistory] = useState([]);
   const [kickSession, setKickSession] = useState({ count: 0, startedAt: null });
@@ -2295,7 +2469,17 @@ export default function App() {
   const [selectedPostpartumVibes, setSelectedPostpartumVibes] = useState([]);
   const [postpartumVibeHistory, setPostpartumVibeHistory] = useState([]);
   const [mamaWinsTasks, setMamaWinsTasks] = useState(DEFAULT_MAMA_WINS);
+  const [selectedToddlerVibes, setSelectedToddlerVibes] = useState([]);
+  const [toddlerVibeHistory, setToddlerVibeHistory] = useState([]);
+  const [toddlerWinsTasks, setToddlerWinsTasks] = useState(DEFAULT_TODDLER_WINS);
+  const [littleHorizonsHistory, setLittleHorizonsHistory] = useState([]);
+  const toddlerVibeLogIdRef = useRef(0);
+  const [milestoneScrapbook, setMilestoneScrapbook] = useState({});
+  const [timeCapsuleEntries, setTimeCapsuleEntries] = useState({});
+  const [goldenHourKeepsakes, setGoldenHourKeepsakes] = useState([]);
+  const goldenHourIdRef = useRef(0);
   const postpartumVibeLogIdRef = useRef(0);
+  const postpartumWinsDayRef = useRef(getPostpartumWinsDayKey());
   const [, setKickTick] = useState(0);
   const [inVillagePortal, setInVillagePortal] = useState(false);
   const [villagePortalTab, setVillagePortalTab] = useState('constellation');
@@ -2315,12 +2499,27 @@ export default function App() {
   const communityPostIdRef = useRef(10);
   const basketListingIdRef = useRef(10);
 
-  const showSplitAppHeader = getShowSplitAppHeader(activeTab, inSoulSanctuary);
   const isMobileWeb = useMobileWebLayout();
-  const webWrapperStyle = getWebWrapperStyle();
-  const iphoneFrameStyle = getIphoneFrameStyle(isMobileWeb);
   const bottomNavStyle = getBottomNavStyle(isMobileWeb);
-  const shellFooterLinksStyle = getShellFooterLinksStyle(isMobileWeb);
+
+  useEffect(() => {
+    if (userJourney !== 'postpartum') return undefined;
+
+    const applyDailyWins = () => {
+      const today = getPostpartumWinsDayKey();
+      setMamaWinsTasks((prev) => {
+        if (prev?.length && String(prev[0]?.id || '').startsWith(today)) {
+          return prev;
+        }
+        postpartumWinsDayRef.current = today;
+        return getPostpartumDailyWins();
+      });
+    };
+
+    applyDailyWins();
+    const intervalId = setInterval(applyDailyWins, 60_000);
+    return () => clearInterval(intervalId);
+  }, [userJourney]);
 
   useEffect(() => {
     try {
@@ -2348,7 +2547,7 @@ export default function App() {
   }, [userJourney, dueDate, weeksPregnant, birthPromptDismissed, birthPromptOpen]);
 
   useEffect(() => {
-    if (!isOnboarded || birthdayBoutiqueOpen || inVillagePortal) return;
+    if (!isOnboarded || birthdayBoutiqueOpen) return;
     if (!isBirthdayToday(mamaBirthday)) return;
     const year = new Date().getFullYear();
     if (birthdayModalDismissedYear === year) return;
@@ -2360,37 +2559,126 @@ export default function App() {
     mamaBirthday,
     birthdayModalDismissedYear,
     birthdayBoutiqueOpen,
-    inVillagePortal,
   ]);
 
   // BACKGROUND, LOGO & FLOW TRANSITION DRIVERS
-  const colorAnim = useRef(new Animated.Value(0)).current;
-  const nebulaAnim = useRef(new Animated.Value(0)).current;
-  const nebulaLoopRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(0.95)).current;
   const pulseLoopRef = useRef(null);
   const shellEnterAnim = useRef(new Animated.Value(1)).current;
   const flowAnim = useRef(new Animated.Value(1)).current;
   const flowReady = useRef(false);
+  const onboardingStepBlend = useRef(new Animated.Value(0)).current;
+  /** Hardware-accelerated canvas for onboarding ↔ main and page fades (opacity only). */
+  const sceneCanvasOpacity = useRef(new Animated.Value(1)).current;
+  const tabSceneOpacity = useRef(new Animated.Value(1)).current;
+  const sceneSwapLockRef = useRef(false);
+  const enteringFromOnboardingRef = useRef(false);
+  const shellBootSettledRef = useRef(false);
+  const skipInitialFlowRef = useRef(true);
+  const skipJourneyFlowAfterOnboardingRef = useRef(false);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(colorAnim, {
-          toValue: 1,
-          duration: 10000,
-          easing: Easing.inOut(Easing.linear),
-          useNativeDriver: false,
-        }),
-        Animated.timing(colorAnim, {
-          toValue: 0,
-          duration: 10000,
-          easing: Easing.inOut(Easing.linear),
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
-  }, [colorAnim]);
+    let mounted = true;
+    (async () => {
+      try {
+        const boot = await loadBootState();
+        if (!mounted) return;
+
+        if (boot.profile) {
+          applyProfileSnapshot(boot.profile, {
+            setMamaName,
+            setUserJourney,
+            setWeeksPregnant,
+            setDueDate,
+            setBabyAge,
+            setMamaBirthday,
+            setApproximateCity,
+            setUsState,
+            setMamaDiscovery,
+            setProfilePhotoUri,
+            setTimeCapsuleEntries: (entries) =>
+              setTimeCapsuleEntries(normalizeTimeCapsuleEntries(entries)),
+          });
+        }
+
+        if (FORCE_ONBOARDING_LAYOUT_AUDIT) {
+          await setHasCompletedOnboarding(false).catch(() => {});
+          setOnboardingStep('intake');
+          setIsOnboarded(false);
+          if (__DEV__ && typeof console !== 'undefined') {
+            console.info('[CalmMama Village] FORCE_ONBOARDING_LAYOUT_AUDIT — onboarding intake');
+          }
+        } else if (boot.hasCompletedOnboarding) {
+          setIsOnboarded(true);
+        } else {
+          setOnboardingStep('intake');
+          setIsOnboarded(false);
+        }
+      } catch (err) {
+        if (__DEV__ && typeof console !== 'undefined') {
+          console.warn('[CalmMama Village] Boot hydrate failed:', err);
+        }
+        if (mounted) {
+          setOnboardingStep('intake');
+          setIsOnboarded(false);
+        }
+      } finally {
+        if (mounted) {
+          setBootHydrated(true);
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Only reset intake when leaving the main app (e.g. delete account) —
+  // never while mid-flow on the feature highlights step.
+  const wasOnboardedRef = useRef(false);
+  useEffect(() => {
+    const wasOnboarded = wasOnboardedRef.current;
+    wasOnboardedRef.current = isOnboarded;
+    if (wasOnboarded && !isOnboarded) {
+      onboardingStepBlend.setValue(0);
+      setOnboardingStep('intake');
+    }
+  }, [isOnboarded, onboardingStepBlend]);
+
+  useEffect(() => {
+    if (!isOnboarded) return;
+    const timer = setTimeout(() => {
+      saveVillageProfile(
+        buildProfileSnapshot({
+          mamaName,
+          userJourney,
+          weeksPregnant,
+          dueDate,
+          babyAge,
+          mamaBirthday,
+          approximateCity,
+          usState,
+          mamaDiscovery,
+          profilePhotoUri,
+          timeCapsuleEntries,
+        })
+      ).catch(() => {});
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [
+    isOnboarded,
+    mamaName,
+    userJourney,
+    weeksPregnant,
+    dueDate,
+    babyAge,
+    mamaBirthday,
+    approximateCity,
+    usState,
+    mamaDiscovery,
+    profilePhotoUri,
+    timeCapsuleEntries,
+  ]);
 
   useEffect(() => {
     startLogoPulseLoop(pulseAnim, pulseLoopRef);
@@ -2415,78 +2703,153 @@ export default function App() {
     return () => pulseLoopRef.current?.stop();
   }, [pulseAnim]);
 
+  // Skip enter springs on cold boot — only animate after the shell has settled once.
+  useEffect(() => {
+    if (!bootHydrated || !isOnboarded) return;
+
+    if (enteringFromOnboardingRef.current) {
+      enteringFromOnboardingRef.current = false;
+      shellEnterAnim.setValue(1);
+      flowAnim.setValue(1);
+      flowReady.current = true;
+      return;
+    }
+
+    if (!shellBootSettledRef.current) {
+      shellBootSettledRef.current = true;
+      shellEnterAnim.setValue(1);
+      flowAnim.setValue(1);
+      flowReady.current = true;
+    }
+  }, [bootHydrated, isOnboarded, shellEnterAnim, flowAnim]);
+
   useEffect(() => {
     if (!isOnboarded) return;
     startLogoPulseLoop(pulseAnim, pulseLoopRef);
-  }, [activeTab, userJourney, isOnboarded, pulseAnim]);
+  }, [userJourney, isOnboarded, pulseAnim]);
 
+  // Journey context — fade-in only (tab presses use runVillageTabTransition)
   useEffect(() => {
-    if (!inSoulSanctuary) {
-      nebulaLoopRef.current?.stop();
-      nebulaAnim.setValue(0);
+    if (!isOnboarded) return;
+    if (skipJourneyFlowAfterOnboardingRef.current) {
+      skipJourneyFlowAfterOnboardingRef.current = false;
+      flowAnim.setValue(1);
+      flowReady.current = true;
       return;
     }
-    nebulaLoopRef.current = Animated.loop(
-      Animated.sequence([
-        Animated.timing(nebulaAnim, {
-          toValue: 1,
-          duration: 14000,
-          easing: Easing.inOut(Easing.linear),
-          useNativeDriver: false,
-        }),
-        Animated.timing(nebulaAnim, {
-          toValue: 0,
-          duration: 14000,
-          easing: Easing.inOut(Easing.linear),
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    nebulaLoopRef.current.start();
-    return () => nebulaLoopRef.current?.stop();
-  }, [inSoulSanctuary, nebulaAnim]);
-
-  useEffect(() => {
-    if (activeTab !== 'sanctuary' && inSoulSanctuary) {
-      setInSoulSanctuary(false);
+    if (skipInitialFlowRef.current) {
+      skipInitialFlowRef.current = false;
+      flowAnim.setValue(1);
+      flowReady.current = true;
+      return;
     }
-  }, [activeTab, inSoulSanctuary]);
-
-  // Gentle rise-in after onboarding — never fade main content to opacity 0
-  useEffect(() => {
-    if (!isOnboarded) return;
-    shellEnterAnim.setValue(0.96);
-    Animated.timing(shellEnterAnim, {
-      toValue: 1,
-      duration: 650,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [isOnboarded, shellEnterAnim]);
-
-  // Journey / onboarding context — fade-in only (tab presses use runVillageTabTransition)
-  useEffect(() => {
-    if (!isOnboarded) return;
     animateVillageTabFlow(flowAnim, flowReady);
   }, [userJourney, isOnboarded, flowAnim]);
+
+  useEffect(() => {
+    if (!isOnboarded) return;
+    // Defer heavy lounge mount so it doesn't compete with Home's first paint.
+    let cancelled = false;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        if (cancelled) return;
+        setMidnightLoungeMounted(true);
+        guardPromise(warmMidnightLounge(userJourney), 'App:warmMidnightLounge');
+      }, 600);
+    });
+    if (userJourney === 'pregnant') {
+      guardPromise(
+        import('./pregnancyOraclePreload').then(({ warmPregnancyOracle }) => warmPregnancyOracle()),
+        'App:warmPregnancyOracle',
+      );
+      warmBloomVideos(weeksPregnant);
+      warmPregnantKitchenImages();
+    }
+    return () => {
+      cancelled = true;
+      handle?.cancel?.();
+    };
+  }, [isOnboarded, userJourney, weeksPregnant]);
+
+  useEffect(() => {
+    if (userJourney !== 'postpartum') return;
+    guardPromise(warmPostpartumHome(userJourney, babyAge), 'App:warmPostpartumHome');
+  }, [userJourney, babyAge, isOnboarded]);
 
   const runTabTransition = useCallback(
     (nextTab) => {
       if (nextTab === activeTab) return;
-      runVillageTabTransition(flowAnim, flowReady, () => {
-        setInSoulSanctuary(false);
+      if (nextTab === 'tracker' && userJourney === 'pregnant') {
+        warmBloomVideos(weeksPregnant);
+      }
+
+      const finishTabSwap = () => {
+        setInMidnightLounge(false);
+        bottomNavOpacity.setValue(1);
+        bottomNavTranslateY.setValue(0);
         setInVillagePortal(false);
         setActiveTab(nextTab);
-      });
+        if (nextTab === 'home' && userJourney === 'postpartum') {
+          warmPostpartumHome(userJourney, babyAge);
+        }
+        if (nextTab === 'kitchen' && userJourney === 'pregnant') {
+          requestAnimationFrame(() => warmAllPregnantKitchenImages());
+        }
+      };
+
+      // Pregnant: instant tab swap — opacity fade was popping the Bloom video frame.
+      if (userJourney === 'pregnant') {
+        suppressVillageLayoutAnimation();
+        flowAnim.stopAnimation();
+        flowAnim.setValue(1);
+        flowReady.current = true;
+        tabSceneOpacity.setValue(1);
+        finishTabSwap();
+        return;
+      }
+
+      const runTransition =
+        userJourney === 'postpartum'
+          ? runPregnantVillageTabTransition
+          : runVillageTabTransition;
+      runTransition(flowAnim, flowReady, finishTabSwap);
     },
-    [activeTab, flowAnim]
+    [activeTab, flowAnim, bottomNavOpacity, bottomNavTranslateY, userJourney, weeksPregnant, babyAge, tabSceneOpacity]
   );
 
-  const shellOpacity = shellEnterAnim;
-  const shellLift = shellEnterAnim.interpolate({
-    inputRange: [0.9, 1],
-    outputRange: [12, 0],
+  const notificationNavRef = useRef({
+    runTabTransition: () => {},
+    openMidnightLounge: () => {},
   });
+  const initialNotificationHandledRef = useRef(false);
+
+  const handleNotificationRoute = useCallback((route) => {
+    if (!route || !isKnownNotificationRoute(route)) return;
+
+    setInVillagePortal(false);
+
+    if (route === NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE) {
+      notificationNavRef.current.openMidnightLounge();
+      return;
+    }
+
+    if (route === NOTIFICATION_ROUTES.BLOOM) {
+      notificationNavRef.current.runTabTransition('tracker');
+      return;
+    }
+
+    if (route === NOTIFICATION_ROUTES.NURSERY) {
+      notificationNavRef.current.runTabTransition('nursery');
+      return;
+    }
+
+    if (route === NOTIFICATION_ROUTES.KITCHEN) {
+      notificationNavRef.current.runTabTransition('kitchen');
+      return;
+    }
+
+    notificationNavRef.current.runTabTransition('home');
+  }, []);
 
   const handleTogglePostpartumVibe = (vibeId) => {
     const option = POSTPARTUM_VIBES.find((v) => v.id === vibeId);
@@ -2518,6 +2881,44 @@ export default function App() {
       );
       return next;
     });
+  };
+
+  const handleToggleToddlerVibe = (vibeId) => {
+    const option = TODDLER_VIBES.find((v) => v.id === vibeId);
+    if (!option) return;
+
+    setSelectedToddlerVibes((prev) => {
+      const isActive = prev.includes(vibeId);
+      const next = isActive ? prev.filter((id) => id !== vibeId) : [...prev, vibeId];
+      const tags = collectTherapeuticTagsFromVibes(next);
+      setKitchenTherapeuticTags(tags.length ? tags : null);
+
+      if (isActive) {
+        return next;
+      }
+      const now = new Date();
+      toddlerVibeLogIdRef.current += 1;
+      setToddlerVibeHistory((history) =>
+        [
+          {
+            id: toddlerVibeLogIdRef.current,
+            vibeId,
+            emoji: option.emoji,
+            label: option.label,
+            time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+            date: now.toLocaleDateString(),
+          },
+          ...history,
+        ].slice(0, 40)
+      );
+      return next;
+    });
+  };
+
+  const handleToggleToddlerWin = (taskId) => {
+    setToddlerWinsTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, done: !task.done } : task))
+    );
   };
 
   const handleToggleMamaWin = (taskId) => {
@@ -2875,7 +3276,7 @@ export default function App() {
     ]).start(() => setApothecaryDetailProductId(null));
   };
 
-  const handleOpenInfoModal = (type) => {
+  const handleOpenInfoModal = useCallback((type) => {
     setInfoModalType(type);
     infoModalOpacity.setValue(0);
     infoModalScale.setValue(0.86);
@@ -2895,7 +3296,11 @@ export default function App() {
         useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
-  };
+  }, [infoModalOpacity, infoModalScale, infoModalTranslateX, infoModalTranslateY]);
+
+  const handleOpenAboutFooter = useCallback(() => handleOpenInfoModal('about'), [handleOpenInfoModal]);
+  const handleOpenContactFooter = useCallback(() => handleOpenInfoModal('contact'), [handleOpenInfoModal]);
+  const handleOpenLegalFooter = useCallback(() => handleOpenInfoModal('legal'), [handleOpenInfoModal]);
 
   const handleCloseInfoModal = () => {
     Animated.parallel([
@@ -2945,22 +3350,30 @@ export default function App() {
 
   const handleDestroyAccount = () => {
     Alert.alert(
-      'Permanently Delete Account?',
-      'This wipes all local journals, nursery logs, registry items, and returns you to onboarding. This cannot be undone.',
+      'Delete Account',
+      'Are you sure you want to permanently delete your account and data?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete Everything',
+          text: 'Delete Account',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await clearAllVillageStorage();
+            await setHasCompletedOnboarding(false);
             setInfoModalType(null);
-            setInSoulSanctuary(false);
+            setInMidnightLounge(false);
+            setMidnightLoungeMounted(false);
+            setPostpartumLoungeOverlayActive(false);
             setInVillagePortal(false);
             setApothecaryDetailProductId(null);
             setCandleSanctumOpen(false);
             setActiveTab('home');
             setUserJourney('pregnant');
-            setJournalLogs([]);
+            setMamaName('Mama');
+            setMamaBirthday(null);
+            setMamaDiscovery(DEFAULT_MAMA_DISCOVERY);
+            setGuidanceHistory([]);
+            setVentingHistory([]);
             setNurseryLogs([]);
             setRegistryWishlist([]);
             setRegistryDeck(REGISTRY_INVENTORY.map((item) => ({ ...item })));
@@ -2990,8 +3403,16 @@ export default function App() {
             setNestingTasks(DEFAULT_NESTING_TASKS);
             setSelectedPostpartumVibes([]);
             setPostpartumVibeHistory([]);
-            setMamaWinsTasks(DEFAULT_MAMA_WINS);
+            setMamaWinsTasks(getPostpartumDailyWins());
+            setSelectedToddlerVibes([]);
+            setToddlerVibeHistory([]);
+            setToddlerWinsTasks(DEFAULT_TODDLER_WINS);
+            setLittleHorizonsHistory([]);
+            setOnboardingStep('intake');
+            onboardingStepBlend.setValue(0);
+            initialNotificationHandledRef.current = false;
             setIsOnboarded(false);
+            // RESTORE: cancelAllVillageNotifications().catch(() => {});
           },
         },
       ]
@@ -2999,13 +3420,6 @@ export default function App() {
   };
 
   const handleOpenVillagePortal = () => {
-    try {
-      configureVillageLayoutTransition();
-    } catch (layoutError) {
-      if (Platform.OS === 'web' && typeof console !== 'undefined') {
-        console.warn('[CalmMama Village] Layout transition skipped on web:', layoutError);
-      }
-    }
     setVillagePortalTab('constellation');
     setSelectedVillageMamaId(null);
     setInVillagePortal(true);
@@ -3136,16 +3550,16 @@ export default function App() {
 
     const isActive = selectedSymptoms.includes(symptomId);
     if (isActive) {
-      if (remedyPopupSymptomId === symptomId) {
-        setRemedyPopupSymptomId(null);
-      }
-      const next = selectedSymptoms.filter((id) => id !== symptomId);
-      setSelectedSymptoms(next);
-      const tags = collectTherapeuticTagsFromSymptoms(next);
-      setKitchenTherapeuticTags(tags.length ? tags : null);
+      const pickIndex = remedyPickRef.current[symptomId] ?? 0;
+      remedyPickRef.current[symptomId] = pickIndex + 1;
+      setRemedyPopupPickIndex(pickIndex);
+      setRemedyPopupSymptomId(symptomId);
       return;
     }
 
+    const pickIndex = remedyPickRef.current[symptomId] ?? 0;
+    remedyPickRef.current[symptomId] = pickIndex + 1;
+    setRemedyPopupPickIndex(pickIndex);
     setRemedyPopupSymptomId(symptomId);
     const now = new Date();
     symptomLogIdRef.current += 1;
@@ -3163,6 +3577,17 @@ export default function App() {
       ].slice(0, 40)
     );
     const next = [...selectedSymptoms, symptomId];
+    setSelectedSymptoms(next);
+    const tags = collectTherapeuticTagsFromSymptoms(next);
+    setKitchenTherapeuticTags(tags.length ? tags : null);
+  };
+
+  const handleDeselectSymptom = (symptomId) => {
+    if (!selectedSymptoms.includes(symptomId)) return;
+    if (remedyPopupSymptomId === symptomId) {
+      setRemedyPopupSymptomId(null);
+    }
+    const next = selectedSymptoms.filter((id) => id !== symptomId);
     setSelectedSymptoms(next);
     const tags = collectTherapeuticTagsFromSymptoms(next);
     setKitchenTherapeuticTags(tags.length ? tags : null);
@@ -3221,42 +3646,210 @@ export default function App() {
     setBirthdayModalDismissedYear(new Date().getFullYear());
   };
 
-  const handleFinalizeBirthdayGoodies = ({ productIds, discountPercent }) => {
-    if (!productIds?.length) return;
+  const foundingGiftsYearlyEligible = isYearlyFoundingGiftTier(
+    userSubscriptionType,
+    subscriptionProductId
+  );
 
-    setCart((prev) => {
-      let next = [...prev];
-      productIds.forEach((productId) => {
-        const product = getApothecaryProduct(productId);
-        if (!product) return;
-        const key = cartLineKey(productId, product.size);
-        const existing = next.find(
-          (line) =>
-            cartLineKey(line.productId, line.size) === key &&
-            (line.discountPercent || 0) === (discountPercent || 0)
-        );
-        if (existing) {
-          next = next.map((line) =>
-            line === existing ? { ...line, quantity: line.quantity + 1 } : line
-          );
-        } else {
-          next.push({
-            productId,
-            size: product.size,
-            quantity: 1,
-            discountPercent: discountPercent || 0,
-            birthdayBundle: true,
-          });
-        }
+  const handleSubscriptionCheckout = useCallback((planId) => {
+    const productId = getSubscriptionProductId(planId);
+    setUserSubscriptionType(planId);
+    setSubscriptionProductId(productId);
+    setIsSubscribed(isPremiumSubscribed(planId));
+    setSubscriptionOpen(false);
+  }, []);
+
+  const refreshFoundingGiftsCount = useCallback(async () => {
+    const count = await fetchFoundingGiftsClaimCount();
+    setFoundingGiftsClaimCount(count);
+    setFoundingGiftsUserClaimed(hasUserClaimedFoundingGift());
+  }, []);
+
+  const handleClaimFoundingGift = useCallback(async () => {
+    if (!foundingGiftsYearlyEligible) return;
+    if (!isFoundingGiftsAvailable(foundingGiftsClaimCount) || foundingGiftsUserClaimed) return;
+    setFoundingGiftsClaiming(true);
+    try {
+      const nextCount = await submitFoundingGiftClaim({
+        mamaName,
+        email: checkoutEmail,
       });
-      return next;
-    });
+      setFoundingGiftsClaimCount(nextCount);
+      setFoundingGiftsUserClaimed(true);
+      Alert.alert(
+        'Bundle claimed!',
+        'Your founding sisters tote, pin & mug bundle is on its way. We will email shipping details soon.'
+      );
+    } catch (err) {
+      Alert.alert('Unable to claim', err?.message || 'Please try again in a moment.');
+      await refreshFoundingGiftsCount();
+    } finally {
+      setFoundingGiftsClaiming(false);
+    }
+  }, [
+    checkoutEmail,
+    foundingGiftsClaimCount,
+    foundingGiftsUserClaimed,
+    foundingGiftsYearlyEligible,
+    mamaName,
+    refreshFoundingGiftsCount,
+  ]);
 
-    setBirthdayBoutiqueOpen(false);
-    setBirthdayModalDismissedYear(new Date().getFullYear());
-    setCartDrawerOpen(false);
-    setTimeout(() => handleOpenCheckout(), 200);
-  };
+  useEffect(() => {
+    if (!inVillagePortal) return;
+    refreshFoundingGiftsCount();
+  }, [inVillagePortal, refreshFoundingGiftsCount]);
+
+  const handleOpenMidnightLounge = useCallback(() => {
+    if (midnightLoungeAnimatingRef.current) return;
+
+    warmMidnightLounge(userJourney);
+    setInVillagePortal(false);
+    setMidnightLoungeMounted(true);
+    midnightLoungeAnimatingRef.current = true;
+
+    if (userJourney === 'pregnant') {
+      setInMidnightLounge(true);
+      Animated.parallel([
+        animateMidnightLoungeOpen({
+          opacity: midnightLoungeOpacity,
+          scale: midnightLoungeScale,
+          translateY: midnightLoungeTranslateY,
+        }),
+        animateBottomNavHide({
+          opacity: bottomNavOpacity,
+          translateY: bottomNavTranslateY,
+        }),
+      ]).start(() => {
+        midnightLoungeAnimatingRef.current = false;
+      });
+      return;
+    }
+
+    if (userJourney === 'postpartum') {
+      setPostpartumLoungeOverlayActive(true);
+      setInMidnightLounge(true);
+      Animated.parallel([
+        animateMidnightLoungeOpen({
+          opacity: midnightLoungeOpacity,
+          scale: midnightLoungeScale,
+          translateY: midnightLoungeTranslateY,
+        }),
+        animateBottomNavHide({
+          opacity: bottomNavOpacity,
+          translateY: bottomNavTranslateY,
+        }),
+      ]).start(() => {
+        midnightLoungeAnimatingRef.current = false;
+      });
+      return;
+    }
+
+    setInMidnightLounge(true);
+    Animated.parallel([
+      animateMidnightLoungeOpen({
+        opacity: midnightLoungeOpacity,
+        scale: midnightLoungeScale,
+        translateY: midnightLoungeTranslateY,
+      }),
+      animateBottomNavHide({
+        opacity: bottomNavOpacity,
+        translateY: bottomNavTranslateY,
+      }),
+    ]).start(() => {
+      midnightLoungeAnimatingRef.current = false;
+    });
+  }, [
+    userJourney,
+    midnightLoungeOpacity,
+    midnightLoungeScale,
+    midnightLoungeTranslateY,
+    bottomNavOpacity,
+    bottomNavTranslateY,
+  ]);
+
+  const handleCloseMidnightLounge = useCallback(() => {
+    if (midnightLoungeAnimatingRef.current || !inMidnightLounge) return;
+
+    midnightLoungeAnimatingRef.current = true;
+
+    Animated.parallel([
+      animateMidnightLoungeClose({
+        opacity: midnightLoungeOpacity,
+        scale: midnightLoungeScale,
+        translateY: midnightLoungeTranslateY,
+      }),
+      animateBottomNavShow({
+        opacity: bottomNavOpacity,
+        translateY: bottomNavTranslateY,
+      }),
+    ]).start(({ finished }) => {
+      midnightLoungeAnimatingRef.current = false;
+      if (!finished) return;
+      // Defer hide until bloom finishes — avoids z-index snap mid-animation
+      setInMidnightLounge(false);
+      setPostpartumLoungeOverlayActive(false);
+    });
+  }, [
+    inMidnightLounge,
+    midnightLoungeOpacity,
+    midnightLoungeScale,
+    midnightLoungeTranslateY,
+    bottomNavOpacity,
+    bottomNavTranslateY,
+  ]);
+
+  useEffect(() => {
+    notificationNavRef.current = {
+      runTabTransition,
+      openMidnightLounge: handleOpenMidnightLounge,
+      closeMidnightLounge: handleCloseMidnightLounge,
+    };
+  }, [runTabTransition, handleOpenMidnightLounge, handleCloseMidnightLounge]);
+
+  /* RESTORE (Apple Developer / dev client): bootstrap + notification tap listener
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe = () => {};
+
+    bootstrapVillageNotifications()
+      .catch(() => {})
+      .finally(() => {
+        if (cancelled) return;
+        unsubscribe = subscribeToNotificationResponses(handleNotificationRoute);
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [handleNotificationRoute]);
+  */
+
+  /* RESTORE: cold-start route from last notification tap
+  useEffect(() => {
+    if (!isOnboarded || initialNotificationHandledRef.current) return;
+    initialNotificationHandledRef.current = true;
+    consumeInitialNotificationRoute()
+      .then((route) => {
+        if (route) {
+          handleNotificationRoute(route);
+        }
+      })
+      .catch(() => {});
+  }, [isOnboarded, handleNotificationRoute]);
+  */
+
+  /* RESTORE: sync village reminder schedule (kitchen, lounge, bloom / feeding)
+  useEffect(() => {
+    if (!isOnboarded) return;
+    syncVillageNotificationSchedule(userJourney).catch((err) => {
+      if (__DEV__ && typeof console !== 'undefined') {
+        console.warn('[CalmMama Village] Notification schedule sync failed:', err);
+      }
+    });
+  }, [isOnboarded, userJourney]);
+  */
 
   const handleOpenKitchenTab = () => {
     runTabTransition('kitchen');
@@ -3292,8 +3885,12 @@ export default function App() {
     ]);
   };
 
-  const handleToggleRecoveryCheck = (key, next) => {
-    setRecoveryChecks((prev) => ({ ...prev, [key]: next }));
+  const handleAddGoldenHourKeepsake = (item) => {
+    goldenHourIdRef.current += 1;
+    setGoldenHourKeepsakes((prev) => [
+      { id: goldenHourIdRef.current, ...item },
+      ...prev,
+    ]);
   };
 
   const handleGraduationSwitch = () => {
@@ -3317,308 +3914,319 @@ export default function App() {
     setBirthPromptDismissed(true);
   };
 
-  const handleCompleteOnboarding = () => {
-    setIsOnboarded(true);
+  const handleContinueOnboarding = () => {
+    if (sceneSwapLockRef.current) return;
+    sceneSwapLockRef.current = true;
+    suppressVillageLayoutAnimation();
+
+    // Navigate first — defer asset warm so a web asset bug can never block Continue.
+    runNativeOpacitySceneSwap(sceneCanvasOpacity, () => {
+      onboardingStepBlend.setValue(1);
+      setOnboardingStep('welcome');
+    }, {
+      onComplete: () => {
+        sceneSwapLockRef.current = false;
+        setTimeout(() => {
+          try {
+            if (userJourney === 'postpartum') {
+              warmPostpartumHome(userJourney, babyAge);
+            } else if (userJourney === 'pregnant') {
+              warmPregnantHome(userJourney, weeksPregnant);
+            }
+          } catch (_) {
+            /* warm is best-effort */
+          }
+        }, 0);
+      },
+    });
   };
 
-  // 📋 ONBOARDING VIEW ENGINE
-  if (!isOnboarded) {
+  const handleCompleteOnboarding = async () => {
+    if (sceneSwapLockRef.current) return;
+    sceneSwapLockRef.current = true;
+
+    const profile = buildProfileSnapshot({
+      mamaName,
+      userJourney,
+      weeksPregnant,
+      dueDate,
+      babyAge,
+      mamaBirthday,
+      approximateCity,
+      usState,
+      mamaDiscovery,
+      profilePhotoUri,
+    });
+
+    const persistOnboarding = () => {
+      guardPromise(
+        (async () => {
+          await setHasCompletedOnboarding(true);
+          await saveVillageProfile(profile);
+        })(),
+        'onboarding:persistProfile',
+      );
+      import('./MidnightLoungeScreen');
+    };
+
+    suppressVillageLayoutAnimation();
+    enteringFromOnboardingRef.current = true;
+    skipJourneyFlowAfterOnboardingRef.current = true;
+    shellEnterAnim.setValue(1);
+    bottomNavOpacity.setValue(1);
+    bottomNavTranslateY.setValue(0);
+    flowAnim.setValue(1);
+    flowReady.current = true;
+    tabSceneOpacity.setValue(1);
+
+    runNativeOpacitySceneSwap(sceneCanvasOpacity, () => {
+      setActiveTab('home');
+      setOnboardingStep('intake');
+      onboardingStepBlend.setValue(0);
+      setIsOnboarded(true);
+      persistOnboarding();
+      if (userJourney === 'postpartum') {
+        void warmPostpartumHome(userJourney, babyAge);
+      } else if (userJourney === 'pregnant') {
+        void warmPregnantHome(userJourney, weeksPregnant);
+      }
+    }, {
+      onComplete: () => {
+        sceneSwapLockRef.current = false;
+      },
+    });
+  };
+
+  const mainTabContentProps = useMemo(
+    () => ({
+      userJourney,
+      mamaName,
+      weeksPregnant,
+      dueDate,
+      babyAge,
+      nurseryLogs,
+      nurseryPerspective,
+      onNurseryPerspectiveChange: setNurseryPerspective,
+      onAddNurseryLog: appendNurseryLog,
+      hydrationOz,
+      hydrationGoal,
+      onHydrationChange: setHydrationOz,
+      minutesForMe,
+      onMinutesForMeChange: setMinutesForMe,
+      goldenHourKeepsakes,
+      onAddGoldenHourKeepsake: handleAddGoldenHourKeepsake,
+      weightEntries,
+      setWeeksPregnant,
+      setWeightEntries,
+      onOpenBirthPrompt: handleOpenBirthPrompt,
+      embedded: true,
+      selectedSymptoms,
+      onToggleSymptom: handleToggleSymptom,
+      onDeselectSymptom: handleDeselectSymptom,
+      symptomHistory,
+      kickSession,
+      kickSessionLog,
+      onLogKick: handleLogKick,
+      onSaveKickSession: handleSaveKickSession,
+      nestingTasks,
+      onToggleNestingTask: handleToggleNestingTask,
+      newNestingTask,
+      onNewNestingTaskChange: setNewNestingTask,
+      onAddNestingTask: handleAddNestingTask,
+      selectedPostpartumVibes,
+      onTogglePostpartumVibe: handleTogglePostpartumVibe,
+      postpartumVibeHistory,
+      selectedToddlerVibes,
+      onToggleToddlerVibe: handleToggleToddlerVibe,
+      toddlerVibeHistory,
+      mamaWinsTasks,
+      onToggleMamaWin: handleToggleMamaWin,
+      toddlerWinsTasks,
+      onToggleToddlerWin: handleToggleToddlerWin,
+      littleHorizonsHistory,
+      onSaveLittleHorizonsEntry: (entry) =>
+        setLittleHorizonsHistory((prev) => [entry, ...prev].slice(0, 80)),
+      pulseAnim,
+      kitchenTherapeuticTags,
+      onOpenKitchenTab: handleOpenKitchenTab,
+      milestoneScrapbook,
+      onSaveMilestoneEntry: (id, data) =>
+        setMilestoneScrapbook((prev) => ({ ...prev, [id]: data })),
+      timeCapsuleEntries,
+      onSaveTimeCapsuleMonth: (monthId, data) =>
+        setTimeCapsuleEntries((prev) => ({
+          ...prev,
+          [monthId]: normalizeTimeCapsuleEntry(data),
+        })),
+      isSubscribed,
+      isYearlyMember: foundingGiftsYearlyEligible,
+      onReleaseUpgradePrompt: handleReleaseUpgradePrompt,
+      onOpenSubscription: handleOpenSubscription,
+    }),
+    [
+      userJourney,
+      mamaName,
+      weeksPregnant,
+      dueDate,
+      babyAge,
+      nurseryLogs,
+      nurseryPerspective,
+      hydrationOz,
+      hydrationGoal,
+      minutesForMe,
+      goldenHourKeepsakes,
+      weightEntries,
+      guidanceHistory,
+      ventingHistory,
+      selectedSymptoms,
+      symptomHistory,
+      kickSession,
+      kickSessionLog,
+      nestingTasks,
+      newNestingTask,
+      selectedPostpartumVibes,
+      postpartumVibeHistory,
+      selectedToddlerVibes,
+      toddlerVibeHistory,
+      mamaWinsTasks,
+      toddlerWinsTasks,
+      littleHorizonsHistory,
+      pulseAnim,
+      kitchenTherapeuticTags,
+      milestoneScrapbook,
+      timeCapsuleEntries,
+      isSubscribed,
+      foundingGiftsYearlyEligible,
+      handleReleaseUpgradePrompt,
+      handleOpenSubscription,
+    ]
+  );
+
+  if (!bootHydrated) {
     return (
-      <View style={[styles.webWrapper, webWrapperStyle]}>
-        <View style={[styles.iphoneFrame, iphoneFrameStyle]}>
-          <StatusBar barStyle="dark-content" />
-          {Platform.OS === 'web' ? <View style={styles.iphoneNotch} /> : null}
-          
-          <CalmMamaOmbreBackdrop phaseAnim={colorAnim} />
-
-          <SafeAreaView style={styles.screenForeground}>
-            <ScrollView
-              style={styles.transparentScroll}
-              contentContainerStyle={styles.onboardingScroll}
-              showsVerticalScrollIndicator={false}
-              showsHorizontalScrollIndicator={false}
-            >
-              <VillageBrandHeader
-                logoUri={CALMMAMA_VILLAGE_BADGE}
-                pulseAnim={pulseAnim}
-                variant="onboarding"
-              />
-
-              <Text style={[styles.obWelcomeTitle, ONBOARDING_WELCOME_FONT]}>Welcome, beautiful mama</Text>
-              <Text style={[styles.obWelcomeSub, ONBOARDING_SERIF]}>
-                A soft sanctuary for your pregnancy and postpartum journey — curated with love.
-              </Text>
-
-              <Text style={[styles.obSectionLabel, ONBOARDING_SERIF]}>Tell us where you are</Text>
-              <View style={styles.obPersonaRow}>
-                <TouchableOpacity
-                  style={[styles.obPersonaCard, userJourney === 'pregnant' && styles.obPersonaCardActive]}
-                  onPress={() => setUserJourney('pregnant')}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.obPersonaOrb}>
-                    <Text style={styles.obPersonaEmoji}>🤰</Text>
-                  </View>
-                  <Text style={[styles.obPersonaLabel, userJourney === 'pregnant' && styles.obPersonaLabelActive]}>
-                    Pregnant
-                  </Text>
-                  <Text style={styles.obPersonaHint}>Bloom week by week</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.obPersonaCard, userJourney === 'postpartum' && styles.obPersonaCardActive]}
-                  onPress={() => setUserJourney('postpartum')}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.obPersonaOrb}>
-                    <Text style={styles.obPersonaEmoji}>👶</Text>
-                  </View>
-                  <Text style={[styles.obPersonaLabel, userJourney === 'postpartum' && styles.obPersonaLabelActive]}>
-                    Postpartum
-                  </Text>
-                  <Text style={styles.obPersonaHint}>Cloud nursery & recovery</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.glassFormGroup}>
-                <Text style={[styles.obFormTitle, ONBOARDING_SERIF]}>Your village profile</Text>
-                <Text style={styles.formLabel}>Mama nickname</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="What should we call you?"
-                  placeholderTextColor="#8A9E92"
-                  onChangeText={setMamaName}
-                />
-
-                {userJourney === 'pregnant' ? (
-                  <View>
-                    <Text style={styles.formLabel}>Weeks pregnant</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      defaultValue={weeksPregnant}
-                      keyboardType="numeric"
-                      onChangeText={setWeeksPregnant}
-                    />
-                    <Text style={styles.formLabel}>Estimated due date</Text>
-                    <TextInput style={styles.formInput} defaultValue={dueDate} onChangeText={setDueDate} />
-                  </View>
-                ) : (
-                  <View>
-                    <Text style={styles.formLabel}>Baby&apos;s current age</Text>
-                    <TextInput style={styles.formInput} defaultValue={babyAge} onChangeText={setBabyAge} />
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.secureDetailsBox}>
-                <Text style={styles.secureDetailsIcon}>🔒</Text>
-                <Text style={styles.secureDetailsText}>On-device encryption vault active</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.submitBtn}
-                onPress={handleCompleteOnboarding}
-                activeOpacity={0.92}
-                accessibilityRole="button"
-              >
-                <Text style={styles.submitBtnText}>Welcome to the Village</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.bypassLink}
-                onPress={handleCompleteOnboarding}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-              >
-                <Text style={styles.bypassLinkText}>Skip for now — let me browse first →</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </SafeAreaView>
-        </View>
-      </View>
+      <AppLayout>
+        <AppStatusBar />
+        <VillageOmbreBackdrop />
+        <SafeAreaView style={styles.screenForeground} />
+      </AppLayout>
     );
   }
 
-  // 🏡 PRIMARY SANCTUARY DASHBOARD SCREEN SHELL
-  const mainTabContentProps = {
-    activeTab,
-    userJourney,
-    mamaName,
-    weeksPregnant,
-    dueDate,
-    babyAge,
-    nurseryLogs,
-    nurseryPerspective,
-    onNurseryPerspectiveChange: setNurseryPerspective,
-    onAddNurseryLog: appendNurseryLog,
-    hydrationOz,
-    hydrationGoal,
-    onHydrationChange: setHydrationOz,
-    recoveryChecks,
-    onToggleRecoveryCheck: handleToggleRecoveryCheck,
-    minutesForMe,
-    onMinutesForMeChange: setMinutesForMe,
-    weightEntries,
-    setWeeksPregnant,
-    setWeightEntries,
-    onOpenBirthPrompt: handleOpenBirthPrompt,
-    embedded: true,
-    inSoulSanctuary,
-    onEnterSoulSanctuary: () => setInSoulSanctuary(true),
-    onExitSoulSanctuary: () => setInSoulSanctuary(false),
-    journalLogs,
-    onSaveJournalEntry: (entry) =>
-      setJournalLogs((prev) =>
-        [...prev, entry]
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-          .slice(0, 30)
-      ),
-    selectedSymptoms,
-    onToggleSymptom: handleToggleSymptom,
-    symptomHistory,
-    kickSession,
-    kickSessionLog,
-    onLogKick: handleLogKick,
-    onSaveKickSession: handleSaveKickSession,
-    nestingTasks,
-    onToggleNestingTask: handleToggleNestingTask,
-    newNestingTask,
-    onNewNestingTaskChange: setNewNestingTask,
-    onAddNestingTask: handleAddNestingTask,
-    selectedPostpartumVibes,
-    onTogglePostpartumVibe: handleTogglePostpartumVibe,
-    postpartumVibeHistory,
-    mamaWinsTasks,
-    onToggleMamaWin: handleToggleMamaWin,
-    onOpenVillagePortal: handleOpenVillagePortal,
-    pulseAnim,
-    mamaBirthday,
-    onBirthdayChange: handleBirthdayChange,
-    approximateCity,
-    mamaDiscovery,
-    profilePhotoUri,
-    onPickProfilePhoto: handlePickProfilePhoto,
-    registryDeck,
-    registryWishlist,
-    onRegistrySkip: handleRegistrySkip,
-    onRegistrySave: handleRegistrySave,
-    registryVouches,
-    registryVouchDraft,
-    onRegistryVouchDraftChange: setRegistryVouchDraft,
-    onRegistryVouch: handleRegistryVouch,
-    expandedRegistryNotes,
-    onToggleRegistryNotes: handleToggleRegistryNotes,
-    onOpenCandleSanctum: handleOpenCandleSanctum,
-    onAddToCart: handleAddToCart,
-    kitchenTherapeuticTags,
-    onOpenKitchenTab: handleOpenKitchenTab,
-    onSaveDiscoveryField: handleSaveDiscoveryField,
-    kitchenListHeaderPrefix: showSplitAppHeader
-      ? renderSplitAppHeader(pulseAnim)
-      : null,
-  };
+  // Root switch: onboarding XOR tabs — never both (shared ombre stays outside the gate).
+  const showOnboarding = !isOnboarded;
+  const showMainApp = isOnboarded;
+  const pregnantWelcomeHighlights =
+    showOnboarding && userJourney === 'pregnant' && onboardingStep === 'welcome';
+  const postpartumWelcomeHighlights =
+    showOnboarding && userJourney === 'postpartum' && onboardingStep === 'welcome';
+  const welcomeFullBleedHighlights = pregnantWelcomeHighlights || postpartumWelcomeHighlights;
+
+  const edgeToEdgePregnantShell =
+    !inVillagePortal &&
+    !inMidnightLounge &&
+    userJourney === 'pregnant' &&
+    isOnboarded;
 
   return (
-    <View style={[styles.webWrapper, webWrapperStyle]}>
-      <View style={[styles.iphoneFrame, iphoneFrameStyle]}>
-        <StatusBar barStyle={inSoulSanctuary && activeTab === 'sanctuary' ? 'light-content' : 'dark-content'} />
-        {Platform.OS === 'web' ? <View style={styles.iphoneNotch} /> : null}
-        {inSoulSanctuary && activeTab === 'sanctuary' && !inVillagePortal ? (
-          <CosmicNebulaBackdrop phaseAnim={nebulaAnim} />
-        ) : (
-          <CalmMamaOmbreBackdrop phaseAnim={colorAnim} />
-        )}
+    <AppLayout>
+        <AppStatusBar />
+        {/* Isolated sage/lavender/peach ombre — lives in VillageOmbreBackdrop.js only */}
+        <VillageOmbreBackdrop />
 
-        <SafeAreaView style={styles.screenForeground}>
+        {/* Single hardware-accelerated canvas — opacity fades only, then swap the child */}
+        <Animated.View
+          style={[styles.sceneCanvas, { opacity: sceneCanvasOpacity }]}
+          collapsable={false}
+        >
+        {showMainApp ? (
+        <View style={styles.mainAppReveal}>
+        <SafeAreaView
+          style={styles.screenForeground}
+          edges={edgeToEdgePregnantShell ? ['left', 'right', 'bottom'] : undefined}
+        >
           <View style={styles.shellLayout}>
-            {inVillagePortal ? (
-              <VillageCommunityPortal
-                villageLogoUri={CALMMAMA_OFFICIAL_LOGO}
+            <View
+              style={[styles.mainShellKeepAlive, inVillagePortal && styles.mainShellDimmed]}
+              pointerEvents={inVillagePortal ? 'none' : 'auto'}
+            >
+              <MainTabShell
+                activeTab={activeTab}
+                userJourney={userJourney}
+                mainTabContentProps={mainTabContentProps}
+                flowAnim={flowAnim}
                 pulseAnim={pulseAnim}
-                villagePortalTab={villagePortalTab}
-                onVillagePortalTabChange={setVillagePortalTab}
-                onClose={handleCloseVillagePortal}
-                communityPosts={communityPosts}
-                expandedThreads={expandedThreads}
-                threadDrafts={threadDrafts}
-                newPostDraft={newCommunityPostDraft}
-                onNewPostDraftChange={setNewCommunityPostDraft}
-                onAddCommunityPost={handleAddCommunityPost}
-                onToggleThread={handleToggleThread}
-                onThreadDraftChange={handleThreadDraftChange}
-                onAddThreadReply={handleAddThreadReply}
-                onCoordinateBasket={handleCoordinateBasket}
-                basketOfferings={basketOfferings}
-                basketSeeking={basketSeeking}
-                newBasketDraft={newBasketDraft}
-                onNewBasketDraftChange={setNewBasketDraft}
-                basketShareMode={basketShareMode}
-                onBasketShareModeChange={setBasketShareMode}
-                onAddBasketListing={handleAddBasketListing}
-                selectedVillageMamaId={selectedVillageMamaId}
-                onSelectVillageMama={setSelectedVillageMamaId}
+                tabSceneOpacity={tabSceneOpacity}
               />
-            ) : (
-              <View style={styles.mainShell}>
-                <Animated.View
-                  style={[
-                    styles.mainShellBody,
-                    { opacity: shellOpacity, transform: [{ translateY: shellLift }] },
-                  ]}
-                >
-                  {activeTab === 'kitchen' ? (
-                    <FlowPanel anim={flowAnim} embedded={false}>
-                      {renderMainTabContent(mainTabContentProps)}
-                    </FlowPanel>
-                  ) : (
-                    <ScrollView
-                      style={styles.mainScroll}
-                      contentContainerStyle={styles.mainScrollContent}
-                      showsVerticalScrollIndicator={false}
-                      showsHorizontalScrollIndicator={false}
-                    >
-                      {showSplitAppHeader
-                        ? renderSplitAppHeader(pulseAnim)
-                        : null}
-                      <FlowPanel anim={flowAnim} embedded>
-                        {renderMainTabContent(mainTabContentProps)}
-                      </FlowPanel>
-                    </ScrollView>
-                  )}
-                </Animated.View>
-              </View>
-            )}
+            </View>
 
-            {(activeTab === 'home' || activeTab === 'profile' || candleSanctumOpen) && !inVillagePortal ? (
-              <TouchableOpacity
-                style={styles.homeCartFloating}
-                onPress={handleOpenCartDrawer}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.homeCartIcon}>🧺</Text>
-                {cartItemCount > 0 ? (
-                  <View style={styles.homeCartBadge}>
-                    <Text style={styles.homeCartBadgeText}>
-                      {cartItemCount > 9 ? '9+' : cartItemCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
+            {inVillagePortal ? (
+              <View style={styles.villagePortalOverlay}>
+                <VillageCommunityPortal
+                  villageLogoUri={CALMMAMA_OFFICIAL_LOGO}
+                  pulseAnim={pulseAnim}
+                  villagePortalTab={villagePortalTab}
+                  onVillagePortalTabChange={setVillagePortalTab}
+                  onClose={handleCloseVillagePortal}
+                  communityPosts={communityPosts}
+                  expandedThreads={expandedThreads}
+                  threadDrafts={threadDrafts}
+                  newPostDraft={newCommunityPostDraft}
+                  onNewPostDraftChange={setNewCommunityPostDraft}
+                  onAddCommunityPost={handleAddCommunityPost}
+                  onToggleThread={handleToggleThread}
+                  onThreadDraftChange={handleThreadDraftChange}
+                  onAddThreadReply={handleAddThreadReply}
+                  onCoordinateBasket={handleCoordinateBasket}
+                  basketOfferings={basketOfferings}
+                  basketSeeking={basketSeeking}
+                  newBasketDraft={newBasketDraft}
+                  onNewBasketDraftChange={setNewBasketDraft}
+                  basketShareMode={basketShareMode}
+                  onBasketShareModeChange={setBasketShareMode}
+                  onAddBasketListing={handleAddBasketListing}
+                  selectedVillageMamaId={selectedVillageMamaId}
+                  onSelectVillageMama={setSelectedVillageMamaId}
+                  foundingGiftsClaimCount={foundingGiftsClaimCount}
+                  foundingGiftsAvailable={isFoundingGiftsAvailable(foundingGiftsClaimCount)}
+                  foundingGiftsYearlyEligible={foundingGiftsYearlyEligible}
+                  foundingGiftsUserClaimed={foundingGiftsUserClaimed}
+                  foundingGiftsClaiming={foundingGiftsClaiming}
+                  onClaimFoundingGift={handleClaimFoundingGift}
+                  onRefreshFoundingGiftsCount={refreshFoundingGiftsCount}
+                  villageUserState={usState}
+                  villageUserLatitude={villageLatitude}
+                  villageUserLongitude={villageLongitude}
+                  userJourney={userJourney}
+                />
+              </View>
             ) : null}
 
-            <View style={[styles.shellFooterLinks, shellFooterLinksStyle]}>
-              <TouchableOpacity onPress={() => handleOpenInfoModal('about')} activeOpacity={0.75}>
-                <Text style={styles.shellFooterLinkText}>About Us</Text>
-              </TouchableOpacity>
-              <Text style={styles.shellFooterDot}>•</Text>
-              <TouchableOpacity onPress={() => handleOpenInfoModal('contact')} activeOpacity={0.75}>
-                <Text style={styles.shellFooterLinkText}>Contact Us</Text>
-              </TouchableOpacity>
-              <Text style={styles.shellFooterDot}>•</Text>
-              <TouchableOpacity onPress={() => handleOpenInfoModal('legal')} activeOpacity={0.75}>
-                <Text style={styles.shellFooterLinkText}>Legal & Safety</Text>
-              </TouchableOpacity>
-            </View>
+            {!inVillagePortal ? (
+              <Animated.View
+                style={{
+                  opacity:
+                    activeTab === 'home' || candleSanctumOpen ? bottomNavOpacity : 0,
+                }}
+                pointerEvents={
+                  activeTab === 'home' || candleSanctumOpen ? 'box-none' : 'none'
+                }
+              >
+                <TouchableOpacity
+                  style={styles.homeCartFloating}
+                  onPress={handleOpenCartDrawer}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.homeCartIcon}>🧺</Text>
+                  {cartItemCount > 0 ? (
+                    <View style={styles.homeCartBadge}>
+                      <Text style={styles.homeCartBadgeText}>
+                        {cartItemCount > 9 ? '9+' : cartItemCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              </Animated.View>
+            ) : null}
 
             <SanctuaryCartDrawer
               visible={cartDrawerOpen}
@@ -3656,16 +4264,29 @@ export default function App() {
             />
 
             <BirthdayBoutiqueModal
-              visible={birthdayBoutiqueOpen && isOnboarded && !inVillagePortal}
-              mamaName={mamaName}
-              candles={APOTHECARY_CANDLES}
-              scrubs={APOTHECARY_SCRUBS}
+              visible={birthdayBoutiqueOpen && isOnboarded}
               onClose={handleCloseBirthdayBoutique}
-              onFinalize={handleFinalizeBirthdayGoodies}
+            />
+
+            <UpgradeOfferSheet
+              visible={upgradeSheetOpen}
+              onClose={() => setUpgradeSheetOpen(false)}
+              onViewPlans={() => setSubscriptionOpen(true)}
+            />
+
+            <SubscriptionScreen
+              visible={subscriptionOpen}
+              onClose={() => setSubscriptionOpen(false)}
+              onCheckout={handleSubscriptionCheckout}
             />
 
             <VillageRemedyPopup
               symptom={SANCTUARY_SYMPTOMS.find((s) => s.id === remedyPopupSymptomId) || null}
+              remedy={
+                remedyPopupSymptomId
+                  ? getVillageRemedy(remedyPopupSymptomId, remedyPopupPickIndex)
+                  : null
+              }
               visible={
                 Boolean(remedyPopupSymptomId) &&
                 activeTab === 'daily' &&
@@ -3715,13 +4336,12 @@ export default function App() {
               onPlaceOrder={handlePlaceOrder}
             />
 
-            {infoModalType ? (
+            {infoModalType && infoModalType !== 'legal' ? (
               <VillageInfoModal
                 type={infoModalType}
                 contactHeartNote={contactHeartNote}
                 onContactHeartNoteChange={setContactHeartNote}
                 onSendHeartNote={handleSendHeartNote}
-                onDestroyAccount={handleDestroyAccount}
                 onClose={handleCloseInfoModal}
                 anim={{
                   opacity: infoModalOpacity,
@@ -3732,189 +4352,342 @@ export default function App() {
               />
             ) : null}
 
-            <View style={[styles.bottomNav, bottomNavStyle]}>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => runTabTransition('home')}
-            >
-              <Text style={[styles.navIcon, activeTab === 'home' && styles.activeText]}>🏡</Text>
-              <Text style={[styles.navText, activeTab === 'home' && styles.activeText]}>Home</Text>
-            </TouchableOpacity>
+            {infoModalType === 'legal' ? (
+              <LegalComplianceModal
+                onClose={handleCloseInfoModal}
+                onDestroyAccount={handleDestroyAccount}
+                anim={{
+                  opacity: infoModalOpacity,
+                  scale: infoModalScale,
+                  translateX: infoModalTranslateX,
+                  translateY: infoModalTranslateY,
+                }}
+              />
+            ) : null}
 
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => runTabTransition('kitchen')}
-            >
-              <Text style={[styles.navIcon, activeTab === 'kitchen' && styles.activeText]}>🍳</Text>
-              <Text style={[styles.navText, activeTab === 'kitchen' && styles.activeText]}>Kitchen</Text>
-            </TouchableOpacity>
+            {midnightLoungeMounted ? (
+              <Animated.View
+                style={[
+                  styles.midnightLoungeOverlay,
+                  (userJourney === 'postpartum'
+                    ? !postpartumLoungeOverlayActive
+                    : !inMidnightLounge) && styles.midnightLoungeCachedHidden,
+                  {
+                    opacity: midnightLoungeOpacity,
+                    transform: [
+                      { scale: midnightLoungeScale },
+                      { translateY: midnightLoungeTranslateY },
+                    ],
+                  },
+                ]}
+                pointerEvents={inMidnightLounge ? 'auto' : 'none'}
+              >
+                  <MidnightLoungeScreen
+                    onExit={handleCloseMidnightLounge}
+                    userJourney={userJourney}
+                    postpartumLotusOpen={userJourney === 'postpartum' && inMidnightLounge}
+                    mamaName={mamaName}
+                    onMamaNameChange={setMamaName}
+                    shortBio={mamaDiscovery?.heartSpace || ''}
+                    onShortBioChange={(text) => handleSaveDiscoveryField('heartSpace', text)}
+                    mamaBirthday={mamaBirthday}
+                    onBirthdayChange={handleBirthdayChange}
+                    profilePhotoUri={profilePhotoUri}
+                    onPickProfilePhoto={handlePickProfilePhoto}
+                    onOpenVillagePortal={handleOpenVillagePortal}
+                    onDeleteAccount={handleDestroyAccount}
+                    ventingHistory={ventingHistory}
+                    onAppendVentingEntry={(entry) =>
+                      setVentingHistory((prev) =>
+                        [...prev, entry].sort(
+                          (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+                        )
+                      )
+                    }
+                    guidanceHistory={guidanceHistory}
+                    onAppendGuidanceHistory={(entry) =>
+                      setGuidanceHistory((prev) => [...prev, entry].slice(-50))
+                    }
+                    isSubscribed={isSubscribed}
+                    onRequestUpgrade={handleReleaseUpgradePrompt}
+                    renderVillagePortal={({ onClose }) => (
+                      <VillageCommunityPortal
+                        villageLogoUri={CALMMAMA_OFFICIAL_LOGO}
+                        pulseAnim={pulseAnim}
+                        villagePortalTab={villagePortalTab}
+                        onVillagePortalTabChange={setVillagePortalTab}
+                        onClose={onClose}
+                        communityPosts={communityPosts}
+                        expandedThreads={expandedThreads}
+                        threadDrafts={threadDrafts}
+                        newPostDraft={newCommunityPostDraft}
+                        onNewPostDraftChange={setNewCommunityPostDraft}
+                        onAddCommunityPost={handleAddCommunityPost}
+                        onToggleThread={handleToggleThread}
+                        onThreadDraftChange={handleThreadDraftChange}
+                        onAddThreadReply={handleAddThreadReply}
+                        onCoordinateBasket={handleCoordinateBasket}
+                        basketOfferings={basketOfferings}
+                        basketSeeking={basketSeeking}
+                        newBasketDraft={newBasketDraft}
+                        onNewBasketDraftChange={setNewBasketDraft}
+                        basketShareMode={basketShareMode}
+                        onBasketShareModeChange={setBasketShareMode}
+                        onAddBasketListing={handleAddBasketListing}
+                        selectedVillageMamaId={selectedVillageMamaId}
+                        onSelectVillageMama={setSelectedVillageMamaId}
+                        foundingGiftsClaimCount={foundingGiftsClaimCount}
+                        foundingGiftsAvailable={isFoundingGiftsAvailable(foundingGiftsClaimCount)}
+                        foundingGiftsYearlyEligible={foundingGiftsYearlyEligible}
+                        foundingGiftsUserClaimed={foundingGiftsUserClaimed}
+                        foundingGiftsClaiming={foundingGiftsClaiming}
+                        onClaimFoundingGift={handleClaimFoundingGift}
+                        onRefreshFoundingGiftsCount={refreshFoundingGiftsCount}
+                        villageUserState={usState}
+                        villageUserLatitude={villageLatitude}
+                        villageUserLongitude={villageLongitude}
+                        userJourney={userJourney}
+                      />
+                    )}
+                  />
+              </Animated.View>
+            ) : null}
 
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => runTabTransition('sanctuary')}
-            >
-              <Text style={[styles.navIcon, activeTab === 'sanctuary' && styles.activeText]}>🕊️</Text>
-              <Text style={[styles.navText, activeTab === 'sanctuary' && styles.activeText]}>Sanctuary</Text>
-            </TouchableOpacity>
-
-            {userJourney === 'pregnant' ? (
-              <>
-                <TouchableOpacity
-                  style={styles.navItem}
-                  onPress={() => runTabTransition('daily')}
-                >
-                  <Text style={[styles.navIcon, activeTab === 'daily' && styles.activeText]}>✨</Text>
-                  <Text style={[styles.navText, activeTab === 'daily' && styles.activeText]}>Daily</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.navItem}
-                  onPress={() => runTabTransition('tracker')}
-                >
-                  <Text style={[styles.navIcon, activeTab === 'tracker' && styles.activeText]}>🌱</Text>
-                  <Text style={[styles.navText, activeTab === 'tracker' && styles.activeText]}>Bloom</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.navItem}
-                  onPress={() => runTabTransition('daily')}
-                >
-                  <Text style={[styles.navIcon, activeTab === 'daily' && styles.activeText]}>✨</Text>
-                  <Text style={[styles.navText, activeTab === 'daily' && styles.activeText]}>Daily</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.navItem}
-                  onPress={() => runTabTransition('nursery')}
-                >
-                  <Text style={[styles.navIcon, activeTab === 'nursery' && styles.activeText]}>☁️</Text>
-                  <Text style={[styles.navText, activeTab === 'nursery' && styles.activeText]}>Nursery</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            <TouchableOpacity style={styles.navItem} onPress={() => runTabTransition('profile')}>
-              <Text style={[styles.navIcon, activeTab === 'profile' && styles.activeText]}>👤</Text>
-              <Text style={[styles.navText, activeTab === 'profile' && styles.activeText]}>Me</Text>
-            </TouchableOpacity>
-          </View>
+            {!inVillagePortal ? (
+              <Animated.View
+                pointerEvents={inMidnightLounge ? 'none' : 'auto'}
+                style={[
+                  styles.bottomChrome,
+                  {
+                    opacity: bottomNavOpacity,
+                    transform: [{ translateY: bottomNavTranslateY }],
+                  },
+                ]}
+              >
+                {!inMidnightLounge ? (
+                  <View style={styles.shellFooterDock} pointerEvents="box-none">
+                    <ShellFooterLinks
+                      onOpenAbout={handleOpenAboutFooter}
+                      onOpenContact={handleOpenContactFooter}
+                      onOpenLegal={handleOpenLegalFooter}
+                    />
+                  </View>
+                ) : null}
+                <AppBottomTabBar
+                  activeTab={activeTab}
+                  userJourney={userJourney}
+                  bottomNavStyle={bottomNavStyle}
+                  midnightLoungeOpen={inMidnightLounge}
+                  onTabPress={runTabTransition}
+                  onOpenMidnightLounge={handleOpenMidnightLounge}
+                />
+              </Animated.View>
+            ) : null}
           </View>
 
         </SafeAreaView>
-      </View>
-    </View>
+        </View>
+        ) : null}
+
+        {showOnboarding ? (
+          <View style={styles.onboardingOverlayShell}>
+            <SafeAreaView
+              style={styles.screenForeground}
+              edges={['left', 'right']}
+            >
+              <View style={styles.onboardingSceneStack}>
+                {onboardingStep === 'intake' ? (
+                  <View style={styles.onboardingSceneLayer}>
+                    <OnboardingStageScreen
+                      logoUri={CALMMAMA_VILLAGE_BADGE}
+                      pulseAnim={pulseAnim}
+                      userJourney={userJourney}
+                      onSelectJourney={setUserJourney}
+                      mamaName={mamaName}
+                      onMamaNameChange={setMamaName}
+                      weeksPregnant={weeksPregnant}
+                      onWeeksPregnantChange={setWeeksPregnant}
+                      dueDate={dueDate}
+                      onDueDateChange={setDueDate}
+                      babyAge={babyAge}
+                      onBabyAgeChange={setBabyAge}
+                      onContinue={handleContinueOnboarding}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.onboardingSceneLayer}>
+                    <WelcomeDashboardView
+                      logoUri={CALMMAMA_VILLAGE_BADGE}
+                      mamaName={mamaName}
+                      userJourney={userJourney}
+                      onGetStarted={handleCompleteOnboarding}
+                    />
+                  </View>
+                )}
+              </View>
+            </SafeAreaView>
+          </View>
+        ) : null}
+        </Animated.View>
+
+        {/* Web-only install overlay — transparent over living ombre */}
+        <PWAInstallPrompt />
+    </AppLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  // CONTAINER SHELL DEFINITIONS
-  webWrapper: {
-    flex: 1,
-    ...Platform.select({
-      web: {
-        backgroundColor: '#BAC6BC',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100dvh',
-        height: '100dvh',
-        overflow: 'hidden',
-      },
-      default: {
-        width: '100%',
-        backgroundColor: 'transparent',
-      },
-    }),
-  },
-  iphoneFrame: {
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 25,
-    ...Platform.select({
-      web: {
-        width: 355,
-        minHeight: '92dvh',
-        height: '92dvh',
-        maxHeight: 750,
-        borderRadius: 40,
-        borderWidth: 10,
-        borderColor: '#242424',
-      },
-      default: {
-        flex: 1,
-        width: '100%',
-        borderRadius: 0,
-        borderWidth: 0,
-        maxHeight: undefined,
-      },
-    }),
-  },
-  iphoneNotch: {
-    position: 'absolute',
-    top: 8,
-    left: '50%',
-    transform: [{ translateX: -45 }],
-    width: 90,
-    height: 22,
-    backgroundColor: '#242424',
-    borderRadius: 12,
-    zIndex: 999,
-  },
-
+  // CONTAINER SHELL DEFINITIONS — outer frame lives in AppLayout.js
   screenForeground: {
     flex: 1,
     zIndex: 10,
     backgroundColor: 'transparent',
   },
+  sceneCanvas: {
+    flex: 1,
+    zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  mainAppReveal: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  onboardingScene: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  onboardingOverlayShell: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    backgroundColor: 'transparent',
+  },
+  onboardingSceneStack: {
+    flex: 1,
+    flexDirection: 'column',
+    position: 'relative',
+  },
+  onboardingSceneLayer: {
+    flex: 1,
+    width: '100%',
+  },
+  onboardingSceneLayerStacked: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  onboardingBackdropStack: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    pointerEvents: 'none',
+  },
+  onboardingBackdropLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  welcomeOnboardingBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: CALM_MAMA_PASTEL.peach,
+  },
+  guidanceBackdropFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FAF7F2',
+  },
+  expertGuidanceBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  oracleBackdropFill: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    backgroundColor: '#0B0C10',
+  },
+  mindfulPauseBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+    backgroundColor: '#0A0910',
+  },
   shellLayout: {
     flex: 1,
     backgroundColor: 'transparent',
+    position: 'relative',
     ...Platform.select({
-      web: { position: 'relative', minHeight: 0 },
+      web: { minHeight: 0 },
       default: {},
     }),
+  },
+  mainShellKeepAlive: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: 'transparent',
+  },
+  mainShellDimmed: {
+    opacity: 0,
+  },
+  villagePortalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 40,
+    backgroundColor: 'transparent',
   },
   mainShell: {
     flex: 1,
     minHeight: 0,
     backgroundColor: 'transparent',
+    position: 'relative',
+    overflow: 'hidden',
     ...Platform.select({
       web: {
-        paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 16px))',
+        // Footer (~32) + tab bar (~56) + safe area
+        paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 16px))',
       },
-      default: {},
+      default: {
+        paddingBottom: 88,
+      },
     }),
   },
   mainShellBody: {
     flex: 1,
     minHeight: 0,
     backgroundColor: 'transparent',
+    zIndex: 1,
   },
-  mainScroll: {
+  tabStage: {
     flex: 1,
+    minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: 'transparent',
   },
-  mainScrollContent: {
-    flexGrow: 1,
+  tabSuspenseFallback: {
+    flex: 1,
+    minHeight: 120,
     backgroundColor: 'transparent',
-    ...Platform.select({
-      web: {
-        paddingBottom: 'calc(104px + env(safe-area-inset-bottom, 16px))',
-      },
-      default: {
-        paddingBottom: 104,
-      },
-    }),
   },
-  flowFill: {
+  tabPane: {
     flex: 1,
     minHeight: 0,
     backgroundColor: 'transparent',
   },
+  flowFill: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+  },
   flowEmbedded: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+  },
+  embeddedTabScroll: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: 'transparent',
+    ...Platform.select({
+      web: { overflowY: 'auto' },
+      default: {},
+    }),
+  },
+  embeddedTabScrollContent: {
+    flexGrow: 1,
+    paddingBottom: SHELL_SCROLL_FOOTER_CLEARANCE,
     backgroundColor: 'transparent',
   },
   homeIntroCard: {
@@ -5474,8 +6247,16 @@ const styles = StyleSheet.create({
   // ONBOARDING — premium welcome flow
   onboardingScroll: {
     paddingHorizontal: 28,
-    paddingTop: 36,
+    paddingTop: 20,
     paddingBottom: 40,
+    flexGrow: 1,
+  },
+  obBrandBlock: {
+    width: '100%',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 18,
+    gap: 0,
   },
   obWelcomeEyebrow: {
     fontSize: 10,
@@ -5490,10 +6271,11 @@ const styles = StyleSheet.create({
     fontSize: 34,
     color: '#3D5246',
     textAlign: 'center',
-    lineHeight: 46,
-    marginTop: 4,
-    marginBottom: 12,
+    lineHeight: 42,
+    marginTop: 10,
+    marginBottom: 0,
     paddingHorizontal: 8,
+    alignSelf: 'center',
   },
   obWelcomeSub: {
     fontSize: 14,
@@ -5503,7 +6285,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     maxWidth: 300,
     alignSelf: 'center',
-    marginBottom: 28,
+    marginTop: 8,
+    marginBottom: 0,
     paddingHorizontal: 6,
   },
   obSectionLabel: {
@@ -5698,14 +6481,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoModalLegalHeading: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '800',
     color: '#4A5E52',
     marginBottom: 6,
     letterSpacing: 0.2,
   },
   infoModalDeleteText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#C46B5A',
     textAlign: 'center',
@@ -5715,6 +6498,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 24,
+    backgroundColor: 'transparent',
+  },
+  homePregnantRoot: {
+    backgroundColor: 'transparent',
+    flexGrow: 1,
+    marginTop: 2,
+  },
+  homePregnantShell: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    backgroundColor: 'transparent',
+  },
+  homeLinenCanvas: {
+    backgroundColor: 'transparent',
+  },
+  homePregnantCanvas: {
+    paddingHorizontal: 20,
+    paddingTop: 0,
     backgroundColor: 'transparent',
   },
   scrollContentFlex: {
@@ -5930,9 +6733,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   dailyTabHeader: {
-    paddingTop: 4,
-    paddingBottom: 12,
-    paddingHorizontal: 2,
+    paddingTop: PREGNANT_DAILY_LAYOUT.headerPadTop,
+    paddingBottom: PREGNANT_DAILY_LAYOUT.headerPadBottom,
+    paddingHorizontal: PREGNANT_DAILY_LAYOUT.headerPadHorizontal,
+  },
+  pregnantDailyScroll: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: 'transparent',
+    ...Platform.select({
+      web: { overflowY: 'auto' },
+      default: {},
+    }),
+  },
+  pregnantDailyScrollContent: {
+    flexGrow: 1,
+    paddingBottom: PREGNANT_DAILY_LAYOUT.scrollFooterPad,
   },
   dailyTabTitle: {
     fontSize: 18,
@@ -6016,6 +6832,43 @@ const styles = StyleSheet.create({
   postpartumDailyInner: {
     paddingHorizontal: 0,
     paddingTop: 0,
+  },
+  postpartumDailyScroll: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: 'transparent',
+    ...Platform.select({
+      web: { overflowY: 'auto' },
+      default: {},
+    }),
+  },
+  postpartumDailyScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: SHELL_SCROLL_FOOTER_CLEARANCE,
+  },
+  postpartumNurseryShell: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    backgroundColor: 'transparent',
+  },
+  postpartumNurseryScroll: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: 'transparent',
+    ...Platform.select({
+      web: { overflowY: 'auto' },
+      default: {},
+    }),
+  },
+  postpartumNurseryScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: SHELL_SCROLL_FOOTER_CLEARANCE,
   },
   homeGlassCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.28)',
@@ -6185,59 +7038,39 @@ const styles = StyleSheet.create({
   },
   winsCard: {
     overflow: 'visible',
+    position: 'relative',
   },
   winsCardBody: {
     position: 'relative',
     overflow: 'visible',
   },
-  fireworksStage: {
-    ...StyleSheet.absoluteFillObject,
+  fireworkModalRoot: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+  },
+  fireworksStage: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'visible',
-    zIndex: 20,
   },
   fireworksOrigin: {
+    width: 280,
+    height: 280,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  fireworkParticleWrap: {
     position: 'absolute',
-    bottom: 36,
-    width: 1,
-    height: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fireworkParticle: {
-    position: 'absolute',
-    fontSize: 18,
-  },
-  fireworksMessageStack: {
-    position: 'absolute',
-    bottom: 6,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  fireworksPopText: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#6B3D2E',
+  fireworkParticleEmoji: {
     textAlign: 'center',
-    letterSpacing: 0.2,
-    ...Platform.select({
-      web: { fontFamily: 'Georgia, "Palatino Linotype", serif', fontStyle: 'italic' },
-    }),
-  },
-  fireworksPopSubtext: {
-    marginTop: 6,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#5C6E63',
-    textAlign: 'center',
-    lineHeight: 18,
-    fontStyle: 'italic',
-    ...Platform.select({
-      web: { fontFamily: 'Georgia, "Palatino Linotype", serif' },
-    }),
   },
   symptomEmoji: {
     fontSize: 22,
@@ -6427,6 +7260,9 @@ const styles = StyleSheet.create({
     height: 72,
     backgroundColor: 'rgba(232, 218, 244, 0.5)',
   },
+  therapeuticMealImageFallback: {
+    backgroundColor: 'rgba(232, 218, 244, 0.35)',
+  },
   therapeuticMealTitle: {
     fontSize: 10,
     fontWeight: '800',
@@ -6570,39 +7406,48 @@ const styles = StyleSheet.create({
     marginTop: 12,
     letterSpacing: 0.3,
   },
-  shellFooterLinks: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  shellFooterLinksInline: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(186, 152, 138, 0.1)',
-    ...Platform.select({
-      web: {
-        bottom: 'calc(56px + env(safe-area-inset-bottom, 16px))',
-      },
-      default: {
-        bottom: 56,
-      },
-    }),
+  },
+  shellFooterDock: {
+    paddingTop: 7,
+    paddingBottom: 5,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255, 252, 248, 0.28)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(186, 152, 138, 0.16)',
+  },
+  shellFooterLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    backgroundColor: 'transparent',
   },
   shellFooterLinkText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#A89A90',
-    letterSpacing: 0.12,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4A5C50',
+    letterSpacing: 0.2,
   },
   shellFooterDot: {
-    fontSize: 8,
-    color: '#B5C4BA',
-    marginHorizontal: 6,
-    opacity: 0.9,
+    fontSize: 11,
+    color: '#8A9A90',
+    marginHorizontal: 7,
+    opacity: 0.95,
+  },
+  bottomChrome: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10000,
+    backgroundColor: 'transparent',
   },
   infoModalOverlay: {
     ...Platform.select({
@@ -6613,7 +7458,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    zIndex: 1100,
+    zIndex: 11050,
   },
   infoModalCard: {
     width: '100%',
@@ -6640,75 +7485,96 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   infoModalTitle: {
-    fontSize: 13,
+    fontSize: 18,
     fontWeight: '800',
     color: '#4A5E52',
     flex: 1,
     paddingRight: 8,
   },
   infoModalClose: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '800',
     color: '#B8958A',
   },
   infoModalBody: {
-    fontSize: 13,
-    lineHeight: 21,
-    color: '#4A5C50',
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#3D5246',
     fontStyle: 'italic',
-    marginBottom: 12,
+    marginBottom: 14,
     paddingHorizontal: 2,
   },
+  infoModalInstagramBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(143, 168, 150, 0.22)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(143, 168, 150, 0.4)',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  infoModalInstagramBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#3D5246',
+    letterSpacing: 0.2,
+  },
+  infoModalInstagramHandle: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5C7A68',
+  },
   infoModalInput: {
-    minHeight: 88,
+    minHeight: 96,
     backgroundColor: 'rgba(255, 255, 255, 0.72)',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(143, 168, 150, 0.35)',
-    padding: 20,
-    fontSize: 12,
+    padding: 16,
+    fontSize: 15,
+    lineHeight: 22,
     color: '#3D5246',
     marginBottom: 12,
   },
   infoModalSendBtn: {
     backgroundColor: '#8FA896',
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: 'center',
     marginBottom: 10,
   },
   infoModalSendText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   infoModalDismissBtn: {
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   infoModalDismissText: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#A68B7E',
+    color: '#8A6F64',
     letterSpacing: 0.2,
   },
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    position: 'relative',
     minHeight: 56,
     backgroundColor: 'rgba(255, 255, 255, 0.62)',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.04)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.06)',
     paddingTop: 4,
     ...Platform.select({
       web: {
-        zIndex: 9999,
+        zIndex: 1,
         paddingBottom: 'env(safe-area-inset-bottom, 16px)',
       },
       default: {
@@ -6716,10 +7582,25 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  midnightLoungeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10000,
+    backgroundColor: '#14121C',
+  },
+  midnightLoungeCachedHidden: {
+    zIndex: -1,
+  },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+  },
+  navLotusCenterSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: -22,
+    transform: [{ scale: 0.48 }],
   },
   navIcon: {
     fontSize: 15,
@@ -6734,5 +7615,71 @@ const styles = StyleSheet.create({
     color: '#152219',
     fontWeight: '800',
     opacity: 1,
+  },
+  upgradeBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(24, 28, 26, 0.42)',
+    justifyContent: 'flex-end',
+  },
+  upgradeSheet: {
+    backgroundColor: 'rgba(255, 252, 248, 0.98)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    borderWidth: 1,
+    borderColor: 'rgba(196, 165, 116, 0.28)',
+  },
+  upgradeHandle: {
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(92, 122, 104, 0.25)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  upgradeEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+    color: '#6A7A68',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  upgradeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2A382E',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  upgradeBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#5A6A62',
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  upgradePrimaryBtn: {
+    backgroundColor: 'rgba(92, 122, 104, 0.9)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  upgradePrimaryText: {
+    color: '#FFF9F4',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  upgradeGhostBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  upgradeGhostText: {
+    color: '#6A7A68',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

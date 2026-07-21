@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState, memo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,25 +7,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
-  Image,
-  Animated,
 } from 'react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { getBloomWeek, getCombinedWeeklyMedicalInsight, TRIMESTER_LABELS } from './bloomWeekData';
-import { getTrimesterForWeek, getBloomVideoForWeek } from './bloomVideoConfig';
-import { getBloomVisualForWeek } from './bloomWeekVisuals';
 import { getWeeklyAffirmation } from './bloomAffirmations';
-import { VILLAGE_IN_OUT_SIN } from './villageEasing';
+import BabyGrowthScreen from './BabyGrowthScreen';
+import {
+  PREGNANT_BLOOM_LAYOUT,
+  PREGNANT_BLOOM_LAYOUT_LOCKED,
+  PREGNANT_BLOOM_STACK,
+} from './pregnantBloomLayoutConfig';
+import { KITCHEN_SERIF } from './designTypography';
+import { bloomFredokaTitle, injectBloomFredokaFont, injectNurseryWebFonts } from './nurseryRetroFonts';
 
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const BLOOM_BODY_W = 300;
-const BLOOM_BODY_H = 300;
-
-const BLOOM_TRIMESTER_IMAGES = {
-  1: require('./assets/soul-cloud-peach.png'),
-  2: require('./assets/soul-cloud-sage.png'),
-  3: require('./assets/soul-cloud-lavender.png'),
-};
+/** PREGNANT BLOOM TAB — layout locked. User must say "UNLOCK BLOOM LAYOUT" before structural edits. */
 
 const AFFIRMATION_SERIF = Platform.select({
   web: { fontFamily: 'Georgia, "Palatino Linotype", "Times New Roman", serif' },
@@ -64,118 +58,6 @@ function BloomAffirmationMiniCard({ affirmation, trimesterLabel, week }) {
           <Text style={affirmationMiniStyles.footerLeaf}>🌿</Text>
         </View>
       </View>
-    </View>
-  );
-}
-
-/** Trimester belly-caress video — loops softly inside the bloom frame */
-function BloomTrimesterVideo({ week, style, onFallback }) {
-  const trimester = getTrimesterForWeek(week);
-  const source = getBloomVideoForWeek(week);
-  const player = useVideoPlayer(source, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-
-  useEffect(() => {
-    try {
-      player.play();
-    } catch (_) {
-      onFallback?.();
-    }
-  }, [player, trimester, week, onFallback]);
-
-  return (
-    <VideoView
-      style={style}
-      player={player}
-      nativeControls={false}
-      contentFit="contain"
-      allowsFullscreen={false}
-    />
-  );
-}
-
-/** Stable trimester bloom graphic — trimester video + PNG fallback + breathe loop */
-function BloomingBodyGraphic({ week, palette, visual }) {
-  const trimester = getTrimesterForWeek(week);
-  const [useImageFallback, setUseImageFallback] = useState(false);
-  const breathe = useRef(new Animated.Value(0)).current;
-  const imageSource = BLOOM_TRIMESTER_IMAGES[trimester] || BLOOM_TRIMESTER_IMAGES[2];
-
-  const handleVideoFallback = useCallback(() => {
-    setUseImageFallback(true);
-  }, []);
-
-  useEffect(() => {
-    setUseImageFallback(false);
-  }, [trimester, week]);
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathe, {
-          toValue: 1,
-          duration: 2600,
-          easing: VILLAGE_IN_OUT_SIN,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(breathe, {
-          toValue: 0,
-          duration: 2600,
-          easing: VILLAGE_IN_OUT_SIN,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [breathe]);
-
-  const breatheScale = breathe.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.04],
-  });
-
-  const mediaStyle = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: BLOOM_BODY_W,
-    height: BLOOM_BODY_H,
-    zIndex: 2,
-  };
-
-  return (
-    <View style={[silhouetteStyles.landscapeStage, { backgroundColor: palette.wash }]}>
-      <View style={[silhouetteStyles.washBlob, { backgroundColor: palette.accent }]} />
-      <Animated.View
-        style={[
-          silhouetteStyles.landscapeFrame,
-          { width: BLOOM_BODY_W, height: BLOOM_BODY_H, borderColor: palette.accent },
-          { transform: [{ scale: breatheScale }] },
-        ]}
-      >
-        {useImageFallback ? (
-          <Image
-            source={imageSource}
-            style={mediaStyle}
-            resizeMode="contain"
-            accessibilityLabel={`Week ${week} blooming body illustration`}
-          />
-        ) : (
-          <BloomTrimesterVideo
-            key={`bloom-video-t${trimester}-w${week}`}
-            week={week}
-            style={mediaStyle}
-            onFallback={handleVideoFallback}
-          />
-        )}
-      </Animated.View>
-      <Text style={[silhouetteStyles.weekBadge, { color: palette.primary }]}>
-        Week {week} · {visual.dressLabel}
-      </Text>
     </View>
   );
 }
@@ -224,7 +106,7 @@ function WeightChart({ entries, palette, maxWeek }) {
   );
 }
 
-export default function WeeklyBloomScreen({
+function WeeklyBloomScreen({
   embedded = false,
   initialWeek = 24,
   mamaName = 'Mama',
@@ -233,11 +115,16 @@ export default function WeeklyBloomScreen({
   onAddWeight,
   onWeekChange,
   onOpenBirthPrompt,
+  onLogMeals,
+  isActive = true,
 }) {
+  if (__DEV__ && !PREGNANT_BLOOM_LAYOUT_LOCKED) {
+    console.warn('[WeeklyBloomScreen] PREGNANT_BLOOM_LAYOUT_LOCKED is false — bloom layout edits allowed');
+  }
+
   const [week, setWeek] = useState(Math.min(40, Math.max(1, parseInt(String(initialWeek), 10) || 24)));
   const [weightInput, setWeightInput] = useState('');
   const data = getBloomWeek(week);
-  const visual = getBloomVisualForWeek(week);
 
   const changeWeek = (delta) => {
     const next = Math.min(40, Math.max(1, week + delta));
@@ -262,16 +149,16 @@ export default function WeeklyBloomScreen({
     [week]
   );
 
+  useEffect(() => {
+    injectNurseryWebFonts();
+    injectBloomFredokaFont();
+  }, []);
+
   const body = (
     <>
-      <View style={bloomStyles.hero}>
+      <View style={bloomStyles.hero} nativeID={PREGNANT_BLOOM_STACK[0]}>
         <Text style={bloomStyles.heroEyebrow}>WEEKLY BLOOM</Text>
-        <Text
-          style={[bloomStyles.heroTitle, { color: data.palette.primary }]}
-          numberOfLines={2}
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
-        >
+        <Text style={[bloomStyles.heroTitle, { color: data.palette.primary }]}>
           Mama's Journey
         </Text>
         <Text style={bloomStyles.heroSub} numberOfLines={2}>
@@ -279,13 +166,18 @@ export default function WeeklyBloomScreen({
         </Text>
       </View>
 
-      <BloomAffirmationMiniCard
-        affirmation={weeklyAffirmation}
-        trimesterLabel={TRIMESTER_LABELS[data.trimester - 1]}
-        week={week}
-      />
+      <View nativeID={PREGNANT_BLOOM_STACK[1]}>
+        <BloomAffirmationMiniCard
+          affirmation={weeklyAffirmation}
+          trimesterLabel={TRIMESTER_LABELS[data.trimester - 1]}
+          week={week}
+        />
+      </View>
 
-      <View style={[bloomStyles.weekStepper, { borderColor: data.palette.accent }]}>
+      <View
+        style={[bloomStyles.weekStepper, { borderColor: data.palette.accent }]}
+        nativeID={PREGNANT_BLOOM_STACK[2]}
+      >
         <TouchableOpacity style={bloomStyles.stepBtn} onPress={() => changeWeek(-1)} disabled={week <= 1}>
           <Text style={bloomStyles.stepBtnText}>‹</Text>
         </TouchableOpacity>
@@ -298,19 +190,19 @@ export default function WeeklyBloomScreen({
         </TouchableOpacity>
       </View>
 
-      <View style={[bloomStyles.silhouetteCard, { backgroundColor: data.palette.wash, borderColor: data.palette.accent }]}>
-        <Text style={bloomStyles.cardEyebrow}>YOUR BLOOMING BODY</Text>
-        <BloomingBodyGraphic
-          key={`bloom-body-t${visual.trimester}`}
-          week={week}
-          palette={data.palette}
-          visual={visual}
-        />
-        <Text style={bloomStyles.caressCaption}>{visual.silhouetteNote}</Text>
+      <View
+        style={[bloomStyles.silhouetteCard, { backgroundColor: data.palette.wash, borderColor: data.palette.accent }]}
+        nativeID={PREGNANT_BLOOM_STACK[3]}
+      >
+        <Text style={bloomStyles.bloomingBodyTitle}>YOUR BLOOMING BODY</Text>
+        <BabyGrowthScreen week={week} onLogMeals={onLogMeals} embedded isActive={isActive} />
       </View>
 
-      <View style={[bloomStyles.fruitCard, { backgroundColor: data.palette.fruitBg, borderColor: data.palette.accent }]}>
-        <Text style={bloomStyles.cardEyebrow}>BABY SIZE THIS WEEK</Text>
+      <View
+        style={[bloomStyles.fruitCard, { backgroundColor: data.palette.fruitBg, borderColor: data.palette.accent }]}
+        nativeID={PREGNANT_BLOOM_STACK[4]}
+      >
+        <Text style={bloomStyles.bloomSectionTitle}>BABY SIZE THIS WEEK</Text>
         <View style={bloomStyles.fruitRow}>
           <View style={[bloomStyles.fruitOrb, { backgroundColor: data.palette.wash }]}>
             <Text style={bloomStyles.fruitEmoji}>{data.fruitEmoji}</Text>
@@ -325,8 +217,8 @@ export default function WeeklyBloomScreen({
         </View>
       </View>
 
-      <View style={bloomStyles.sectionCard}>
-        <Text style={bloomStyles.cardEyebrow}>WEIGHT TRACKER</Text>
+      <View style={bloomStyles.sectionCard} nativeID={PREGNANT_BLOOM_STACK[5]}>
+        <Text style={bloomStyles.bloomSectionTitle}>WEIGHT TRACKER</Text>
         <View style={bloomStyles.weightInputRow}>
           <TextInput
             style={bloomStyles.weightInput}
@@ -360,8 +252,8 @@ export default function WeeklyBloomScreen({
         )}
       </View>
 
-      <View style={[bloomStyles.medicalCard, { borderColor: data.palette.accent }]}>
-        <Text style={bloomStyles.cardEyebrow}>WEEKLY MEDICAL INSIGHTS</Text>
+      <View style={[bloomStyles.medicalCard, { borderColor: data.palette.accent }]} nativeID={PREGNANT_BLOOM_STACK[6]}>
+        <Text style={bloomStyles.bloomSectionTitle}>WEEKLY MEDICAL INSIGHTS</Text>
         <Text style={bloomStyles.medicalBadge}>Holistic body + baby check-in · not a substitute for care</Text>
         <Text style={bloomStyles.medicalBody}>{combinedMedicalInsight}</Text>
         <Text style={bloomStyles.medicalFooter}>
@@ -369,8 +261,11 @@ export default function WeeklyBloomScreen({
         </Text>
       </View>
 
-      <View style={[bloomStyles.sectionCard, { backgroundColor: 'rgba(255,255,255,0.32)' }]}>
-        <Text style={bloomStyles.cardEyebrow}>THIS WEEK FOR YOU</Text>
+      <View
+        style={[bloomStyles.sectionCard, { backgroundColor: 'rgba(255,255,255,0.32)' }]}
+        nativeID={PREGNANT_BLOOM_STACK[7]}
+      >
+        <Text style={bloomStyles.bloomSectionTitle}>THIS WEEK FOR YOU</Text>
         <View style={bloomStyles.factBlock}>
           <Text style={bloomStyles.factIcon}>🌿</Text>
           <View style={bloomStyles.factTextWrap}>
@@ -392,17 +287,28 @@ export default function WeeklyBloomScreen({
           style={[bloomStyles.birthPromptLink, { borderColor: data.palette.accent }]}
           onPress={onOpenBirthPrompt}
           activeOpacity={0.88}
+          nativeID={PREGNANT_BLOOM_STACK[8]}
         >
-          <Text style={bloomStyles.birthPromptText}>
-            Little one here sooner than expected? Tap to let your village know →
-          </Text>
+          <Text style={bloomStyles.birthPromptTitle}>Little one here sooner than expected?</Text>
+          <Text style={bloomStyles.birthPromptCta}>Tap to let your village know →</Text>
         </TouchableOpacity>
       ) : null}
     </>
   );
 
   if (embedded) {
-    return <View style={bloomStyles.embeddedContent}>{body}</View>;
+    return (
+      <ScrollView
+        style={bloomStyles.embeddedScroll}
+        contentContainerStyle={bloomStyles.embeddedContent}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {body}
+      </ScrollView>
+    );
   }
 
   return (
@@ -417,71 +323,7 @@ export default function WeeklyBloomScreen({
   );
 }
 
-const silhouetteStyles = StyleSheet.create({
-  landscapeStage: {
-    width: '100%',
-    minHeight: BLOOM_BODY_H + 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginVertical: 6,
-    overflow: 'visible',
-    borderRadius: 16,
-  },
-  washBlob: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.22,
-  },
-  landscapeFrame: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-    overflow: 'hidden',
-    borderRadius: 14,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255, 252, 248, 0.72)',
-    width: BLOOM_BODY_W,
-    height: BLOOM_BODY_H,
-    minWidth: BLOOM_BODY_W,
-    minHeight: BLOOM_BODY_H,
-  },
-  bloomBodyImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: BLOOM_BODY_W,
-    height: BLOOM_BODY_H,
-    zIndex: 2,
-    ...Platform.select({
-      web: { objectFit: 'contain' },
-      default: {},
-    }),
-  },
-  landscapeWebEmoji: {
-    fontSize: 42,
-    marginBottom: 6,
-  },
-  landscapeWebLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  weekBadge: {
-    position: 'absolute',
-    bottom: 6,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-});
+export default React.memo(WeeklyBloomScreen);
 
 const affirmationMiniStyles = StyleSheet.create({
   wrap: {
@@ -562,20 +404,20 @@ const affirmationMiniStyles = StyleSheet.create({
     marginRight: 10,
   },
   iconEmoji: {
-    fontSize: 16,
+    fontSize: 18,
   },
   headerCopy: {
     flex: 1,
   },
   eyebrow: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
     color: '#7A6494',
     textTransform: 'uppercase',
   },
   weekPill: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#8E7AA8',
     marginTop: 2,
     fontStyle: 'italic',
@@ -583,12 +425,12 @@ const affirmationMiniStyles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: 'rgba(167, 139, 196, 0.22)',
-    marginVertical: 10,
+    marginVertical: 8,
     zIndex: 1,
   },
   quote: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
     color: '#3A3048',
     textAlign: 'center',
     fontStyle: 'italic',
@@ -599,16 +441,16 @@ const affirmationMiniStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 8,
     gap: 6,
     zIndex: 1,
   },
   footerLeaf: {
-    fontSize: 10,
+    fontSize: 9,
     opacity: 0.7,
   },
   footerText: {
-    fontSize: 9,
+    fontSize: 11,
     color: '#9A88B0',
     fontStyle: 'italic',
     letterSpacing: 0.3,
@@ -617,41 +459,53 @@ const affirmationMiniStyles = StyleSheet.create({
 
 const bloomStyles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: 'transparent' },
-  embeddedContent: {
+  embeddedScroll: {
+    flex: 1,
+    minHeight: 0,
     backgroundColor: 'transparent',
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+    ...Platform.select({
+      web: { overflowY: 'auto' },
+      default: {},
+    }),
+  },
+  embeddedContent: {
+    flexGrow: 1,
+    backgroundColor: 'transparent',
+    paddingTop: PREGNANT_BLOOM_LAYOUT.embeddedPadTop,
+    paddingBottom: PREGNANT_BLOOM_LAYOUT.embeddedScrollFooterPad,
+    paddingHorizontal: PREGNANT_BLOOM_LAYOUT.embeddedPadHorizontal,
   },
   scrollContent: { paddingBottom: 88, paddingHorizontal: 16 },
   hero: {
-    marginBottom: 12,
+    marginBottom: PREGNANT_BLOOM_LAYOUT.heroMarginBottom,
     paddingHorizontal: 4,
     alignItems: 'center',
     width: '100%',
   },
   heroEyebrow: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#5c6d63',
+    color: '#4A5C50',
     letterSpacing: 1.2,
     textAlign: 'center',
   },
   heroTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginTop: 4,
+    ...KITCHEN_SERIF,
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 5,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 30,
     maxWidth: '100%',
     alignSelf: 'stretch',
   },
   heroSub: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#5a6e62',
-    marginTop: 4,
+    marginTop: 3,
     fontStyle: 'italic',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 14,
     maxWidth: '100%',
   },
   weekStepper: {
@@ -664,7 +518,7 @@ const bloomStyles = StyleSheet.create({
     marginBottom: 14,
   },
   stepBtn: {
-    width: 44,
+    width: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -677,31 +531,25 @@ const bloomStyles = StyleSheet.create({
   stepCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
   stepWeek: { fontSize: 18, fontWeight: '800' },
   stepMilestone: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#5c6e63',
     textAlign: 'center',
     marginTop: 2,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   silhouetteCard: {
     borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     marginBottom: 14,
     borderWidth: 1.5,
     overflow: 'hidden',
-    alignItems: 'center',
-  },
-  caressCaption: {
-    fontSize: 11,
-    color: '#6a7a6e',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginTop: 4,
+    alignItems: 'stretch',
+    width: '100%',
   },
   fruitCard: {
     borderRadius: 18,
-    padding: 16,
+    padding: 14,
     marginBottom: 14,
     borderWidth: 1,
   },
@@ -712,17 +560,17 @@ const bloomStyles = StyleSheet.create({
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    marginRight: 12,
   },
   fruitEmoji: { fontSize: 36 },
   fruitCopy: { flex: 1 },
-  fruitName: { fontSize: 16, fontWeight: '800' },
-  fruitLength: { fontSize: 12, color: '#5c6e63', marginTop: 2, fontWeight: '600' },
-  fruitFact: { fontSize: 12, color: '#4a5c51', lineHeight: 17, marginTop: 6 },
+  fruitName: { fontSize: 17, fontWeight: '800', lineHeight: 22 },
+  fruitLength: { fontSize: 13, color: '#5c6e63', marginTop: 2, fontWeight: '600' },
+  fruitFact: { fontSize: 13, color: '#4a5c51', lineHeight: 19, marginTop: 5 },
   sectionCard: {
     backgroundColor: 'rgba(255,255,255,0.36)',
     borderRadius: 18,
-    padding: 16,
+    padding: 14,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.38)',
@@ -734,13 +582,37 @@ const bloomStyles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
   },
-  weightInputRow: { flexDirection: 'row', marginBottom: 12 },
+  insightSectionEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4a5c50',
+    letterSpacing: 0.9,
+    marginBottom: 10,
+  },
+  bloomingBodyTitle: {
+    ...bloomFredokaTitle,
+    fontSize: 15,
+    color: '#3d4f44',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    textAlign: 'center',
+    alignSelf: 'center',
+    width: '100%',
+  },
+  bloomSectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#4a5c50',
+    letterSpacing: 0.9,
+    marginBottom: 8,
+  },
+  weightInputRow: { flexDirection: 'row', marginBottom: 10 },
   weightInput: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.52)',
     borderRadius: 10,
     padding: 10,
-    fontSize: 14,
+    fontSize: 15,
     borderWidth: 1,
     borderColor: 'rgba(140,160,145,0.4)',
     marginRight: 8,
@@ -751,9 +623,9 @@ const bloomStyles = StyleSheet.create({
     paddingHorizontal: 16,
     justifyContent: 'center',
   },
-  weightSaveText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  weightSaveText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   chartWrap: { marginTop: 4 },
-  chartEmpty: { fontSize: 12, color: '#6a7a6e', fontStyle: 'italic', lineHeight: 17 },
+  chartEmpty: { fontSize: 13, color: '#6a7a6e', fontStyle: 'italic', lineHeight: 19 },
   chartBars: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -762,64 +634,74 @@ const bloomStyles = StyleSheet.create({
   },
   chartCol: { flex: 1, alignItems: 'center', marginHorizontal: 2 },
   chartBar: { width: '70%', borderRadius: 6, minHeight: 8 },
-  chartLabel: { fontSize: 8, color: '#6a7a6e', marginTop: 4, fontWeight: '700' },
+  chartLabel: { fontSize: 11, color: '#6a7a6e', marginTop: 4, fontWeight: '700' },
   chartLegend: { marginTop: 8, alignItems: 'center' },
-  chartLegendText: { fontSize: 11, color: '#4a5c51', fontWeight: '600' },
-  weightTable: { marginTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 10 },
-  tableHeader: { flexDirection: 'row', marginBottom: 6 },
-  tableHeadCell: { flex: 1, fontSize: 9, fontWeight: '800', color: '#6a7a6e', letterSpacing: 0.5 },
+  chartLegendText: { fontSize: 13, color: '#4a5c51', fontWeight: '600' },
+  weightTable: { marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 8 },
+  tableHeader: { flexDirection: 'row', marginBottom: 5 },
+  tableHeadCell: { flex: 1, fontSize: 11, fontWeight: '800', color: '#6a7a6e', letterSpacing: 0.5 },
   tableRow: {
     flexDirection: 'row',
     paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.04)',
   },
-  tableCell: { flex: 1, fontSize: 12, color: '#2a3d32', fontWeight: '600' },
+  tableCell: { flex: 1, fontSize: 13, color: '#2a3d32', fontWeight: '600' },
   factBlock: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 10,
     alignItems: 'flex-start',
   },
-  factIcon: { fontSize: 20, marginRight: 10, marginTop: 2 },
+  factIcon: { fontSize: 16, marginRight: 8, marginTop: 1 },
   factTextWrap: { flex: 1 },
-  factLabel: { fontSize: 11, fontWeight: '800', color: '#4a5c50', marginBottom: 3 },
-  factBody: { fontSize: 13, color: '#3d4f44', lineHeight: 19 },
+  factLabel: { fontSize: 12, fontWeight: '800', color: '#4a5c50', marginBottom: 3 },
+  factBody: { fontSize: 14, color: '#3d4f44', lineHeight: 20 },
   medicalCard: {
     backgroundColor: 'rgba(255,255,255,0.4)',
     borderRadius: 18,
-    padding: 16,
-    marginBottom: 20,
+    padding: 14,
+    marginBottom: 18,
     borderWidth: 1.5,
   },
   medicalBadge: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#7a6a5a',
     fontWeight: '600',
     marginBottom: 8,
     fontStyle: 'italic',
+    lineHeight: 17,
   },
-  medicalBody: { fontSize: 13, color: '#2a3d32', lineHeight: 20 },
+  medicalBody: { fontSize: 14, color: '#2a3d32', lineHeight: 21 },
   medicalFooter: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#6a7a6e',
     marginTop: 10,
-    lineHeight: 16,
+    lineHeight: 18,
     fontStyle: 'italic',
   },
   birthPromptLink: {
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 2,
     borderStyle: 'dashed',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 14,
-    marginBottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    marginTop: 4,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.48)',
   },
-  birthPromptText: {
-    fontSize: 11,
-    color: '#5c6e63',
+  birthPromptTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2a3d32',
     textAlign: 'center',
-    lineHeight: 16,
-    fontStyle: 'italic',
+    lineHeight: 20,
+    marginBottom: 5,
+  },
+  birthPromptCta: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4a6b55',
+    textAlign: 'center',
+    lineHeight: 17,
   },
 });

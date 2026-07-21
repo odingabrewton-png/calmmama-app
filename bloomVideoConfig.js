@@ -11,7 +11,7 @@
 
 const TRIMESTER_1_VIDEO = require('./assets/bloom-trimester-1.mp4');
 const TRIMESTER_2_VIDEO = require('./assets/bloom-trimester-2.mp4');
-const TRIMESTER_3_VIDEO = require('./assets/bloom-trimester-3.mp4');
+const TRIMESTER_3_VIDEO = require('./assets/bloom-trimester-3.mp4'); // gemini_generated_video_22A2FD08
 
 export function getTrimesterForWeek(weekInput) {
   const week = Math.min(40, Math.max(1, parseInt(String(weekInput), 10) || 1));
@@ -30,5 +30,5 @@ export function getBloomVideoForWeek(weekInput) {
 export const TRIMESTER_VIDEO_LABELS = {
   1: 'First trimester · golden dress (weeks 1–12)',
   2: 'Second trimester · sage dress (weeks 13–27)',
-  3: 'Third trimester · full-term bloom (weeks 28–40)',
+  3: 'Third trimester · pregnancy yoga bloom (weeks 28–40)',
 };

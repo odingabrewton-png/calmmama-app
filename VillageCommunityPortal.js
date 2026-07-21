@@ -10,12 +10,14 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import VillageBrandHeader from './VillageBrandHeader';
+import AppBrandHeader from './AppBrandHeader';
+import VillageOmbreBackdrop from './VillageOmbreBackdrop';
 import CosmicNebulaBackdrop from './CosmicNebulaBackdrop';
 import { injectNurseryWebFonts, retroSoft, retroAccent, retroHubTitle } from './nurseryRetroFonts';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import {
-  VILLAGE_PRIVACY_BANNER,
+  VILLAGE_PRIVACY_TITLE,
+  VILLAGE_PRIVACY_DESCRIPTION,
   ICEBREAKER_HINTS,
   ICEBREAKER_PLACEHOLDER,
   BASKET_SHARE_HINTS,
@@ -40,8 +42,43 @@ const PORTAL_TABS = [
 
 function PrivacyBanner() {
   return (
-    <View style={styles.privacyBanner}>
-      <Text style={styles.privacyBannerText}>{VILLAGE_PRIVACY_BANNER}</Text>
+    <View
+      style={[
+        {
+          position: 'absolute',
+          top: 145,
+          left: 16,
+          right: 16,
+          zIndex: 999,
+          backgroundColor: 'rgba(5, 11, 31, 0.72)',
+          borderRadius: 14,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.28)',
+        },
+        Platform.select({
+          web: {
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            boxShadow: '0 8px 24px rgba(5, 11, 31, 0.28)',
+          },
+          default: {
+            shadowColor: '#050B1F',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.22,
+            shadowRadius: 12,
+            elevation: 4,
+          },
+        }),
+      ]}
+    >
+      <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 8 }}>
+        {VILLAGE_PRIVACY_TITLE}
+      </Text>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', lineHeight: 20, textAlign: 'center' }}>
+        {VILLAGE_PRIVACY_DESCRIPTION}
+      </Text>
     </View>
   );
 }
@@ -376,10 +413,10 @@ function VillageConstellationPanel({ selectedVillageMamaId, onSelectVillageMama 
           </View>
         ) : (
           <View style={styles.constellationHintCard}>
-            <Text style={[styles.constellationHintTitle, retroAccent]}>
+            <Text style={styles.constellationHintTitle}>
               Tap a star mama to meet her
             </Text>
-            <Text style={[styles.constellationHintText, retroSoft]}>
+            <Text style={styles.constellationHintText}>
               Distances are fuzzy on purpose — your exact location stays hidden.
             </Text>
           </View>
@@ -396,8 +433,8 @@ function BasketListing({ item, onCoordinate }) {
       {item.sharedBy ? (
         <Text style={styles.basketSharedBy}>Shared by {item.sharedBy}</Text>
       ) : null}
-      <Text style={[styles.basketTitle, retroSoft]}>{item.title}</Text>
-      <Text style={[styles.basketDetail, retroSoft]}>{item.detail}</Text>
+      <Text style={styles.basketTitle}>{item.title}</Text>
+      <Text style={styles.basketDetail}>{item.detail}</Text>
       <TouchableOpacity style={styles.basketBtn} onPress={() => onCoordinate(item.id)} activeOpacity={0.88}>
         <Text style={styles.basketBtnText}>Coordinate Support Hub</Text>
       </TouchableOpacity>
@@ -418,8 +455,8 @@ function VillageBasketPanel({
   return (
     <ScrollView style={styles.portalScroll} showsVerticalScrollIndicator={false}>
       <View style={styles.icebreakerCard}>
-        <Text style={[styles.icebreakerTitle, retroHubTitle]}>Village Basket Share</Text>
-        <Text style={[styles.icebreakerSub, retroSoft]}>
+        <Text style={styles.basketPanelTitle}>Village Basket — Share</Text>
+        <Text style={styles.basketPanelSub}>
           Tell nearby mamas what you can offer — or what you gently need
         </Text>
         {BASKET_SHARE_HINTS.map((hint) => (
@@ -464,7 +501,7 @@ function VillageBasketPanel({
           </TouchableOpacity>
         </View>
         <TextInput
-          style={[styles.icebreakerInput, retroSoft]}
+          style={styles.basketPanelInput}
           placeholder={BASKET_SHARE_PLACEHOLDER}
           placeholderTextColor="#7A8E82"
           value={newBasketDraft}
@@ -473,15 +510,15 @@ function VillageBasketPanel({
           onSubmitEditing={onAddBasketListing}
         />
         <TouchableOpacity style={styles.icebreakerPostBtn} onPress={onAddBasketListing} activeOpacity={0.88}>
-          <Text style={styles.icebreakerPostBtnText}>Share with the Village Basket</Text>
+          <Text style={styles.basketShareBtnText}>Share with the Village Basket</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={[styles.basketSectionTitle, retroAccent]}>Offering Items</Text>
+      <Text style={styles.basketSectionTitle}>Offering Items</Text>
       {(basketOfferings ?? []).map((item) => (
         <BasketListing key={item.id} item={item} onCoordinate={onCoordinate} />
       ))}
-      <Text style={[styles.basketSectionTitle, { marginTop: 8 }, retroAccent]}>Seeking Help</Text>
+      <Text style={styles.basketSectionTitle}>Seeking Help</Text>
       {(basketSeeking ?? []).map((item) => (
         <BasketListing key={item.id} item={item} onCoordinate={onCoordinate} />
       ))}
@@ -503,8 +540,8 @@ function CommunityBoardsPanel({
   return (
     <ScrollView style={styles.portalScroll} showsVerticalScrollIndicator={false}>
       <View style={styles.icebreakerCard}>
-        <Text style={[styles.icebreakerTitle, retroHubTitle]}>Icebreaker Village Chat</Text>
-        <Text style={[styles.icebreakerSub, retroSoft]}>
+        <Text style={styles.boardsPanelTitle}>Icebreaker Village Chat</Text>
+        <Text style={styles.boardsPanelSub}>
           Start a gentle conversation — your village is listening
         </Text>
         {ICEBREAKER_HINTS.map((hint) => (
@@ -513,7 +550,7 @@ function CommunityBoardsPanel({
           </Text>
         ))}
         <TextInput
-          style={[styles.icebreakerInput, retroSoft]}
+          style={styles.icebreakerInput}
           placeholder={ICEBREAKER_PLACEHOLDER}
           placeholderTextColor="#7A8E82"
           value={newPostDraft}
@@ -531,9 +568,9 @@ function CommunityBoardsPanel({
         const draft = threadDrafts[post.id] || '';
         return (
           <View key={post.id} style={styles.postCard}>
-            <Text style={[styles.postAuthor, retroSoft]}>{post.author}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#1F2E24' }}>{post.author}</Text>
             <Text style={styles.postTime}>{post.time}</Text>
-            <Text style={[styles.postBody, retroSoft]}>{post.body}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#3D4F44', lineHeight: 22 }}>{post.body}</Text>
             <TouchableOpacity style={styles.threadToggle} onPress={() => onToggleThread(post.id)}>
               <Text style={[styles.threadToggleText, retroAccent]}>
                 {expanded ? '▼ Hide village thread' : '▶ Open village thread'}
@@ -606,20 +643,26 @@ export default function VillageCommunityPortal({
 
   return (
     <View style={styles.portalRoot}>
-      <View style={styles.portalWarmWash} pointerEvents="none" />
+      <View style={styles.portalOmbreWrap} pointerEvents="none">
+        <VillageOmbreBackdrop />
+      </View>
       <View style={styles.portalForeground}>
+      <View style={styles.portalTopStack}>
       <View style={styles.portalHeader}>
         <TouchableOpacity style={styles.portalBackBtn} onPress={onClose} activeOpacity={0.85}>
           <Text style={[styles.portalBackText, retroSoft]}>← Back to Me</Text>
         </TouchableOpacity>
-        <VillageBrandHeader
-          logoUri={villageLogoUri}
-          pulseAnim={pulseAnim}
-          variant="sanctuary"
-          sanctuaryMode
-          compact
-          notchSafe
-        />
+        <View style={styles.portalLogoWrap}>
+          <AppBrandHeader
+            logoUri={villageLogoUri}
+            pulseAnim={pulseAnim}
+            variant="sanctuary"
+            sanctuaryMode
+            compact
+            notchSafe
+            enableShine
+          />
+        </View>
       </View>
 
       <PrivacyBanner />
@@ -633,16 +676,18 @@ export default function VillageCommunityPortal({
             activeOpacity={0.85}
           >
             <Text
-              style={[
-                styles.portalTabText,
-                retroSoft,
-                villagePortalTab === tab.id && styles.portalTabTextActive,
-              ]}
+              style={{
+                fontSize: 16,
+                fontWeight: '800',
+                color: villagePortalTab === tab.id ? '#1C1C1E' : '#8E8E93',
+                textAlign: 'center',
+              }}
             >
               {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
       </View>
 
       <View style={styles.portalBody}>
@@ -691,71 +736,83 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  portalWarmWash: {
+  portalOmbreWrap: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 0,
-    backgroundColor: '#C8D4BC',
-    ...Platform.select({
-      web: {
-        backgroundImage:
-          'linear-gradient(180deg, #BAC6BC 0%, #D4C8B8 42%, #E9A889 100%)',
-      },
-      default: {},
-    }),
+    overflow: 'hidden',
   },
   portalForeground: {
     flex: 1,
     minHeight: 0,
     zIndex: 1,
+    position: 'relative',
+  },
+  portalTopStack: {
+    position: 'relative',
+    zIndex: 2,
+    paddingBottom: 4,
   },
   portalHeader: {
     paddingTop: 36,
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 0,
     backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  portalLogoWrap: {
+    width: '100%',
+    marginBottom: 0,
+    zIndex: 10,
+    overflow: 'visible',
   },
   portalBackBtn: {
     alignSelf: 'flex-start',
-    marginBottom: 4,
+    marginBottom: 6,
     paddingVertical: 4,
   },
   portalBackText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#4A5C50',
   },
   portalTabRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    marginTop: 95,
     backgroundColor: 'rgba(255, 248, 242, 0.32)',
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: 'rgba(233, 168, 137, 0.22)',
+    zIndex: 4,
   },
   portalTabBtn: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.28)',
     borderWidth: 1,
     borderColor: 'rgba(186, 198, 188, 0.45)',
+    minHeight: 48,
   },
   portalTabBtnActive: {
     backgroundColor: 'rgba(233, 168, 137, 0.38)',
     borderColor: 'rgba(163, 83, 56, 0.45)',
   },
   portalTabText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#5C6E63',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#8E8E93',
     textAlign: 'center',
   },
   portalTabTextActive: {
-    color: '#2A382E',
+    fontSize: 16,
     fontWeight: '800',
+    color: '#1C1C1E',
   },
   portalBody: {
     flex: 1,
@@ -774,24 +831,6 @@ const styles = StyleSheet.create({
       },
       default: {},
     }),
-  },
-  privacyBanner: {
-    backgroundColor: 'rgba(255, 252, 248, 0.5)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(163, 83, 56, 0.32)',
-    marginHorizontal: 20,
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  privacyBannerText: {
-    fontSize: 9,
-    lineHeight: 14,
-    fontWeight: '700',
-    color: '#3D5246',
-    textAlign: 'center',
   },
   constellationScrollContent: {
     paddingBottom: 28,
@@ -854,7 +893,7 @@ const styles = StyleSheet.create({
   },
   constellationCenterLabel: {
     marginTop: 8,
-    fontSize: 9,
+    fontSize: 15,
     fontWeight: '800',
     color: 'rgba(255,255,255,0.92)',
     backgroundColor: 'rgba(255, 214, 140, 0.12)',
@@ -893,8 +932,8 @@ const styles = StyleSheet.create({
   },
   constellationNodeDistance: {
     marginTop: 6,
-    fontSize: 8,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
   },
@@ -937,18 +976,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(186, 198, 188, 0.5)',
   },
   constellationHintTitle: {
-    fontSize: 12,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#2A382E',
     textAlign: 'center',
   },
   constellationHintText: {
     marginTop: 8,
-    fontSize: 11,
+    fontSize: 15,
+    fontWeight: '700',
     color: '#3D5246',
     textAlign: 'center',
-    lineHeight: 16,
-    fontStyle: 'italic',
+    lineHeight: 22,
   },
   mapPanelScrollContent: {
     paddingBottom: 28,
@@ -1223,25 +1262,62 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(233, 168, 137, 0.4)',
     marginBottom: 14,
   },
-  icebreakerTitle: {
-    fontSize: 18,
+  basketPanelTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#2A382E',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  basketPanelSub: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#3D5246',
     textAlign: 'center',
-    marginBottom: 4,
+    lineHeight: 22,
+    marginBottom: 10,
   },
-  icebreakerSub: {
-    fontSize: 11,
-    color: '#5C6E63',
+  basketPanelInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(186, 198, 188, 0.55)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#152219',
+    minHeight: 80,
+    textAlignVertical: 'top',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  basketShareBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  boardsPanelTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#2A382E',
     textAlign: 'center',
-    fontStyle: 'italic',
+    marginBottom: 6,
+  },
+  boardsPanelSub: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3D5246',
+    textAlign: 'center',
+    lineHeight: 22,
     marginBottom: 10,
   },
   icebreakerHint: {
-    fontSize: 10,
-    color: '#5A6E58',
-    lineHeight: 15,
-    marginBottom: 3,
-    fontStyle: 'italic',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3D5246',
+    lineHeight: 22,
+    marginBottom: 4,
   },
   icebreakerInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.62)',
@@ -1250,7 +1326,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(186, 198, 188, 0.55)',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 12,
+    fontSize: 15,
     color: '#152219',
     minHeight: 72,
     textAlignVertical: 'top',
@@ -1265,7 +1341,7 @@ const styles = StyleSheet.create({
   },
   icebreakerPostBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -1289,7 +1365,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(92, 122, 104, 0.55)',
   },
   basketModeBtnText: {
-    fontSize: 11,
+    fontSize: 16,
     fontWeight: '700',
     color: '#5C6E63',
   },
@@ -1298,10 +1374,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   basketSectionTitle: {
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: '800',
     color: '#2A382E',
-    marginBottom: 8,
+    marginBottom: 10,
     marginTop: 4,
   },
   basketSharedBy: {
@@ -1327,8 +1403,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 4,
   },
-  basketTitle: { fontSize: 13, fontWeight: '800', color: '#1F2E24', marginBottom: 4 },
-  basketDetail: { fontSize: 11, color: '#4A5C50', lineHeight: 16, marginBottom: 10 },
+  basketTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2E24',
+    marginBottom: 6,
+  },
+  basketDetail: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4A5C50',
+    lineHeight: 22,
+    marginBottom: 10,
+  },
   basketBtn: {
     backgroundColor: '#5C7A68',
     borderRadius: 10,
@@ -1345,9 +1432,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: GLASS.border,
   },
-  postAuthor: { fontSize: 12, fontWeight: '800', color: '#1F2E24' },
-  postTime: { fontSize: 9, color: '#6E8578', marginTop: 2, marginBottom: 6 },
-  postBody: { fontSize: 12, color: '#3D4F44', lineHeight: 18 },
+  postAuthor: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2E24',
+  },
+  postTime: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6E8578',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  postBody: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3D4F44',
+    lineHeight: 22,
+  },
   threadToggle: { marginTop: 10, alignSelf: 'flex-start' },
   threadToggleText: { fontSize: 11, fontWeight: '700', color: '#6B3D2E' },
   threadBox: {

@@ -150,7 +150,7 @@ function premultiplyAlpha(image) {
   }
 }
 
-function trimTransparentPadding(image, pad = 6) {
+function trimTransparentPadding(image, pad = 6, padTop = pad, padRight = pad, padBottom = pad, padLeft = pad) {
   const { width, height, data } = image.bitmap;
   let minX = width;
   let minY = height;
@@ -170,10 +170,10 @@ function trimTransparentPadding(image, pad = 6) {
 
   if (maxX <= minX || maxY <= minY) return image;
 
-  const x = Math.max(0, minX - pad);
-  const y = Math.max(0, minY - pad);
-  const w = Math.min(width - x, maxX - minX + 1 + pad * 2);
-  const h = Math.min(height - y, maxY - minY + 1 + pad * 2);
+  const x = Math.max(0, minX - padLeft);
+  const y = Math.max(0, minY - padTop);
+  const w = Math.min(width - x, maxX - minX + 1 + padLeft + padRight);
+  const h = Math.min(height - y, maxY - minY + 1 + padTop + padBottom);
   return image.crop({ x, y, w, h });
 }
 
@@ -268,11 +268,13 @@ function keyOutSanctuaryWordmark(image, tolerance = 58) {
   stripLightFringe(image);
   stripLightFringe(image);
 
-  return trimTransparentPadding(image, 4);
+  return trimTransparentPadding(image, 6, 22, 18, 6, 6);
 }
 
 async function buildSanctuaryLogos() {
-  const sourcePath = path.join(assetsDir, 'calmmama-official-logo.png');
+  const rosegoldSource = path.join(assetsDir, 'calmmama-official-logo-rosegold-source.png');
+  const fallbackSource = path.join(assetsDir, 'calmmama-official-logo.png');
+  const sourcePath = fs.existsSync(rosegoldSource) ? rosegoldSource : fallbackSource;
   const raw = await Jimp.read(sourcePath);
   if (raw.width > MAX_SIZE || raw.height > MAX_SIZE) {
     raw.scaleToFit({ w: MAX_SIZE, h: MAX_SIZE });

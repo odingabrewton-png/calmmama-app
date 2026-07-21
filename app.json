@@ -1,22 +1,29 @@
 {
   "expo": {
-    "name": "calmmama-app",
+    "name": "CalmMama",
     "slug": "calmmama-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E5FCE8"
+    },
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.odingaa.calmmamaapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "EXDevMenuShowFloatingActionButton": false
       }
     },
     "android": {
       "package": "com.odingaa.calmmamaapp",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E5FCE8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -26,17 +33,40 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/favicon.png",
+      "name": "CalmMama Village",
+      "shortName": "CalmMama",
+      "themeColor": "#E5FCE8",
+      "backgroundColor": "#E5FCE8",
+      "display": "standalone",
       "meta": {
         "viewport": "width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
       }
     },
     "plugins": [
-      "expo-video"
+      [
+        "expo-dev-client",
+        {
+          "toolsButton": false
+        }
+      ],
+      "expo-video",
+      "expo-image",
+      "expo-audio",
+      "./plugins/withHideExpoDevToolsFab.js",
+      "expo-asset",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
         "projectId": "e350e578-be56-46b9-839e-3ec2e1af7fce"
       }
+    },
+    "owner": "odingaa",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e350e578-be56-46b9-839e-3ec2e1af7fce"
     }
   }
 }

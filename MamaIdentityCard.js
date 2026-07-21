@@ -3,14 +3,15 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Animated,
   StyleSheet,
   Platform,
   Image,
   TextInput,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { injectNurseryWebFonts, retroSoft, retroAccent, retroHubTitle } from './nurseryRetroFonts';
+import { VILLAGE_BOUTIQUE_COLLECTION_URL } from './retailConfig';
 import {
   getBirthdayProfileSummary,
   getDaysInMonth,
@@ -19,7 +20,7 @@ import {
   MONTH_SHORT,
   normalizeBirthday,
 } from './mamaBirthdayUtils';
-import { useVillagePressTransition } from './villageScreenTransitions';
+import FindMyVillageHubCard from './FindMyVillageHubCard';
 
 const AVATAR_SIZE = 101;
 
@@ -33,13 +34,22 @@ const DISCOVERY_FIELDS = [
     id: 'heartSpace',
     emoji: '☕',
     label: 'How are you truly filling your cup today, mama?',
-    placeholder: 'Rest, nourishment, joy — what’s refilling you right now?',
+    placeholder: 'Affirmations, rest, joy — what refills you right now?',
+    grid: 'wide',
   },
   {
-    id: 'centerRitual',
-    emoji: '🕯️',
-    label: 'What small ritual brings you back to your center when things get chaotic?',
-    placeholder: 'A breath, a song, a warm shower — your reset button…',
+    id: 'groundedActivities',
+    emoji: '🌿',
+    label: 'What activities keep you grounded?',
+    placeholder: 'Walks, journaling, breathwork, creative rituals…',
+    grid: 'left',
+  },
+  {
+    id: 'villageShares',
+    emoji: '📺',
+    label: 'TV, books, or media you would share with other mamas?',
+    placeholder: 'Shows, podcasts, or books that helped in overwhelming times…',
+    grid: 'right',
   },
 ];
 
@@ -187,17 +197,11 @@ export default function MamaIdentityCard({
   profilePhotoUri,
   onPickProfilePhoto,
   onOpenVillagePortal,
-  onOpenCandleSanctum,
-  candles,
   onGraduation,
   showGraduation,
 }) {
   const [drafts, setDrafts] = useState(() => ({ ...discovery }));
   const [savedFields, setSavedFields] = useState({});
-  const { animatedStyle: villagePortalStyle, runTransition: runVillagePortalTransition } =
-    useVillagePressTransition();
-  const { animatedStyle: candleSanctumStyle, runTransition: runCandleSanctumTransition } =
-    useVillagePressTransition();
 
   useEffect(() => {
     injectNurseryWebFonts();
@@ -212,11 +216,11 @@ export default function MamaIdentityCard({
   const timelineLabel = userJourney === 'pregnant' ? 'Due date' : 'Baby age';
 
   const handleOpenVillage = () => {
-    runVillagePortalTransition(() => onOpenVillagePortal?.());
+    onOpenVillagePortal?.();
   };
 
-  const handleOpenCandleSanctum = () => {
-    runCandleSanctumTransition(() => onOpenCandleSanctum?.());
+  const handleOpenBoutique = () => {
+    Linking.openURL(VILLAGE_BOUTIQUE_COLLECTION_URL).catch(() => {});
   };
 
   const handleSaveField = (fieldId) => {
@@ -248,93 +252,46 @@ export default function MamaIdentityCard({
             <Text style={styles.avatarCameraIcon}>📷</Text>
           </View>
         </TouchableOpacity>
-        <Text style={styles.avatarHint}>Tap to add photo</Text>
         <Text style={[styles.nickname, retroHubTitle]} numberOfLines={2}>
-          {mamaName}
+          {mamaName || 'Amelia Foster'}
         </Text>
-        <Text style={[styles.journeyTrack, retroSoft, PROFILE_SERIF]}>{journeyTrack}</Text>
+        <Text style={[styles.cityLine, PROFILE_SERIF]}>{approximateCity || 'Your village'}</Text>
 
         <BirthdayField birthday={mamaBirthday} onBirthdayChange={onBirthdayChange} />
 
-        <View style={styles.metaStrip}>
-          <Text style={styles.metaStripText}>
-            {timelineLabel}: {timelineValue}
-          </Text>
-          <Text style={styles.metaStripDot}>·</Text>
-          <Text style={styles.metaStripText}>{approximateCity}</Text>
-          <Text style={styles.metaStripDot}>·</Text>
-          <Text style={styles.metaStripText}>
-            {userJourney === 'pregnant' ? `Week ${weeksPregnant}` : 'Postpartum'}
-          </Text>
-        </View>
-
-        <View style={styles.getToKnowSection}>
-          <Text style={[styles.getToKnowTitle, PROFILE_SERIF]}>Get to Know Mama</Text>
+        <Text style={[styles.gridSectionTitle, PROFILE_SERIF]}>Sanctuary Journal Cards</Text>
+        <View style={styles.discoveryGrid}>
           {DISCOVERY_FIELDS.map((field) => (
-            <DiscoveryInputBox
+            <View
               key={field.id}
-              field={field}
-              value={drafts[field.id] ?? ''}
-              onChange={(text) => {
-                setDrafts((prev) => ({ ...prev, [field.id]: text }));
-                setSavedFields((prev) => ({ ...prev, [field.id]: false }));
-              }}
-              onSave={() => handleSaveField(field.id)}
-              saved={!!savedFields[field.id]}
-            />
+              style={[
+                styles.gridCard,
+                field.grid === 'wide' && styles.gridCardWide,
+                field.grid === 'left' && styles.gridCardLeft,
+                field.grid === 'right' && styles.gridCardRight,
+              ]}
+            >
+              <DiscoveryInputBox
+                field={field}
+                value={drafts[field.id] ?? ''}
+                onChange={(text) => {
+                  setDrafts((prev) => ({ ...prev, [field.id]: text }));
+                  setSavedFields((prev) => ({ ...prev, [field.id]: false }));
+                }}
+                onSave={() => handleSaveField(field.id)}
+                saved={!!savedFields[field.id]}
+              />
+            </View>
           ))}
         </View>
       </View>
 
-      <Animated.View style={villagePortalStyle}>
-        <TouchableOpacity style={styles.findVillageCard} onPress={handleOpenVillage} activeOpacity={0.92}>
-          <Text style={styles.findVillageEmoji}>🌍</Text>
-          <Text style={[styles.findVillageTitle, retroAccent, PROFILE_SERIF]}>
-            Find My Village Network
-          </Text>
-          <Text style={[styles.findVillageDesc, retroSoft]}>
-            Discover blurred-nearby mamas, mutual aid, and gentle community threads — all privacy-shielded.
-          </Text>
-          <Text style={styles.findVillageCta}>Enter the community village →</Text>
-        </TouchableOpacity>
-      </Animated.View>
+      <TouchableOpacity style={styles.boutiqueRow} onPress={handleOpenBoutique} activeOpacity={0.88}>
+        <Text style={[styles.boutiqueRowLabel, PROFILE_SERIF]}>✨ The Village Boutique</Text>
+        <Text style={styles.boutiqueRowChevron}>›</Text>
+      </TouchableOpacity>
 
-      {onOpenCandleSanctum ? (
-        <Animated.View style={candleSanctumStyle}>
-          <TouchableOpacity
-            style={styles.candleSanctumCard}
-            onPress={handleOpenCandleSanctum}
-            activeOpacity={0.92}
-          >
-            <Text style={styles.candleSanctumEyebrow}>🕯️ VILLAGE CANDLE SANCTUM</Text>
-            <Text style={[styles.candleSanctumTitle, retroAccent, PROFILE_SERIF]}>
-              Hand-poured ritual candles
-            </Text>
-            <Text style={[styles.candleSanctumDesc, retroSoft]}>
-              Sunrise Village & Sweet Dreams Cloud 9 — enter for full sensory stories.
-            </Text>
-            {candles?.length ? (
-              <View style={styles.candleSanctumPreviewRow}>
-                {candles.map((candle) => (
-                  <View key={candle.id} style={styles.candleSanctumPreviewTile}>
-                    {candle.imageSource ? (
-                      <Image
-                        source={candle.imageSource}
-                        style={styles.candleSanctumPreviewImage}
-                        resizeMode="cover"
-                      />
-                    ) : null}
-                    <Text style={[styles.candleSanctumPreviewLabel, retroSoft]} numberOfLines={2}>
-                      {candle.title}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-            <Text style={styles.candleSanctumCta}>Enter the Candle Sanctum →</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      ) : null}
+      <FindMyVillageHubCard onPress={handleOpenVillage} />
 
       {showGraduation ? (
         <View style={styles.graduationCard}>
@@ -355,13 +312,39 @@ const styles = StyleSheet.create({
   root: {
     paddingBottom: 8,
   },
+  boutiqueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 252, 248, 0.72)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(186, 198, 188, 0.42)',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  boutiqueRowLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3D5246',
+    letterSpacing: 0.2,
+  },
+  boutiqueRowChevron: {
+    fontSize: 22,
+    fontWeight: '300',
+    color: '#8A9E92',
+    marginTop: -2,
+  },
   identityCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: '#E6ECE6',
     borderRadius: 24,
     paddingVertical: 24,
     paddingHorizontal: 20,
     marginBottom: 20,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(195, 169, 149, 0.25)',
   },
   avatarRing: {
     padding: 3,
@@ -411,10 +394,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   nickname: {
-    fontSize: 18,
-    color: '#1F2E24',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#C3A995',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 26,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  cityLine: {
+    fontSize: 13,
+    color: '#7A6A62',
+    marginBottom: 12,
+  },
+  gridSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#5A4E48',
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  discoveryGrid: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  gridCard: {
+    width: '100%',
+  },
+  gridCardWide: {
+    width: '100%',
+  },
+  gridCardLeft: {
+    width: '48%',
+  },
+  gridCardRight: {
+    width: '48%',
   },
   journeyTrack: {
     fontSize: 12,
@@ -446,10 +464,12 @@ const styles = StyleSheet.create({
   },
   birthdayField: {
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: '#FBF9F6',
     borderRadius: 16,
     padding: 14,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(195, 169, 149, 0.2)',
   },
   birthdayHeaderRow: {
     flexDirection: 'row',
@@ -585,7 +605,12 @@ const styles = StyleSheet.create({
   },
   discoveryBlock: {
     width: '100%',
-    marginBottom: 22,
+    marginBottom: 0,
+    backgroundColor: '#F3EBE9',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(195, 169, 149, 0.3)',
   },
   discoveryBlockSaved: {},
   discoveryQuestion: {
@@ -602,11 +627,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     color: '#2A382E',
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: '#FBF9F6',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(195, 169, 149, 0.2)',
   },
   discoverySaveBtn: {
     alignSelf: 'flex-end',
@@ -626,100 +653,6 @@ const styles = StyleSheet.create({
   },
   discoverySaveBtnTextSaved: {
     color: '#2A382E',
-  },
-  findVillageCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  findVillageEmoji: {
-    fontSize: 28,
-    marginBottom: 6,
-  },
-  findVillageTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#4A3860',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  findVillageDesc: {
-    fontSize: 11,
-    color: '#5C6E63',
-    textAlign: 'center',
-    lineHeight: 16,
-    fontStyle: 'italic',
-    marginBottom: 10,
-  },
-  findVillageCta: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#6B5588',
-  },
-  candleSanctumCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  candleSanctumEyebrow: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.1,
-    color: '#6B3D2E',
-    marginBottom: 6,
-  },
-  candleSanctumTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#6B3D2E',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  candleSanctumDesc: {
-    fontSize: 11,
-    color: '#5C6E63',
-    textAlign: 'center',
-    lineHeight: 16,
-    fontStyle: 'italic',
-    marginBottom: 12,
-  },
-  candleSanctumPreviewRow: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-    marginBottom: 12,
-  },
-  candleSanctumPreviewTile: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
-    borderRadius: 14,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(233, 168, 137, 0.28)',
-    alignItems: 'center',
-  },
-  candleSanctumPreviewImage: {
-    width: '100%',
-    height: 68,
-    borderRadius: 10,
-    marginBottom: 6,
-    backgroundColor: 'rgba(255, 252, 248, 0.8)',
-  },
-  candleSanctumPreviewLabel: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#4A5E52',
-    textAlign: 'center',
-    lineHeight: 12,
-  },
-  candleSanctumCta: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#A35338',
   },
   graduationCard: {
     backgroundColor: 'rgba(255, 248, 242, 0.55)',

@@ -1,20 +1,81 @@
+import './nativeReloadPolyfill';
+import './resolveAssetSourceWebPolyfill';
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
+import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
+import { enableScreens } from 'react-native-screens';
 import { registerRootComponent } from 'expo';
 import { Platform } from 'react-native';
-import React from 'react';
+import { logNativeError } from './nativeRuntimeGuard';
+
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
+
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  const reportUnhandled = (reason) => {
+    logNativeError('unhandledrejection', reason);
+  };
+  if (typeof globalThis.addEventListener === 'function') {
+    globalThis.addEventListener('unhandledrejection', (event) => {
+      reportUnhandled(event?.reason);
+    });
+  }
+}
+
+enableScreens(false);
+import React, { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { requireOptionalNativeModule } from 'expo';
 
 import App from './App';
 import ErrorBoundary from './ErrorBoundary';
+import { injectMobileWebViewport } from './mobileWebLayout';
+
+// Paint edge-to-edge ombre before React mounts (kills flat sage letterbox bars)
+if (Platform.OS === 'web') {
+  injectMobileWebViewport();
+}
 
 function installWebFatalErrorReporter() {
   if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') {
     return;
   }
 
+  const isNoisyBrowserNoise = (message) => {
+    const text = String(message || '');
+    return (
+      text.includes('ResizeObserver loop') ||
+      text.includes('Script error.') ||
+      text.includes('Loading CSS chunk') ||
+      text.includes('Non-Error promise rejection')
+    );
+  };
+
   const mountOverlay = (error, details) => {
     const root = document.getElementById('root');
     if (!root || root.dataset.villageFatalError === '1') return;
 
     const message = error?.message || String(error || 'Unknown error');
+    if (isNoisyBrowserNoise(message)) {
+      if (typeof console !== 'undefined') {
+        console.warn('[CalmMama Village] ignored non-fatal web noise:', message);
+      }
+      return;
+    }
+
+    // Keep React alive for recoverable issues — only hard-swap if the tree is gone.
+    const hasLiveTree = root.childNodes && root.childNodes.length > 0;
+    if (hasLiveTree) {
+      if (typeof console !== 'undefined') {
+        console.error('[CalmMama Village] runtime error (React still mounted):', message, details || error?.stack);
+      }
+      return;
+    }
+
     const stack = error?.stack || details || '';
     root.dataset.villageFatalError = '1';
 
@@ -31,10 +92,26 @@ function installWebFatalErrorReporter() {
   };
 
   window.addEventListener('error', (event) => {
-    mountOverlay(event.error, event.error?.stack);
+    const message = event.error?.message || event.message || '';
+    if (String(message).includes('resolveAssetSource is not a function')) {
+      event.preventDefault?.();
+      if (typeof console !== 'undefined') {
+        console.warn('[CalmMama Village] suppressed resolveAssetSource web miss');
+      }
+      return;
+    }
+    mountOverlay(event.error || { message: event.message }, event.error?.stack);
   });
 
   window.addEventListener('unhandledrejection', (event) => {
+    const message = event.reason?.message || String(event.reason || '');
+    if (String(message).includes('resolveAssetSource is not a function')) {
+      event.preventDefault?.();
+      if (typeof console !== 'undefined') {
+        console.warn('[CalmMama Village] suppressed resolveAssetSource rejection');
+      }
+      return;
+    }
     mountOverlay(event.reason, event.reason?.stack);
   });
 }
@@ -42,11 +119,41 @@ function installWebFatalErrorReporter() {
 installWebFatalErrorReporter();
 
 function Root() {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const DevMenuPreferences = requireOptionalNativeModule('DevMenuPreferences');
+        if (DevMenuPreferences && typeof DevMenuPreferences.setPreferencesAsync === 'function') {
+          DevMenuPreferences.setPreferencesAsync({
+            showFloatingActionButton: false,
+            showsAtLaunch: false
+          }).catch((err) => console.log("DevMenu preferences suppressed safely:", err));
+        }
+      } catch (e) {
+        console.log("DevMenu module not ready yet:", e);
+      }
+    }, 500); // 500ms safety window
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider style={styles.root}>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  // Transparent so VillageOmbreBackdrop (and html pastel wash) show through edges
+  root: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+});
 
 registerRootComponent(Root);

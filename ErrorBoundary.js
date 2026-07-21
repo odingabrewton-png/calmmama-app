@@ -1,21 +1,40 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 
+function resolveHmrUnavailableReason(error) {
+  if (Platform.OS !== 'web') {
+    return null;
+  }
+
+  const message = error?.message || String(error || '');
+  const isHmrError =
+    message.includes('HMR') ||
+    message.includes('hot update') ||
+    message.includes('Fast Refresh');
+
+  if (!isHmrError) {
+    return null;
+  }
+
+  return 'Hot reload is unavailable in this session. Tap below to recover without reloading.';
+}
+
 /**
- * Root error boundary — surfaces render crashes on web production deploys
- * with the exact message and React component stack for debugging.
+ * Root error boundary — surfaces render crashes with the exact message
+ * and React component stack for debugging.
  */
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
+      hasError: false,
       error: null,
       componentStack: '',
     };
   }
 
   static getDerivedStateFromError(error) {
-    return { error };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -29,18 +48,18 @@ export default class ErrorBoundary extends React.Component {
   }
 
   handleReload = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.location.reload();
-      return;
+    if (typeof console !== 'undefined') {
+      console.warn('[CalmMama Village ErrorBoundary] Recovering from render error.');
     }
-    this.setState({ error: null, componentStack: '' });
+    this.setState({ hasError: false, error: null, componentStack: '' });
   };
 
   render() {
-    const { error, componentStack } = this.state;
+    const { hasError, error, componentStack } = this.state;
 
-    if (error) {
+    if (hasError && error) {
       const message = error?.message || String(error);
+      const hmrUnavailableReason = resolveHmrUnavailableReason(error);
 
       return (
         <View style={styles.wrap}>
@@ -55,6 +74,13 @@ export default class ErrorBoundary extends React.Component {
               This screen caught an error before the app could finish loading. Details below are
               safe to screenshot for debugging on your live deploy.
             </Text>
+
+            {hmrUnavailableReason ? (
+              <View style={styles.block}>
+                <Text style={styles.blockLabel}>Hot reload notice</Text>
+                <Text style={styles.mono}>{hmrUnavailableReason}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.block}>
               <Text style={styles.blockLabel}>Error message</Text>
