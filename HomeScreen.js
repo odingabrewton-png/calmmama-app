@@ -433,7 +433,6 @@ const BabyRegistryTrackerFrame = memo(
   function BabyRegistryTrackerFrame({ title, progress, onRegistryLinkPress }) {
     return (
       <BotanicalGardenFrame
-        wrap
         topColor={BOTANICAL_GREEN}
         bottomColor={BOTANICAL_PEACH}
         sideColor={BOTANICAL_GREEN}
