@@ -284,22 +284,31 @@ function WaitlistFormCard({
   isSubmitted,
   setIsSubmitted,
   isSubmitting = false,
-  checkoutPlan,
-  setCheckoutPlan,
   onSubmit,
   compact = false,
 }) {
   const isFounding = signupTier === 'founding40';
   const waitlistDescription = isFounding
-    ? 'Join the Founding Mother tier for full Village access, premium oracle features, and launch-day gifts 👑'
-    : 'Join our open waitlist for Village updates and launch alerts 🤍';
+    ? 'Our premier $25/year tier. Founding 40 status, launch gifts, and the full oracle and registry experience are exclusive to Founding Mothers.'
+    : 'Standard Village access for $5.99/month, with the everyday support and sanctuary tools every mama deserves.';
+  const tierFeatures = isFounding
+    ? [
+        'Exclusive Founding 40 Mother status',
+        'Founding launch gifts',
+        'Full premium oracle and registry perks',
+        'Premier annual access for $25/year',
+      ]
+    : [
+        'Standard monthly Village access',
+        'Weekly bloom and sanctuary tools',
+        'Village updates and community access',
+        '$5.99 billed monthly',
+      ];
   const waitlistButtonLabel = isSubmitting
     ? 'Saving your spot…'
     : isFounding
-      ? checkoutPlan === 'annual'
-        ? 'Join the Village (Annual) 👑'
-        : 'Join the Village ($5.99/mo) 👑'
-      : 'Join Waitlist 🌸';
+      ? 'Become a Founding Mother · $25/yr 👑'
+      : 'Join General Access · $5.99/mo 🌸';
   const successTitle = 'Welcome to the Village! 🌸';
   const successBody = "We've saved your spot for Village updates and launch-day alerts.";
 
@@ -317,7 +326,7 @@ function WaitlistFormCard({
           style={[styles.tierTab, !isFounding && styles.tierTabActive]}
         >
           <Text style={[styles.tierTabText, !isFounding && styles.tierTabTextActive, SANS]}>
-            General Waitlist
+            {'General Waitlist\n$5.99/mo'}
           </Text>
         </Pressable>
         <Pressable
@@ -333,7 +342,7 @@ function WaitlistFormCard({
           <Text
             style={[styles.tierTabText, isFounding && styles.tierTabTextActiveFounding, SANS]}
           >
-            Founding 40 Club 👑
+            {'Founding 40 Club 👑\n$25/yr'}
           </Text>
         </Pressable>
       </View>
@@ -352,53 +361,22 @@ function WaitlistFormCard({
         </View>
       ) : (
         <>
-          <Text style={[styles.waitlistDescription, SANS]}>{waitlistDescription}</Text>
           {isFounding ? (
-            <View style={styles.billingToggleRow}>
-              <Pressable
-                onPress={() => {
-                  if (!isSubmitting) setCheckoutPlan('monthly');
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: checkoutPlan === 'monthly' }}
-                style={[
-                  styles.billingOption,
-                  checkoutPlan === 'monthly' && styles.billingOptionActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.billingOptionText,
-                    checkoutPlan === 'monthly' && styles.billingOptionTextActive,
-                    SANS,
-                  ]}
-                >
-                  Monthly · $5.99
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  if (!isSubmitting) setCheckoutPlan('annual');
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: checkoutPlan === 'annual' }}
-                style={[
-                  styles.billingOption,
-                  checkoutPlan === 'annual' && styles.billingOptionActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.billingOptionText,
-                    checkoutPlan === 'annual' && styles.billingOptionTextActive,
-                    SANS,
-                  ]}
-                >
-                  Annual
-                </Text>
-              </Pressable>
+            <View style={styles.premierTierBadge}>
+              <Text style={[styles.premierTierBadgeText, SANS]}>PREMIER ANNUAL TIER</Text>
             </View>
           ) : null}
+          <Text style={[styles.waitlistDescription, SANS]}>{waitlistDescription}</Text>
+          <View style={styles.tierFeatureList}>
+            {tierFeatures.map((feature) => (
+              <View key={feature} style={styles.tierFeatureRow}>
+                <Text style={[styles.tierFeatureCheck, isFounding && styles.tierFeatureCheckFounding]}>
+                  ✓
+                </Text>
+                <Text style={[styles.tierFeatureText, SANS]}>{feature}</Text>
+              </View>
+            ))}
+          </View>
           <TextInput
             value={contactInfo}
             onChangeText={setContactInfo}
@@ -457,7 +435,6 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   const [installHint, setInstallHint] = useState('');
   const [contactInfo, setContactInfo] = useState('');
   const [signupTier, setSignupTier] = useState('general');
-  const [checkoutPlan, setCheckoutPlan] = useState('monthly');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const installPrimaryRef = useRef(() => {});
@@ -608,9 +585,12 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
       typeof checkoutOverride === 'string'
         ? checkoutOverride
         : signupTier === 'founding40'
-          ? checkoutPlan
-          : null;
-    const activeTagId = requestedCheckout ? TAG_FOUNDING_ID : TAG_GENERAL_ID;
+          ? 'annual'
+          : 'monthly';
+    const activeTagId =
+      signupTier === 'founding40' || requestedCheckout === 'gift'
+        ? TAG_FOUNDING_ID
+        : TAG_GENERAL_ID;
     setIsSubmitting(true);
 
     const showError = (title, message) => {
@@ -666,16 +646,12 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
       });
       setContactInfo('');
 
-      if (!requestedCheckout) {
-        setIsSubmitted(true);
-        return;
-      }
-
       if (typeof window !== 'undefined') {
         window.location.href = STRIPE_LINKS[requestedCheckout];
         return;
       }
 
+      setIsSubmitted(true);
       showError('Checkout unavailable', 'Please open this page in your browser to continue.');
     } catch (err) {
       console.warn('ConvertKit subscribe network error', err);
@@ -686,7 +662,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [checkoutPlan, contactInfo, isSubmitting, signupTier]);
+  }, [contactInfo, isSubmitting, signupTier]);
 
   const openPrivacy = useCallback(() => {
     Linking.openURL('mailto:founder.calmmamavillage@gmail.com?subject=Privacy%20Policy').catch(
@@ -707,8 +683,6 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     isSubmitted,
     setIsSubmitted,
     isSubmitting,
-    checkoutPlan,
-    setCheckoutPlan,
     onSubmit: handleWaitlistSubmit,
   };
 
@@ -1263,34 +1237,46 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginBottom: 14,
   },
-  billingToggleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  billingOption: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
+  premierTierBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(154, 117, 213, 0.24)',
-    paddingVertical: 9,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(255, 252, 248, 0.45)',
+    borderColor: 'rgba(138, 106, 26, 0.34)',
+    backgroundColor: 'rgba(212, 175, 55, 0.16)',
   },
-  billingOptionActive: {
-    borderColor: 'rgba(138, 106, 26, 0.52)',
-    backgroundColor: 'rgba(212, 175, 55, 0.18)',
-  },
-  billingOptionText: {
-    color: SAGE_TEXT,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  billingOptionTextActive: {
+  premierTierBadgeText: {
     color: '#8a6a1a',
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+  },
+  tierFeatureList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  tierFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tierFeatureCheck: {
+    color: PURPLE_DEEP,
+    width: 16,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  tierFeatureCheckFounding: {
+    color: '#8a6a1a',
+  },
+  tierFeatureText: {
+    flex: 1,
+    color: CHARCOAL,
+    fontSize: 12,
+    lineHeight: 17,
   },
   waitlistInput: {
     width: '100%',
