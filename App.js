@@ -2354,7 +2354,7 @@ export default function App() {
   const [subscriptionProductId, setSubscriptionProductId] = useState(null);
   const [upgradeSheetOpen, setUpgradeSheetOpen] = useState(false);
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
-  const [userJourney, setUserJourney] = useState('pregnant'); // TEMP: advice list on Home registry; switch to postpartum + 1yo for poll popup
+  const [userJourney, setUserJourney] = useState('pregnant');
   const [activeTab, setActiveTab] = useState('home');
   const [inMidnightLounge, setInMidnightLounge] = useState(false);
   const [midnightLoungeMounted, setMidnightLoungeMounted] = useState(false);
@@ -2435,7 +2435,7 @@ export default function App() {
   const infoModalTranslateY = useRef(new Animated.Value(42)).current;
   const [weeksPregnant, setWeeksPregnant] = useState('24');
   const [dueDate, setDueDate] = useState('October 2026');
-  const [babyAge, setBabyAge] = useState('1 Year Old'); // TEMP preview: registry poll popup on postpartum Home
+  const [babyAge, setBabyAge] = useState('Newborn');
   const [nurseryLogs, setNurseryLogs] = useState([]);
   const [nurseryPerspective, setNurseryPerspective] = useState('baby');
   const [hydrationOz, setHydrationOz] = useState(0);

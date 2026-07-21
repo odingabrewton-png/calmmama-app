@@ -9,7 +9,7 @@ import {
   Pressable,
 } from 'react-native';
 import LiveVillagePollFeedCard from './LiveVillagePollFeedCard';
-import { subscribeVillagePolls, ensureTempPreviewRegistryPolls } from './villagePollBridge';
+import { subscribeVillagePolls } from './villagePollBridge';
 import { canAnswerVillageRegistryPolls } from './homeJourneyUtils';
 
 const SANS = Platform.select({
@@ -39,7 +39,6 @@ export default function PostpartumHomePollModal({ active = true, babyAge = null 
 
   useEffect(() => {
     if (!eligible) return undefined;
-    ensureTempPreviewRegistryPolls();
     return subscribeVillagePolls((snapshot) => {
       setQueue(snapshot.open);
     });
@@ -96,7 +95,7 @@ export default function PostpartumHomePollModal({ active = true, babyAge = null 
         </Animated.View>
 
         <Animated.View style={[styles.sheet, { opacity: backdropOpacity }]}>
-          <Text style={[styles.eyebrow, SANS]}>VILLAGE REGISTRY ASK · TEMP PREVIEW</Text>
+          <Text style={[styles.eyebrow, SANS]}>VILLAGE REGISTRY ASK</Text>
           <Text style={[styles.title, SANS]}>A pregnant mama needs your vote</Text>
           <Text style={[styles.sub, SANS]}>
             Say whether she should add this to her registry — and why, if you like.

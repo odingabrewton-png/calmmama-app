@@ -5,101 +5,14 @@ import {
 } from './villagePollDuplicateEngine';
 import { canAnswerVillageRegistryPolls } from './homeJourneyUtils';
 
-const SEED_TIPS_NEEDED = [
-  'Night feeds feel colder than you expect — our wipe warmer was a tiny comfort ritual.',
-  'We kept it on the dresser. Low heat, soft glow, zero regrets.',
-];
-
-const SEED_TIPS_SKIP = [
-  'Room-temp wipes never bothered our little one — save the counter space.',
-  'A warm washcloth for thirty seconds works just as well.',
-  'Put that money toward burp cloths. You will need dozens.',
-];
-
 let pollIdCounter = 1;
 const polls = [];
 const listeners = new Set();
 let preferredRegistryPlatform = null;
-let tempPreviewSeeded = false;
-
-/** TEMP — sample asks + resolved advice for UI preview. */
-export const TEMP_REGISTRY_POLL_PREVIEW = true;
-
-const TEMP_PREVIEW_OPEN_ITEMS = ['Sound machine', 'Diaper cream kit'];
-
-const TEMP_PREVIEW_RESOLVED = [
-  {
-    item: 'Wipe warmer',
-    neededPct: 18,
-    skipPct: 82,
-    tip: 'Room-temp wipes never bothered our little one — save the counter space and the cord worry.',
-  },
-  {
-    item: 'Night light',
-    neededPct: 76,
-    skipPct: 24,
-    tip: 'A soft warm glow for night changes was one of the most-loved little comforts in our nursery.',
-  },
-  {
-    item: 'Bottle warmer',
-    neededPct: 42,
-    skipPct: 58,
-    tip: 'We warmed bottles in a mug of hot water. Nice to have, not a must — I’d skip it for the registry.',
-  },
-];
 
 function notify() {
   const snapshot = getVillagePollSnapshot();
   listeners.forEach((listener) => listener(snapshot));
-}
-
-export function ensureTempPreviewRegistryPolls() {
-  if (!TEMP_REGISTRY_POLL_PREVIEW || tempPreviewSeeded) return;
-  tempPreviewSeeded = true;
-
-  TEMP_PREVIEW_RESOLVED.forEach((entry) => {
-    const already = polls.some(
-      (poll) => poll.status === 'resolved' && poll.item === entry.item,
-    );
-    if (already) return;
-    polls.push({
-      id: `temp-advice-${pollIdCounter++}`,
-      item: entry.item,
-      status: 'resolved',
-      neededVotes: entry.neededPct >= entry.skipPct ? 1 : 0,
-      skipVotes: entry.skipPct > entry.neededPct ? 1 : 0,
-      tips: entry.tip
-        ? [{ id: `temp-tip-${pollIdCounter}`, text: entry.tip, fromMama: true }]
-        : [],
-      neededPct: entry.neededPct,
-      skipPct: entry.skipPct,
-      createdAt: Date.now() - 60000,
-      resolvedAt: Date.now() - 30000,
-      seenByPregnant: true,
-      isTempPreview: true,
-    });
-  });
-
-  const existingOpen = polls.some((poll) => poll.status === 'open');
-  if (!existingOpen) {
-    TEMP_PREVIEW_OPEN_ITEMS.forEach((item) => {
-      polls.push({
-        id: `temp-preview-${pollIdCounter++}`,
-        item,
-        status: 'open',
-        neededVotes: 0,
-        skipVotes: 0,
-        tips: [],
-        neededPct: 0,
-        skipPct: 0,
-        createdAt: Date.now(),
-        seenByPregnant: false,
-        isTempPreview: true,
-      });
-    });
-  }
-
-  notify();
 }
 
 export function getPreferredRegistryPlatform() {
@@ -226,17 +139,8 @@ export function submitPostpartumPollResponse(pollId, vote, tipText, babyAge) {
     poll.tips.unshift({ id: `${poll.id}-tip-${Date.now()}`, text: trimmedTip });
   }
 
-  const seedTips = voteKey === 'needed' ? SEED_TIPS_NEEDED : SEED_TIPS_SKIP;
-  seedTips.forEach((text, index) => {
-    poll.tips.push({ id: `${poll.id}-seed-${index}`, text });
-  });
-
-  const villageWeight = 4;
-  const neededScore = poll.neededVotes * 2 + (voteKey === 'needed' ? villageWeight : 0);
-  const skipScore = poll.skipVotes * 2 + (voteKey === 'skip' ? villageWeight : 0);
-  const total = Math.max(1, neededScore + skipScore);
-
-  poll.neededPct = Math.round((neededScore / total) * 100);
+  const total = Math.max(1, poll.neededVotes + poll.skipVotes);
+  poll.neededPct = Math.round((poll.neededVotes / total) * 100);
   poll.skipPct = 100 - poll.neededPct;
   poll.status = 'resolved';
   poll.resolvedAt = Date.now();

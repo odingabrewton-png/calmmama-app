@@ -13,8 +13,6 @@ import {
   submitVillagePollQuestion,
   getPreferredRegistryPlatform,
   setPreferredRegistryPlatform,
-  ensureTempPreviewRegistryPolls,
-  TEMP_REGISTRY_POLL_PREVIEW,
 } from './villagePollBridge';
 import { mamaCardScriptTitle } from './nurseryRetroFonts';
 
@@ -103,9 +101,6 @@ export default function RegistryVillageAskPanel() {
   const [preferredSiteId, setPreferredSiteId] = useState(() => getPreferredRegistryPlatform());
 
   useEffect(() => {
-    if (TEMP_REGISTRY_POLL_PREVIEW) {
-      ensureTempPreviewRegistryPolls();
-    }
     return subscribeVillagePolls((snapshot) => {
       setOpenPolls(snapshot.open);
       setResolvedPolls(snapshot.resolved);
@@ -145,9 +140,8 @@ export default function RegistryVillageAskPanel() {
     <View style={styles.root}>
       <Text style={[styles.title, mamaCardScriptTitle]}>Ask a postpartum mama</Text>
       <Text style={[styles.hint, SANS]}>
-        {TEMP_REGISTRY_POLL_PREVIEW
-          ? 'TEMP preview — sample village advice below (needed vs skip + mama notes).'
-          : 'Not sure if it belongs on your registry? Ask the village. Past answers show up here with notes.'}
+        Not sure if it belongs on your registry? Ask the village. Real answers and mama notes
+        appear here after postpartum mamas respond.
       </Text>
       <TextInput
         style={[styles.input, SANS]}
