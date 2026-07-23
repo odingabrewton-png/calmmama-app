@@ -19,24 +19,78 @@ function resolveResendApiKey(explicitKey) {
   }
 }
 
-/** Nested-table HTML for broader desktop client background support. */
+/** Gmail-safe template: bgcolor attributes + embedded <style> for gradient where supported. */
 function buildWelcomeMamaEmailHtml() {
   return `
-<!DOCTYPE html>
-<html>
-<body style="margin: 0; padding: 40px 10px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #E8DFF5;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #E8DFF5; background-image: linear-gradient(135deg, #FCE1E4 0%, #E8DFF5 50%, #FCF4DD 100%); padding: 40px 10px;">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Welcome to Calm Mama Village</title>
+  <style type="text/css">
+    body, table, td {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    }
+    .email-bg {
+      background-color: #E8DFF5 !important;
+      background-image: linear-gradient(135deg, #FCE1E4 0%, #E8DFF5 50%, #FCF4DD 100%) !important;
+    }
+  </style>
+</head>
+<body bgcolor="#E8DFF5" style="margin: 0; padding: 0; background-color: #E8DFF5;">
+  
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#E8DFF5" class="email-bg" style="background-color: #E8DFF5; padding: 40px 12px;">
     <tr>
-      <td align="center">
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 500px; background-color: #ffffff; border-radius: 24px; padding: 40px 30px; text-align: center; box-shadow: 0 10px 30px rgba(110, 80, 140, 0.1);">
-          <tr><td align="center" style="padding-bottom: 12px;"><span style="font-size: 42px;">🌸👑</span></td></tr>
-          <tr><td align="center" style="padding-bottom: 16px;"><h1 style="color: #4A3B5C; font-size: 24px; font-weight: 700; margin: 0;">Welcome Home, Beautiful Mama</h1></td></tr>
-          <tr><td align="center" style="padding-bottom: 28px;"><p style="color: #7D6B91; font-size: 15px; line-height: 1.6; margin: 0;">Your digital sanctuary is ready for you. Take a deep breath, settle in, and explore your peaceful space built just for this journey.</p></td></tr>
-          <tr><td align="center" style="padding-bottom: 24px;"><a href="https://calmmamavillage.com/app" target="_blank" style="background-color: #8A63BE; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 99px; font-weight: 600; font-size: 15px; display: inline-block;">Step Inside Your Sanctuary ✨</a></td></tr>
+      <td align="center" bgcolor="#E8DFF5" class="email-bg">
+        
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#ffffff" style="max-width: 500px; background-color: #ffffff; border-radius: 28px; padding: 40px 28px; text-align: center; box-shadow: 0 10px 30px rgba(110, 80, 140, 0.08);">
+          
+          <tr>
+            <td align="center" style="padding-bottom: 14px;">
+              <span style="font-size: 42px; line-height: 1;">🌸👑</span>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-bottom: 16px;">
+              <h1 style="color: #4A3B5C; font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.5px;">
+                Welcome Home, Beautiful Mama
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-bottom: 28px;">
+              <p style="color: #7D6B91; font-size: 15px; line-height: 1.6; margin: 0;">
+                Your digital sanctuary is ready for you. Take a deep breath, settle in, and explore your peaceful space built just for this journey.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding-bottom: 28px;">
+              <a href="https://calmmamavillage.com/app" target="_blank" style="background-color: #8A63BE; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 99px; font-weight: 600; font-size: 15px; display: inline-block;">
+                Step Inside Your Sanctuary ✨
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="border-top: 1px solid #F2EBF9; padding-top: 20px;">
+              <p style="color: #A493B8; font-size: 12px; margin: 0; line-height: 1.5;">
+                With warmth & support,<br />
+                <strong style="color: #7D6B91;">The Calm Mama Village Team</strong>
+              </p>
+            </td>
+          </tr>
+
         </table>
+
       </td>
     </tr>
   </table>
+
 </body>
 </html>
 `;
