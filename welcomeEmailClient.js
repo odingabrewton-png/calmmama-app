@@ -1,5 +1,5 @@
 /**
- * Client-side Resend welcome dispatch for Free Explorer + waitlist signup.
+ * Client-side Resend welcome + audience contact for Free Explorer + waitlist signup.
  * Uses EXPO_PUBLIC_RESEND_API_KEY — never blocks app redirect on failure.
  */
 
@@ -11,6 +11,7 @@ const welcomeEmail = require('./welcomeEmail');
 
 const {
   sendWelcomeMamaEmail,
+  addResendAudienceContact,
   WELCOME_SUBJECT,
   DEFAULT_FROM,
 } = welcomeEmail;
@@ -23,9 +24,17 @@ function readPublicResendKey() {
   }
 }
 
+function readPublicAudienceId() {
+  try {
+    return String(process.env.EXPO_PUBLIC_RESEND_AUDIENCE_ID || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
 /**
  * @param {{ email: string, firstName?: string, reason?: string }} opts
- * @returns {Promise<{ ok: boolean, id?: string, skipped?: boolean, error?: string }>}
+ * @returns {Promise<{ ok: boolean, id?: string, skipped?: boolean, error?: string, audience?: object }>}
  */
 export async function dispatchWelcomeMamaEmail({ email, firstName, reason = 'signup' } = {}) {
   const to = String(email || '').trim();
@@ -36,13 +45,23 @@ export async function dispatchWelcomeMamaEmail({ email, firstName, reason = 'sig
     return { ok: false, skipped: true, error: 'web only' };
   }
 
+  const apiKey = readPublicResendKey();
+
   try {
-    const result = await sendWelcomeMamaEmail({
-      to,
-      firstName,
-      apiKey: readPublicResendKey(),
-      from: DEFAULT_FROM,
-    });
+    const [result, audience] = await Promise.all([
+      sendWelcomeMamaEmail({
+        to,
+        firstName,
+        apiKey,
+        from: DEFAULT_FROM,
+      }),
+      addResendAudienceContact({
+        email: to,
+        firstName,
+        apiKey,
+        audienceId: readPublicAudienceId(),
+      }),
+    ]);
 
     if (result.ok) {
       console.log('[CalmMama] Resend welcome sent', { reason, id: result.id });
@@ -50,7 +69,13 @@ export async function dispatchWelcomeMamaEmail({ email, firstName, reason = 'sig
       console.warn('[CalmMama] Resend welcome issue (non-blocking)', reason, result.error);
     }
 
-    return result;
+    if (audience.ok) {
+      console.log('[CalmMama] Resend audience contact added', { reason, id: audience.id });
+    } else if (!audience.skipped) {
+      console.warn('[CalmMama] Resend audience issue (non-blocking)', reason, audience.error);
+    }
+
+    return { ...result, audience };
   } catch (err) {
     console.warn('[CalmMama] Resend welcome threw (non-blocking)', err?.message || err);
     return { ok: false, skipped: true, error: err?.message || 'throw' };

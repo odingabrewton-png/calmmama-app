@@ -6,7 +6,8 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { sendWelcomeMamaEmail, resolveResendApiKey } = require('./welcomeEmail');
+const { sendWelcomeMamaEmail, addResendAudienceContact, resolveResendApiKey } = require('./welcomeEmail');
+const { runWeeklyNewsletter, assertCronAuthorized } = require('./weeklyNewsletter');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -46,12 +47,20 @@ app.post('/api/welcome-email', async (req, res) => {
     const firstName = String(req.body?.firstName || req.body?.name || '').trim() || undefined;
     const reason = String(req.body?.reason || 'signup').trim();
 
-    const result = await sendWelcomeMamaEmail({
-      to: email,
-      firstName,
-      apiKey: resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY),
-      from: process.env.RESEND_FROM || undefined,
-    });
+    const apiKey = resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY);
+    const [result] = await Promise.all([
+      sendWelcomeMamaEmail({
+        to: email,
+        firstName,
+        apiKey,
+        from: process.env.RESEND_FROM || undefined,
+      }),
+      addResendAudienceContact({
+        email,
+        firstName,
+        apiKey,
+      }),
+    ]);
 
     if (result.skipped) {
       res.status(503).json({
@@ -73,6 +82,37 @@ app.post('/api/welcome-email', async (req, res) => {
   } catch (err) {
     console.warn('[CalmMama] welcome email route error', err?.message || err);
     res.status(500).json({ ok: false, error: 'Unexpected email error' });
+  }
+});
+
+/**
+ * Weekly newsletter — same handler used by Vercel Cron.
+ * Auth: Authorization: Bearer ${CRON_SECRET}
+ */
+app.get('/api/weekly-newsletter', async (req, res) => {
+  const auth = assertCronAuthorized(req);
+  if (!auth.ok) {
+    res.status(auth.status).json({ ok: false, error: auth.error });
+    return;
+  }
+
+  try {
+    const dryRun = String(req.query?.dryRun || '').toLowerCase() === 'true';
+    const limitRaw = Number(req.query?.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : undefined;
+
+    const result = await runWeeklyNewsletter({
+      apiKey: resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY),
+      from: process.env.RESEND_FROM || undefined,
+      dryRun,
+      limit,
+    });
+
+    const status = result.ok || result.dryRun ? 200 : 502;
+    res.status(status).json({ ok: Boolean(result.ok || result.dryRun), ...result });
+  } catch (err) {
+    console.warn('[CalmMama] weekly newsletter route error', err?.message || err);
+    res.status(500).json({ ok: false, error: 'Unexpected newsletter error' });
   }
 });
 

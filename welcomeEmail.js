@@ -19,6 +19,18 @@ function resolveResendApiKey(explicitKey) {
   }
 }
 
+function resolveResendAudienceId(explicitId) {
+  const fromArg = String(explicitId || '').trim();
+  if (fromArg) return fromArg;
+  try {
+    return String(
+      process.env.EXPO_PUBLIC_RESEND_AUDIENCE_ID || process.env.RESEND_AUDIENCE_ID || '',
+    ).trim();
+  } catch (_) {
+    return '';
+  }
+}
+
 /** Gmail-safe template: bgcolor attributes + embedded <style> for gradient where supported. */
 function buildWelcomeMamaEmailHtml() {
   return `
@@ -168,6 +180,79 @@ async function sendWelcomeMamaEmail({
   }
 }
 
+/**
+ * Add (or upsert) a contact on the Resend Audience list used for broadcasts.
+ * Non-fatal for signup — callers should not block redirect on failure.
+ * @returns {{ ok: boolean, id?: string, skipped?: boolean, error?: string }}
+ */
+async function addResendAudienceContact({
+  email,
+  firstName,
+  apiKey,
+  audienceId,
+} = {}) {
+  const userEmail = String(email || '').trim().toLowerCase();
+  if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+    return { ok: false, error: 'Invalid email address' };
+  }
+
+  const key = resolveResendApiKey(apiKey);
+  if (!key) {
+    return { ok: false, skipped: true, error: 'EXPO_PUBLIC_RESEND_API_KEY not configured' };
+  }
+
+  const listId = resolveResendAudienceId(audienceId);
+  if (!listId) {
+    return { ok: false, skipped: true, error: 'EXPO_PUBLIC_RESEND_AUDIENCE_ID not configured' };
+  }
+
+  const fetchFn = typeof fetch === 'function' ? fetch : null;
+  if (!fetchFn) {
+    return { ok: false, error: 'fetch unavailable' };
+  }
+
+  const payload = {
+    email: userEmail,
+    unsubscribed: false,
+  };
+  const name = String(firstName || '').trim();
+  if (name) payload.first_name = name.slice(0, 48);
+
+  try {
+    const response = await fetchFn(
+      `https://api.resend.com/audiences/${encodeURIComponent(listId)}/contacts`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    const raw = await response.text().catch(() => '');
+    let parsed = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      parsed = null;
+    }
+
+    // 409 = contact already on the list — treat as success for signup.
+    if (!response.ok && response.status !== 409) {
+      const message = parsed?.message || parsed?.error || raw || `HTTP ${response.status}`;
+      console.warn('[CalmMama] Resend audience contact failed', response.status, message);
+      return { ok: false, error: String(message) };
+    }
+
+    return { ok: true, id: parsed?.id || null };
+  } catch (err) {
+    console.warn('[CalmMama] Resend audience contact network error', err?.message || err);
+    return { ok: false, error: err?.message || 'network error' };
+  }
+}
+
 module.exports = {
   APP_ACCESS_URL,
   DEFAULT_FROM,
@@ -175,5 +260,7 @@ module.exports = {
   buildWelcomeMamaEmailHtml,
   buildWelcomeMamaEmailText,
   sendWelcomeMamaEmail,
+  addResendAudienceContact,
   resolveResendApiKey,
+  resolveResendAudienceId,
 };

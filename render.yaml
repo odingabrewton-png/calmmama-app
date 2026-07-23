@@ -20,7 +20,11 @@ services:
         sync: false
       - key: EXPO_PUBLIC_RESEND_API_KEY
         sync: false
+      - key: EXPO_PUBLIC_RESEND_AUDIENCE_ID
+        sync: false
       - key: RESEND_FROM
+        sync: false
+      - key: CRON_SECRET
         sync: false
       - key: EXPO_PUBLIC_GEMINI_API_KEY
         sync: false
