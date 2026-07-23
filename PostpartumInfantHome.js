@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import BabyMilestoneScrapbook from './BabyMilestoneScrapbook';
+import VillageRewardsHighlightCard from './VillageRewardsHighlightCard';
 import { warmPostpartumHome } from './postpartumHomePreload';
 import {
   POSTPARTUM_INFANT_HOME_LAYOUT,
@@ -15,6 +16,7 @@ export default function PostpartumInfantHome({
   mamaName,
   entries,
   onSaveEntry,
+  onExploreRewards,
 }) {
   if (__DEV__ && !POSTPARTUM_INFANT_HOME_LAYOUT_LOCKED) {
     console.warn('[PostpartumInfantHome] POSTPARTUM_INFANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
@@ -34,6 +36,7 @@ export default function PostpartumInfantHome({
       nestedScrollEnabled
       nativeID={POSTPARTUM_INFANT_HOME_STACK[0]}
     >
+      <VillageRewardsHighlightCard onExploreRewards={onExploreRewards} />
       <BabyMilestoneScrapbook
         babyAge={babyAge}
         mamaName={mamaName}

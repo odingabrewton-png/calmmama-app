@@ -55,6 +55,7 @@ import {
   setHasCompletedOnboarding,
 } from './villageStorage';
 import { VillageRewardsProvider, useVillageRewards } from './VillageRewardsContext';
+import VillageRewardsHighlightCard from './VillageRewardsHighlightCard';
 import { normalizeTimeCapsuleEntries, normalizeTimeCapsuleEntry } from './timeCapsuleStorage';
 import { NOTIFICATION_ROUTES } from './notificationConfig';
 /* RESTORE (Apple Developer): re-enable village notification scheduler imports
@@ -1233,6 +1234,7 @@ function PostpartumDailyTracker({
   winsSectionTitle = '📝 Mama-First Daily Wins',
   winsSectionHint = 'Micro-intentions that honor you, not just output',
 }) {
+  const { addPoints } = useVillageRewards();
   const [showFireworks, setShowFireworks] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
@@ -1292,9 +1294,10 @@ function PostpartumDailyTracker({
 
       if (completesLastWin) {
         startWinsCelebration();
+        addPoints(5, 'dailyChecklist');
       }
     },
-    [mamaWinsTasks, onToggleMamaWin, startWinsCelebration]
+    [mamaWinsTasks, onToggleMamaWin, startWinsCelebration, addPoints]
   );
 
   useEffect(() => () => {
@@ -1541,6 +1544,7 @@ function renderMainTabContent({
   isYearlyMember = false,
   onReleaseUpgradePrompt,
   onOpenSubscription,
+  onExploreRewards,
   isActive = true,
 }) {
   const panelStyle = embedded ? styles.scrollContent : styles.scrollContentFlex;
@@ -1559,7 +1563,7 @@ function renderMainTabContent({
 
   if (tabId === 'home') {
     if (homePhase === 'pregnant') {
-      return <HomeScreen />;
+      return <HomeScreen onExploreRewards={onExploreRewards} />;
     }
 
     if (homePhase === 'infant') {
@@ -1571,6 +1575,7 @@ function renderMainTabContent({
             mamaName={mamaName}
             entries={milestoneScrapbook}
             onSaveEntry={onSaveMilestoneEntry}
+            onExploreRewards={onExploreRewards}
           />
         </Suspense>
       );
@@ -1586,6 +1591,7 @@ function renderMainTabContent({
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
           >
+            <VillageRewardsHighlightCard onExploreRewards={onExploreRewards} />
             <VillageTimeCapsule
               babyAge={babyAge}
               entries={timeCapsuleEntries}
@@ -2372,7 +2378,7 @@ export default function App() {
 }
 
 function CalmMamaApp() {
-  const { resetRewards } = useVillageRewards();
+  const { resetRewards, addPoints } = useVillageRewards();
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [bootHydrated, setBootHydrated] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState('intake');
@@ -2387,6 +2393,8 @@ function CalmMamaApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [inMidnightLounge, setInMidnightLounge] = useState(false);
   const [midnightLoungeMounted, setMidnightLoungeMounted] = useState(false);
+  const [loungeFocusTab, setLoungeFocusTab] = useState('home');
+  const [loungeFocusToken, setLoungeFocusToken] = useState(0);
   const [postpartumLoungeOverlayActive, setPostpartumLoungeOverlayActive] = useState(false);
   const midnightLoungeOpacity = useRef(new Animated.Value(0)).current;
   const midnightLoungeScale = useRef(new Animated.Value(0.07)).current;
@@ -3777,8 +3785,12 @@ function CalmMamaApp() {
     refreshFoundingGiftsCount();
   }, [inVillagePortal, refreshFoundingGiftsCount]);
 
-  const handleOpenMidnightLounge = useCallback(() => {
+  const handleOpenMidnightLounge = useCallback((opts = {}) => {
     if (midnightLoungeAnimatingRef.current) return;
+
+    const nextTab = opts?.tab === 'profile' ? 'profile' : 'home';
+    setLoungeFocusTab(nextTab);
+    setLoungeFocusToken((token) => token + 1);
 
     warmMidnightLounge(userJourney);
     setInVillagePortal(false);
@@ -3845,6 +3857,10 @@ function CalmMamaApp() {
     bottomNavTranslateY,
   ]);
 
+  const handleExploreRewards = useCallback(() => {
+    handleOpenMidnightLounge({ tab: 'profile' });
+  }, [handleOpenMidnightLounge]);
+
   const handleCloseMidnightLounge = useCallback(() => {
     if (midnightLoungeAnimatingRef.current || !inMidnightLounge) return;
 
@@ -3866,6 +3882,7 @@ function CalmMamaApp() {
       // Defer hide until bloom finishes — avoids z-index snap mid-animation
       setInMidnightLounge(false);
       setPostpartumLoungeOverlayActive(false);
+      setLoungeFocusTab('home');
     });
   }, [
     inMidnightLounge,
@@ -3933,9 +3950,22 @@ function CalmMamaApp() {
   };
 
   const handleToggleNestingTask = (taskId) => {
-    setNestingTasks((prev) =>
-      prev.map((task) => (task.id === taskId ? { ...task, done: !task.done } : task))
-    );
+    setNestingTasks((prev) => {
+      const task = prev.find((item) => item.id === taskId);
+      const completesAll =
+        Boolean(task) &&
+        !task.done &&
+        prev.length > 0 &&
+        prev.every((item) => item.id === taskId || item.done);
+
+      if (completesAll) {
+        Promise.resolve().then(() => addPoints(5, 'dailyChecklist'));
+      }
+
+      return prev.map((item) =>
+        item.id === taskId ? { ...item, done: !item.done } : item,
+      );
+    });
   };
 
   const handleAddNestingTask = () => {
@@ -4139,6 +4169,7 @@ function CalmMamaApp() {
       isYearlyMember: foundingGiftsYearlyEligible,
       onReleaseUpgradePrompt: handleReleaseUpgradePrompt,
       onOpenSubscription: handleOpenSubscription,
+      onExploreRewards: handleExploreRewards,
     }),
     [
       userJourney,
@@ -4176,6 +4207,7 @@ function CalmMamaApp() {
       foundingGiftsYearlyEligible,
       handleReleaseUpgradePrompt,
       handleOpenSubscription,
+      handleExploreRewards,
     ]
   );
 
@@ -4463,6 +4495,8 @@ function CalmMamaApp() {
               >
                   <MidnightLoungeScreen
                     onExit={handleCloseMidnightLounge}
+                    initialTab={loungeFocusTab}
+                    focusToken={loungeFocusToken}
                     userJourney={userJourney}
                     postpartumLotusOpen={userJourney === 'postpartum' && inMidnightLounge}
                     mamaName={mamaName}

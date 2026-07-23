@@ -141,6 +141,10 @@ export default function VillageRewardsCard() {
           ? `Weekly Sanctuary Bonus claimed (${weeklyJournal.threshold}/${weeklyJournal.threshold}) 🌸`
           : `Soul Sanctuary this week: ${weeklyJournal.count}/${weeklyJournal.threshold} entries`}
       </Text>
+      <Text style={[styles.matrixSummary, SANS]}>
+        Checklist +5/day · Puzzles +15/day · Journal +10 (+50 at 5/week) · Encourage +25
+        (max 5/day) · Poll +100 · Registry +250
+      </Text>
 
       <View style={styles.badgeGrid}>
         {REWARD_TIERS.map((tier) => (
@@ -245,10 +249,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   weeklyHint: {
-    marginBottom: 16,
+    marginBottom: 8,
     fontSize: 12,
     lineHeight: 17,
     color: MIDNIGHT.lavenderMuted,
+    textAlign: 'center',
+  },
+  matrixSummary: {
+    marginBottom: 16,
+    fontSize: 11,
+    lineHeight: 16,
+    color: MIDNIGHT.textMuted,
     textAlign: 'center',
   },
   badgeGrid: {

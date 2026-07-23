@@ -37,6 +37,7 @@ export const REWARD_TIERS = [
 export const REWARD_POINT_VALUES = {
   dailyJournal: 10,
   weeklyJournalBonus: 50,
+  dailyChecklist: 5,
   pollFeedback: 100,
   registryCompleted: 250,
   dailyPuzzle: 15,
@@ -46,6 +47,7 @@ export const REWARD_POINT_VALUES = {
 export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
 export const WEEKLY_JOURNAL_BONUS_TOAST =
   'Weekly Sanctuary Bonus Unlocked! +50 pts 🌸';
+export const DAILY_CHECKLIST_TOAST = 'Daily Care List Complete! +5 pts 🌸';
 
 export function createDefaultVillageRewards() {
   return {
@@ -56,6 +58,7 @@ export function createDefaultVillageRewards() {
       registryCompleted: false,
       dailyJournalDate: null,
       dailyPuzzleDate: null,
+      dailyChecklistDate: null,
       dailyEncouragementsCount: 0,
       dailyEncourageDate: null,
       weeklyJournalWeekKey: null,
@@ -109,6 +112,7 @@ export function normalizeVillageRewards(raw) {
       registryCompleted: Boolean(actions.registryCompleted),
       dailyJournalDate: actions.dailyJournalDate || null,
       dailyPuzzleDate: actions.dailyPuzzleDate || null,
+      dailyChecklistDate: actions.dailyChecklistDate || null,
       dailyEncouragementsCount: Math.max(0, Number(actions.dailyEncouragementsCount) || 0),
       dailyEncourageDate: actions.dailyEncourageDate || null,
       weeklyJournalWeekKey: actions.weeklyJournalWeekKey || null,
@@ -330,6 +334,23 @@ export function applyAddPoints(rewards, amount, actionKey) {
       };
     }
     actions.dailyPuzzleDate = today;
+  } else if (key === 'dailyChecklist') {
+    if (actions.dailyChecklistDate === today) {
+      return {
+        awarded: false,
+        amount: 0,
+        reason: 'already_today',
+        rewards: current,
+        newlyUnlocked: [],
+        toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
+      };
+    }
+    actions.dailyChecklistDate = today;
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: DAILY_CHECKLIST_TOAST,
+    });
   } else if (key === 'pollFeedback') {
     if (actions.pollFeedback) {
       return {

@@ -500,6 +500,7 @@ function PlaceholderPanel({ title, subtitle, emoji }) {
 function MidnightLoungeScreen({
   onExit,
   initialTab = 'home',
+  focusToken = 0,
   userJourney = 'postpartum',
   postpartumLotusOpen = false,
   mamaName = 'Mama',
@@ -552,6 +553,12 @@ function MidnightLoungeScreen({
     },
   ]);
   const { addPoints } = useVillageRewards();
+
+  useEffect(() => {
+    if (!focusToken) return;
+    setLoungeTab(initialTab || 'home');
+    setActiveSubView(null);
+  }, [focusToken, initialTab]);
 
   useEffect(() => {
     if (userJourney === 'pregnant') {
