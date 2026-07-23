@@ -4,7 +4,7 @@
  */
 
 const APP_ACCESS_URL = 'https://calmmamavillage.com/app';
-const DEFAULT_FROM = 'Calm Mama Village <onboarding@resend.dev>';
+const DEFAULT_FROM = 'Calm Mama Village <onboarding@calmmamavillage.com>';
 const WELCOME_SUBJECT = 'Welcome home, beautiful mama 🌸';
 
 function resolveResendApiKey(explicitKey) {

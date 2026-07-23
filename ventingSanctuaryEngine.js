@@ -30,6 +30,8 @@ Tone:
 
 Rules:
 - Write 2–4 short paragraphs (about 120–220 words). Not one short line. Not a long essay.
+- Keep the note cohesive and complete — finish every thought and every sentence. Never stop mid-sentence or trail off.
+- Fully express your response within the space you have; land on a warm, finished closing line
 - Speak directly to her by first name when given
 - Do not use bullet points, numbered lists, headings, hashtags, or emoji walls
 - Do not start with "As an AI" or mention being a model
@@ -284,7 +286,7 @@ ${String(text || '').trim()}
 Recent entries from her venting timeline (for continuity — do not copy them; just avoid sounding identical):
 ${recent || '- (no recent entries yet)'}
 
-Now write your mama-friend note back to her.`;
+Now write your mama-friend note back to her. Keep it cohesive and complete — finish every thought within your reply; do not cut off mid-sentence.`;
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -296,7 +298,8 @@ Now write your mama-friend note back to her.`;
         contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
         generationConfig: {
           temperature: 0.85,
-          maxOutputTokens: 700,
+          // Enough headroom for a full 2–4 paragraph note (700 was cutting mid-thought).
+          maxOutputTokens: 8192,
         },
       }),
     },
@@ -307,9 +310,22 @@ Now write your mama-friend note back to her.`;
   }
 
   const payload = await response.json();
-  const raw =
-    payload?.candidates?.[0]?.content?.parts?.map((part) => part.text).join('\n').trim() || '';
+  const candidate = payload?.candidates?.[0];
+  const finishReason = String(candidate?.finishReason || '');
+
+  // Read every text part — do not stop after the first chunk or truncate response text.
+  const raw = (candidate?.content?.parts || [])
+    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
   if (!raw) return null;
+
+  // If Gemini still hit the token ceiling, prefer the local letter over a half-finished note.
+  if (/MAX_TOKENS/i.test(finishReason) && !/[.!?…]"?\s*$/.test(raw)) {
+    return null;
+  }
 
   return raw
     .replace(/^#+\s*/gm, '')
