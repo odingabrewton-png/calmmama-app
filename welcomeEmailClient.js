@@ -4,7 +4,6 @@
  */
 
 import { Platform } from 'react-native';
-import { APP_ACCESS_URL } from './membershipAccess';
 
 // Metro-friendly require of the shared CJS template/dispatch module.
 // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
@@ -41,7 +40,6 @@ export async function dispatchWelcomeMamaEmail({ email, firstName, reason = 'sig
     const result = await sendWelcomeMamaEmail({
       to,
       firstName,
-      appUrl: APP_ACCESS_URL,
       apiKey: readPublicResendKey(),
       from: DEFAULT_FROM,
     });

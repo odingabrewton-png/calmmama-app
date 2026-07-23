@@ -6,7 +6,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { sendWelcomeMamaEmail, APP_ACCESS_URL, resolveResendApiKey } = require('./welcomeEmail');
+const { sendWelcomeMamaEmail, resolveResendApiKey } = require('./welcomeEmail');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -49,7 +49,6 @@ app.post('/api/welcome-email', async (req, res) => {
     const result = await sendWelcomeMamaEmail({
       to: email,
       firstName,
-      appUrl: APP_ACCESS_URL,
       apiKey: resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY),
       from: process.env.RESEND_FROM || undefined,
     });
