@@ -42,12 +42,14 @@ export const REWARD_POINT_VALUES = {
   registryCompleted: 250,
   dailyPuzzle: 15,
   encourage: 25,
+  subscriptionUpgrade: 250,
 };
 
 export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
 export const WEEKLY_JOURNAL_BONUS_TOAST =
   'Weekly Sanctuary Bonus Unlocked! +50 pts 🌸';
 export const DAILY_CHECKLIST_TOAST = 'Daily Care List Complete! +5 pts 🌸';
+export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium Upgrade Bonus! +250 pts 🌸👑';
 
 export function createDefaultVillageRewards() {
   return {
@@ -56,6 +58,7 @@ export function createDefaultVillageRewards() {
     completedActions: {
       pollFeedback: false,
       registryCompleted: false,
+      subscriptionUpgrade: false,
       dailyJournalDate: null,
       dailyPuzzleDate: null,
       dailyChecklistDate: null,
@@ -110,6 +113,7 @@ export function normalizeVillageRewards(raw) {
     completedActions: {
       pollFeedback: Boolean(actions.pollFeedback),
       registryCompleted: Boolean(actions.registryCompleted),
+      subscriptionUpgrade: Boolean(actions.subscriptionUpgrade),
       dailyJournalDate: actions.dailyJournalDate || null,
       dailyPuzzleDate: actions.dailyPuzzleDate || null,
       dailyChecklistDate: actions.dailyChecklistDate || null,
@@ -379,6 +383,23 @@ export function applyAddPoints(rewards, amount, actionKey) {
       };
     }
     actions.registryCompleted = true;
+  } else if (key === 'subscriptionUpgrade') {
+    if (actions.subscriptionUpgrade) {
+      return {
+        awarded: false,
+        amount: 0,
+        reason: 'already_done',
+        rewards: current,
+        newlyUnlocked: [],
+        toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
+      };
+    }
+    actions.subscriptionUpgrade = true;
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: SUBSCRIPTION_UPGRADE_TOAST,
+    });
   } else if (key === 'encourage') {
     if (actions.dailyEncourageDate !== today) {
       actions.dailyEncourageDate = today;

@@ -200,7 +200,7 @@ export async function consumeStripeUpgradeReturn() {
     try {
       const params = new URLSearchParams(window.location?.search || '');
       if (params.get('upgraded') === '1' || params.get('checkout') === 'success') {
-        plan = params.get('plan') || params.get('tier') || pending?.plan || null;
+        plan = params.get('plan') || params.get('tier') || pending?.plan || 'monthly';
       }
     } catch (_) {
       /* ignore */
@@ -228,11 +228,8 @@ export async function consumeStripeUpgradeReturn() {
   try {
     if (canUseWebStorage()) {
       window.sessionStorage?.removeItem(PENDING_UPGRADE_KEY);
-      const url = new URL(window.location.href);
-      ['upgraded', 'checkout', 'plan', 'tier', 'welcome'].forEach((key) => {
-        url.searchParams.delete(key);
-      });
-      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      // Strip Stripe return params so refresh does not re-trigger unlock UX.
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   } catch (_) {
     /* ignore */

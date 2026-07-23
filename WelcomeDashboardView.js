@@ -19,12 +19,6 @@ const SERIF = Platform.select({
 
 const BASE_FEATURES = [
   {
-    id: 'rewards',
-    emoji: '👑',
-    title: 'Village Rewards & Merch Discounts',
-    body: 'Earn Crown Points for journaling, puzzles, and daily care — unlock Village Sister, Sanctuary Queen, and Founding Legend merch codes.',
-  },
-  {
     id: 'home',
     emoji: '🏡',
     title: 'Your Village Home',

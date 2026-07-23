@@ -55,7 +55,7 @@ import {
   setHasCompletedOnboarding,
 } from './villageStorage';
 import { VillageRewardsProvider, useVillageRewards } from './VillageRewardsContext';
-import VillageRewardsHighlightCard from './VillageRewardsHighlightCard';
+import PremiumUpgradeWelcomeModal from './PremiumUpgradeWelcomeModal';
 import { normalizeTimeCapsuleEntries, normalizeTimeCapsuleEntry } from './timeCapsuleStorage';
 import { NOTIFICATION_ROUTES } from './notificationConfig';
 /* RESTORE (Apple Developer): re-enable village notification scheduler imports
@@ -1544,7 +1544,6 @@ function renderMainTabContent({
   isYearlyMember = false,
   onReleaseUpgradePrompt,
   onOpenSubscription,
-  onExploreRewards,
   isActive = true,
 }) {
   const panelStyle = embedded ? styles.scrollContent : styles.scrollContentFlex;
@@ -1563,7 +1562,7 @@ function renderMainTabContent({
 
   if (tabId === 'home') {
     if (homePhase === 'pregnant') {
-      return <HomeScreen onExploreRewards={onExploreRewards} />;
+      return <HomeScreen />;
     }
 
     if (homePhase === 'infant') {
@@ -1575,7 +1574,6 @@ function renderMainTabContent({
             mamaName={mamaName}
             entries={milestoneScrapbook}
             onSaveEntry={onSaveMilestoneEntry}
-            onExploreRewards={onExploreRewards}
           />
         </Suspense>
       );
@@ -1591,7 +1589,6 @@ function renderMainTabContent({
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
           >
-            <VillageRewardsHighlightCard onExploreRewards={onExploreRewards} />
             <VillageTimeCapsule
               babyAge={babyAge}
               entries={timeCapsuleEntries}
@@ -2389,6 +2386,8 @@ function CalmMamaApp() {
   const [memberEmail, setMemberEmail] = useState(null);
   const [upgradeSheetOpen, setUpgradeSheetOpen] = useState(false);
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
+  const [premiumWelcomeOpen, setPremiumWelcomeOpen] = useState(false);
+  const [premiumWelcomePlan, setPremiumWelcomePlan] = useState(null);
   const [userJourney, setUserJourney] = useState('pregnant');
   const [activeTab, setActiveTab] = useState('home');
   const [inMidnightLounge, setInMidnightLounge] = useState(false);
@@ -2657,10 +2656,25 @@ function CalmMamaApp() {
           });
         }
 
-        // Membership: Stripe success return unlocks premium; otherwise hydrate Free Explorer / paid tier.
+        // Membership: Stripe success return (?upgraded=1&plan=monthly|annual) unlocks Pro.
         const upgraded = await consumeStripeUpgradeReturn();
         if (upgraded) {
           applyMembership(upgraded);
+          // Stripe return should land in the live app, not re-run onboarding.
+          setIsOnboarded(true);
+          setHasCompletedOnboarding(true).catch(() => {});
+          setPremiumWelcomePlan(
+            upgraded.planId === 'yearly' || upgraded.planId === 'annual'
+              ? 'Founding / Annual plan'
+              : upgraded.planId === 'gift'
+                ? 'Gift membership'
+                : 'Village Access · Monthly',
+          );
+          setPremiumWelcomeOpen(true);
+          // Soft delay so rewards hydrate before the upgrade bonus lands.
+          setTimeout(() => {
+            addPoints(250, 'subscriptionUpgrade');
+          }, 400);
         } else {
           const membership = await loadMembershipProfile();
           if (membership) applyMembership(membership);
@@ -2673,7 +2687,7 @@ function CalmMamaApp() {
           if (__DEV__ && typeof console !== 'undefined') {
             console.info('[CalmMama Village] FORCE_ONBOARDING_LAYOUT_AUDIT — onboarding intake');
           }
-        } else if (boot.hasCompletedOnboarding) {
+        } else if (upgraded || boot.hasCompletedOnboarding) {
           setIsOnboarded(true);
         } else {
           setOnboardingStep('intake');
@@ -2696,7 +2710,7 @@ function CalmMamaApp() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [applyMembership, addPoints]);
 
   // Only reset intake when leaving the main app (e.g. delete account) —
   // never while mid-flow on the feature highlights step.
@@ -3857,10 +3871,6 @@ function CalmMamaApp() {
     bottomNavTranslateY,
   ]);
 
-  const handleExploreRewards = useCallback(() => {
-    handleOpenMidnightLounge({ tab: 'profile' });
-  }, [handleOpenMidnightLounge]);
-
   const handleCloseMidnightLounge = useCallback(() => {
     if (midnightLoungeAnimatingRef.current || !inMidnightLounge) return;
 
@@ -4169,7 +4179,6 @@ function CalmMamaApp() {
       isYearlyMember: foundingGiftsYearlyEligible,
       onReleaseUpgradePrompt: handleReleaseUpgradePrompt,
       onOpenSubscription: handleOpenSubscription,
-      onExploreRewards: handleExploreRewards,
     }),
     [
       userJourney,
@@ -4207,7 +4216,6 @@ function CalmMamaApp() {
       foundingGiftsYearlyEligible,
       handleReleaseUpgradePrompt,
       handleOpenSubscription,
-      handleExploreRewards,
     ]
   );
 
@@ -4645,6 +4653,12 @@ function CalmMamaApp() {
 
         {/* Web-only install overlay — transparent over living ombre */}
         <PWAInstallPrompt />
+
+        <PremiumUpgradeWelcomeModal
+          visible={premiumWelcomeOpen}
+          planLabel={premiumWelcomePlan}
+          onClose={() => setPremiumWelcomeOpen(false)}
+        />
     </AppLayout>
   );
 }

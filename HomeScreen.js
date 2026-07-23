@@ -30,7 +30,6 @@ import MamaDailyWordSearch from './MamaDailyWordSearch';
 import BabyTriviaCard from './BabyTriviaCard';
 import BotanicalGardenFrame from './BotanicalGardenFrame';
 import RegistryVillageAskPanel from './RegistryVillageAskPanel';
-import VillageRewardsHighlightCard from './VillageRewardsHighlightCard';
 import { injectNurseryWebFonts, mamaCardScriptTitle } from './nurseryRetroFonts';
 import { useVillageRewards } from './VillageRewardsContext';
 import {
@@ -561,7 +560,7 @@ const LoungePage = memo(
     prev.onWordSearchDragChange === next.onWordSearchDragChange,
 );
 
-function HomeScreen({ onExploreRewards }) {
+function HomeScreen() {
   if (__DEV__ && !PREGNANT_HOME_LAYOUT_LOCKED) {
     console.warn('[HomeScreen] PREGNANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
   }
@@ -647,7 +646,6 @@ function HomeScreen({ onExploreRewards }) {
         bounces={!isDraggingWord}
       >
         <View style={styles.homeDomainBlock}>
-          <VillageRewardsHighlightCard onExploreRewards={onExploreRewards} />
           <View style={styles.paginationRow}>
             {LOUNGE_PAGES.map((page, index) => (
               <TouchableOpacity
