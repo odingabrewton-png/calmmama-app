@@ -19,22 +19,31 @@ function resolveResendApiKey(explicitKey) {
   }
 }
 
-/** Soft lavender/blush gradient card — exact branded HTML for Resend. */
+/** Nested-table HTML for broader desktop client background support. */
 function buildWelcomeMamaEmailHtml() {
   return `
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8" /></head>
-<body style="margin: 0; padding: 40px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #e8dff5; background-image: linear-gradient(135deg, #fce1e4 0%, #e8dff5 50%, #fcf4dd 100%);">
-  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #ffffff; border-radius: 28px; padding: 40px 30px; text-align: center; box-shadow: 0 10px 30px rgba(110, 80, 140, 0.08);">
-    <tr><td align="center" style="padding-bottom: 12px;"><span style="font-size: 42px;">🌸👑</span></td></tr>
-    <tr><td align="center" style="padding-bottom: 16px;"><h1 style="color: #4a3b5c; font-size: 26px; font-weight: 700; margin: 0;">Welcome Home, Beautiful Mama</h1></td></tr>
-    <tr><td align="center" style="padding-bottom: 24px;"><p style="color: #7d6b91; font-size: 15px; line-height: 1.6; margin: 0;">Your digital sanctuary is ready for you. Take a deep breath, settle in, and explore your peaceful space built just for this journey.</p></td></tr>
-    <tr><td align="center" style="padding-top: 10px; padding-bottom: 30px;"><a href="https://calmmamavillage.com/app" target="_blank" style="background-color: #8a63be; background-image: linear-gradient(135deg, #8a63be 0%, #6e48a0 100%); color: #ffffff; text-decoration: none; padding: 16px 36px; border-radius: 99px; font-weight: 600; font-size: 16px; display: inline-block;">Step Inside Your Sanctuary ✨</a></td></tr>
+<body style="margin: 0; padding: 40px 10px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #E8DFF5;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #E8DFF5; background-image: linear-gradient(135deg, #FCE1E4 0%, #E8DFF5 50%, #FCF4DD 100%); padding: 40px 10px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 500px; background-color: #ffffff; border-radius: 24px; padding: 40px 30px; text-align: center; box-shadow: 0 10px 30px rgba(110, 80, 140, 0.1);">
+          <tr><td align="center" style="padding-bottom: 12px;"><span style="font-size: 42px;">🌸👑</span></td></tr>
+          <tr><td align="center" style="padding-bottom: 16px;"><h1 style="color: #4A3B5C; font-size: 24px; font-weight: 700; margin: 0;">Welcome Home, Beautiful Mama</h1></td></tr>
+          <tr><td align="center" style="padding-bottom: 28px;"><p style="color: #7D6B91; font-size: 15px; line-height: 1.6; margin: 0;">Your digital sanctuary is ready for you. Take a deep breath, settle in, and explore your peaceful space built just for this journey.</p></td></tr>
+          <tr><td align="center" style="padding-bottom: 24px;"><a href="https://calmmamavillage.com/app" target="_blank" style="background-color: #8A63BE; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 99px; font-weight: 600; font-size: 15px; display: inline-block;">Step Inside Your Sanctuary ✨</a></td></tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>
 `;
+}
+
+function buildWelcomeMamaEmailText() {
+  return 'Welcome Home, Beautiful Mama! Your digital sanctuary is ready for you: https://calmmamavillage.com/app';
 }
 
 /**
@@ -59,6 +68,7 @@ async function sendWelcomeMamaEmail({
   }
 
   const welcomeHtml = buildWelcomeMamaEmailHtml();
+  const welcomeText = buildWelcomeMamaEmailText();
   const fetchFn = typeof fetch === 'function' ? fetch : null;
   if (!fetchFn) {
     return { ok: false, error: 'fetch unavailable' };
@@ -76,6 +86,7 @@ async function sendWelcomeMamaEmail({
         to: recipientEmail,
         subject: WELCOME_SUBJECT,
         html: welcomeHtml,
+        text: welcomeText,
         ...(firstName
           ? { tags: [{ name: 'mama_first_name', value: String(firstName).slice(0, 48) }] }
           : {}),
@@ -108,6 +119,7 @@ module.exports = {
   DEFAULT_FROM,
   WELCOME_SUBJECT,
   buildWelcomeMamaEmailHtml,
+  buildWelcomeMamaEmailText,
   sendWelcomeMamaEmail,
   resolveResendApiKey,
 };
