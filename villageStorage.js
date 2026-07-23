@@ -54,7 +54,11 @@ export async function loadBootState() {
 }
 
 export async function clearAllVillageStorage() {
-  await AsyncStorage.multiRemove([STORAGE_KEYS.HAS_COMPLETED_ONBOARDING, STORAGE_KEYS.VILLAGE_PROFILE]);
+  await AsyncStorage.multiRemove([
+    STORAGE_KEYS.HAS_COMPLETED_ONBOARDING,
+    STORAGE_KEYS.VILLAGE_PROFILE,
+    'villageRewards',
+  ]);
   clearWebLocal(FOUNDING_GIFTS_KEYS);
 }
 

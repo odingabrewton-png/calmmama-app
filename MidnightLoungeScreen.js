@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import LotusFlowerButton from './LotusFlowerButton';
 import MidnightLoungeProfilePanel from './MidnightLoungeProfilePanel.js';
 import VillageBoutiqueScreen from './VillageBoutiqueScreen';
+import { useVillageRewards } from './VillageRewardsContext';
 import { MIDNIGHT, MIDNIGHT_LOUNGE_TABS } from './midnightLoungeTheme';
 import {
   MIDNIGHT_LOUNGE_FEED_STACK,
@@ -550,6 +551,7 @@ function MidnightLoungeScreen({
       mine: false,
     },
   ]);
+  const { addPoints } = useVillageRewards();
 
   useEffect(() => {
     if (userJourney === 'pregnant') {
@@ -661,18 +663,22 @@ function MidnightLoungeScreen({
   }, [selectedProfileId]);
 
   const handleLike = useCallback((postId) => {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              liked: !p.liked,
-              likes: p.liked ? p.likes - 1 : p.likes + 1,
-            }
-          : p
-      )
-    );
-  }, []);
+    setPosts((prev) => {
+      const target = prev.find((p) => p.id === postId);
+      const liking = Boolean(target && !target.liked);
+      if (liking) {
+        Promise.resolve().then(() => addPoints(25, 'encourage'));
+      }
+      return prev.map((p) => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          liked: liking,
+          likes: liking ? p.likes + 1 : Math.max(0, p.likes - 1),
+        };
+      });
+    });
+  }, [addPoints]);
 
   const handleSendChat = useCallback(() => {
     const trimmed = chatDraft.trim();

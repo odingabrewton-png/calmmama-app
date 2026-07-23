@@ -24,6 +24,7 @@ import {
 } from './pregnantHomeLayoutConfig';
 import { SNAPPY_SPRING, safeAssignSequence, safeAssignTiming } from './reanimatedSafe';
 import { runNativeGuard } from './nativeRuntimeGuard';
+import { useVillageRewards } from './VillageRewardsContext';
 
 const INK = '#4A3E3D';
 const FOUND_GREEN = '#5C7A68';
@@ -169,6 +170,7 @@ const MamaDailyWordSearch = memo(function MamaDailyWordSearch({
   contentWidth = FALLBACK_CONTENT_WIDTH,
   onDragStateChange,
 }) {
+  const { addPoints } = useVillageRewards();
   const [levelIndex, setLevelIndex] = useState(0);
   const dailyPuzzle = useMemo(() => getWordSearchLevel(levelIndex), [levelIndex]);
   const { today, level, puzzle } = dailyPuzzle;
@@ -245,6 +247,7 @@ const MamaDailyWordSearch = memo(function MamaDailyWordSearch({
   useEffect(() => {
     if (allFound && prevFoundRef.current < puzzle.words.length) {
       setShowCompletion(true);
+      addPoints(75, 'dailyPuzzle');
       runNativeGuard('wordSearch:complete', () => {
         safeAssignTiming(completionOpacity, 1, { duration: 360 }, 'wordSearch:opacity');
         safeAssignSequence(
@@ -260,7 +263,7 @@ const MamaDailyWordSearch = memo(function MamaDailyWordSearch({
       completionScale.value = 0.92;
     }
     prevFoundRef.current = foundWordIds.size;
-  }, [allFound, foundWordIds.size, puzzle.words.length, completionOpacity, completionScale]);
+  }, [allFound, foundWordIds.size, puzzle.words.length, completionOpacity, completionScale, addPoints]);
 
   const completionStyle = useAnimatedStyle(() => ({
     opacity: completionOpacity.value,

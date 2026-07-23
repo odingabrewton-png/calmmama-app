@@ -54,6 +54,7 @@ import {
   saveVillageProfile,
   setHasCompletedOnboarding,
 } from './villageStorage';
+import { VillageRewardsProvider, useVillageRewards } from './VillageRewardsContext';
 import { normalizeTimeCapsuleEntries, normalizeTimeCapsuleEntry } from './timeCapsuleStorage';
 import { NOTIFICATION_ROUTES } from './notificationConfig';
 /* RESTORE (Apple Developer): re-enable village notification scheduler imports
@@ -2363,6 +2364,15 @@ if (__DEV__ && !PREGNANT_DAILY_LAYOUT_LOCKED) {
 }
 
 export default function App() {
+  return (
+    <VillageRewardsProvider>
+      <CalmMamaApp />
+    </VillageRewardsProvider>
+  );
+}
+
+function CalmMamaApp() {
+  const { resetRewards } = useVillageRewards();
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [bootHydrated, setBootHydrated] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState('intake');
@@ -3406,6 +3416,7 @@ export default function App() {
           style: 'destructive',
           onPress: async () => {
             await clearAllVillageStorage();
+            await resetRewards();
             await setHasCompletedOnboarding(false);
             setInfoModalType(null);
             setInMidnightLounge(false);

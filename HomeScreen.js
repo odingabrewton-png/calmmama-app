@@ -31,6 +31,7 @@ import BabyTriviaCard from './BabyTriviaCard';
 import BotanicalGardenFrame from './BotanicalGardenFrame';
 import RegistryVillageAskPanel from './RegistryVillageAskPanel';
 import { injectNurseryWebFonts, mamaCardScriptTitle } from './nurseryRetroFonts';
+import { useVillageRewards } from './VillageRewardsContext';
 import {
   PREGNANT_HOME_LAYOUT,
   PREGNANT_HOME_LAYOUT_LOCKED,
@@ -94,6 +95,7 @@ const CrosswordClueLine = memo(function CrosswordClueLine({ word, solved, hinted
 });
 
 const DailyMiniCrossword = memo(function DailyMiniCrossword() {
+  const { addPoints } = useVillageRewards();
   const [levelIndex, setLevelIndex] = useState(0);
   const dailyCrossword = useMemo(() => getCrosswordLevel(levelIndex), [levelIndex]);
   const { today, level, puzzle } = dailyCrossword;
@@ -131,6 +133,7 @@ const DailyMiniCrossword = memo(function DailyMiniCrossword() {
   useEffect(() => {
     if (allSolved && prevSolvedRef.current < puzzle.words.length) {
       setShowSuccess(true);
+      addPoints(75, 'dailyPuzzle');
       runNativeGuard('crossword:successReveal', () => {
         safeAssignTiming(successOpacity, 1, { duration: 280 }, 'crossword:successOpacity');
         safeAssignSequence(
@@ -148,7 +151,7 @@ const DailyMiniCrossword = memo(function DailyMiniCrossword() {
       });
     }
     prevSolvedRef.current = solvedCount;
-  }, [allSolved, solvedCount, puzzle.words.length, successOpacity, successScale]);
+  }, [allSolved, solvedCount, puzzle.words.length, successOpacity, successScale, addPoints]);
 
   const successBannerStyle = useAnimatedStyle(() => ({
     opacity: successOpacity.value,
@@ -561,6 +564,7 @@ function HomeScreen() {
   if (__DEV__ && !PREGNANT_HOME_LAYOUT_LOCKED) {
     console.warn('[HomeScreen] PREGNANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
   }
+  const { addPoints } = useVillageRewards();
   const carouselRef = useRef(null);
   const [pagerWidth, setPagerWidth] = useState(() => Math.max(1, Math.round(FALLBACK_PAGE_WIDTH)));
   const pageWidth = pagerWidth;
@@ -604,11 +608,12 @@ function HomeScreen() {
       if (next >= 1) {
         setTimeout(() => {
           setRewardModalVisible(true);
+          addPoints(250, 'registryCompleted');
         }, 320);
       }
       return next;
     });
-  }, []);
+  }, [addPoints]);
 
   const handleMomentumScrollEnd = useCallback((e) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / pageWidth);

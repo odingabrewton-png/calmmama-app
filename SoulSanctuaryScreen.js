@@ -29,6 +29,7 @@ import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import SanctuaryStarsLayer from './SanctuaryStarsLayer';
 import TextDissolveRelease, { runTextReleaseFlow } from './TextDissolveRelease';
 import { SANCTUARY_ZEN } from './designTypography';
+import { useVillageRewards } from './VillageRewardsContext';
 
 const JOURNAL_SPRING = VILLAGE_SNAPPY_REANIMATED;
 const JOURNAL_SPRING_GENTLE = { damping: 20, stiffness: 68 };
@@ -198,6 +199,7 @@ export default function SoulSanctuaryScreen({
   const screenReveal = gentleEnter ? gentleReveal : standardReveal;
   const scrollRef = useRef(null);
   const releaseRef = useRef(null);
+  const { addPoints } = useVillageRewards();
 
   useEffect(() => {
     const floatLoops = cloudFloats.map((anim, index) => {
@@ -312,6 +314,7 @@ export default function SoulSanctuaryScreen({
     onAppendVentingEntry?.(entry);
     setJournalText('');
     setExpandedEntryId(entry.id);
+    await addPoints(50, 'dailyJournal');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 220);
   };
 

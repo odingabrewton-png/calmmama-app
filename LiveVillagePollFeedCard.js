@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { MIDNIGHT } from './midnightLoungeTheme';
 import { submitPostpartumPollResponse } from './villagePollBridge';
+import { useVillageRewards } from './VillageRewardsContext';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -72,6 +73,7 @@ export default function LiveVillagePollFeedCard({
 }) {
   const isPop = variant === 'pop' || variant === 'dayPop';
   const isDay = variant === 'dayPop';
+  const { addPoints } = useVillageRewards();
   const [vote, setVote] = useState(null);
   const [tip, setTip] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -134,7 +136,10 @@ export default function LiveVillagePollFeedCard({
       }),
     ]).start(() => {
       configurePollDismissLayout(variant);
-      submitPostpartumPollResponse(poll.id, vote, tip, babyAge);
+      const ok = submitPostpartumPollResponse(poll.id, vote, tip, babyAge);
+      if (ok) {
+        addPoints(100, 'pollFeedback');
+      }
       onDismissed?.(poll.id);
     });
   }, [
@@ -149,6 +154,7 @@ export default function LiveVillagePollFeedCard({
     scale,
     onDismissed,
     babyAge,
+    addPoints,
   ]);
 
   return (

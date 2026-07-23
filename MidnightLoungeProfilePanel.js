@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MIDNIGHT } from './midnightLoungeTheme';
 import MamaBirthdayField from './MamaBirthdayField.js';
+import VillageRewardsCard from './VillageRewardsCard.js';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -144,6 +145,8 @@ function MidnightLoungeProfilePanel({
       <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.88}>
         <Text style={[styles.saveBtnText, SANS]}>{savedFlash ? 'Saved ✓' : 'Save Changes'}</Text>
       </TouchableOpacity>
+
+      <VillageRewardsCard />
 
       <VillageBoutiqueBanner onPress={openBoutique} />
 
