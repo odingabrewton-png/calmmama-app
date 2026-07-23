@@ -18,3 +18,9 @@ services:
       # Set in Render dashboard (sync: false = secret / manual entry)
       - key: EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY
         sync: false
+      - key: EXPO_PUBLIC_RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: EXPO_PUBLIC_GEMINI_API_KEY
+        sync: false

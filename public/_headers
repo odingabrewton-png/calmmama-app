@@ -1,0 +1,7 @@
+# Netlify / Cloudflare Pages style headers (copied into dist on expo export).
+# HTML shell must revalidate so deployments are not stuck on a stale index.
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate

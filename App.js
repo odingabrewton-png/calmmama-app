@@ -79,6 +79,13 @@ import {
   isYearlyFoundingGiftTier,
   isPremiumSubscribed,
 } from './subscriptionConfig';
+import {
+  MEMBERSHIP_TIERS,
+  consumeStripeUpgradeReturn,
+  loadMembershipProfile,
+  openStripeCheckout,
+  saveMembershipProfile,
+} from './membershipAccess';
 import LotusFlowerButton from './LotusFlowerButton';
 
 import MidnightLoungeScreen from './MidnightLoungeScreen'; // layout locked — midnightLoungeLayoutConfig.js
@@ -2310,30 +2317,40 @@ function VillageInfoModal({
   );
 }
 
-function UpgradeOfferSheet({ visible, onClose, onViewPlans }) {
+function UpgradeOfferSheet({ visible, onClose, onUpgradeMonthly, onUpgradeFounding }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.upgradeBackdrop} onPress={onClose}>
         <Pressable style={styles.upgradeSheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.upgradeHandle} />
-          <Text style={styles.upgradeEyebrow}>MENTAL RELEASE COMPLETE</Text>
-          <Text style={styles.upgradeTitle}>Save your words to the village archive</Text>
+          <Text style={styles.upgradeEyebrow}>FREE EXPLORER</Text>
+          <Text style={styles.upgradeTitle}>Unlock a little more village care</Text>
           <Text style={styles.upgradeBody}>
-            You still get the full dissolve release. Upgrading unlocks saving to your timeline,
-            toddler capsule, and Little Horizons history.
+            AI Oracle, full registry perks, and founding badges are waiting when you are ready —
+            soft upgrade, no pressure.
           </Text>
           <TouchableOpacity
             style={styles.upgradePrimaryBtn}
             onPress={() => {
               onClose();
-              onViewPlans?.();
+              onUpgradeFounding?.();
             }}
             activeOpacity={0.9}
           >
-            <Text style={styles.upgradePrimaryText}>View membership plans</Text>
+            <Text style={styles.upgradePrimaryText}>Upgrade to Founding Mother ($25/yr)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.upgradeSecondaryBtn}
+            onPress={() => {
+              onClose();
+              onUpgradeMonthly?.();
+            }}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.upgradeSecondaryText}>Upgrade ($5.99/mo)</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.upgradeGhostBtn} onPress={onClose} activeOpacity={0.85}>
-            <Text style={styles.upgradeGhostText}>Maybe later</Text>
+            <Text style={styles.upgradeGhostText}>Keep exploring free</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>
@@ -2352,6 +2369,8 @@ export default function App() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [userSubscriptionType, setUserSubscriptionType] = useState(null);
   const [subscriptionProductId, setSubscriptionProductId] = useState(null);
+  const [membershipTier, setMembershipTier] = useState(MEMBERSHIP_TIERS.FREE_EXPLORER);
+  const [memberEmail, setMemberEmail] = useState(null);
   const [upgradeSheetOpen, setUpgradeSheetOpen] = useState(false);
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [userJourney, setUserJourney] = useState('pregnant');
@@ -2448,6 +2467,17 @@ export default function App() {
     { week: 24, weight: 148 },
   ]);
 
+  const applyMembership = useCallback((profile) => {
+    if (!profile) return;
+    setMembershipTier(profile.tier || MEMBERSHIP_TIERS.FREE_EXPLORER);
+    setMemberEmail(profile.email || null);
+    setIsSubscribed(Boolean(profile.isSubscribed));
+    if (profile.planId) {
+      setUserSubscriptionType(profile.planId);
+      setSubscriptionProductId(getSubscriptionProductId(profile.planId));
+    }
+  }, []);
+
   const handleOpenSubscription = useCallback(() => {
     setSubscriptionOpen(true);
   }, []);
@@ -2455,6 +2485,14 @@ export default function App() {
   const handleReleaseUpgradePrompt = useCallback(() => {
     setUpgradeSheetOpen(true);
   }, []);
+
+  const handleUpgradeMonthly = useCallback(() => {
+    openStripeCheckout('monthly', { email: memberEmail });
+  }, [memberEmail]);
+
+  const handleUpgradeFounding = useCallback(() => {
+    openStripeCheckout('annual', { email: memberEmail });
+  }, [memberEmail]);
   const [ventingHistory, setVentingHistory] = useState([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [symptomHistory, setSymptomHistory] = useState([]);
@@ -2599,6 +2637,15 @@ export default function App() {
             setTimeCapsuleEntries: (entries) =>
               setTimeCapsuleEntries(normalizeTimeCapsuleEntries(entries)),
           });
+        }
+
+        // Membership: Stripe success return unlocks premium; otherwise hydrate Free Explorer / paid tier.
+        const upgraded = await consumeStripeUpgradeReturn();
+        if (upgraded) {
+          applyMembership(upgraded);
+        } else {
+          const membership = await loadMembershipProfile();
+          if (membership) applyMembership(membership);
         }
 
         if (FORCE_ONBOARDING_LAYOUT_AUDIT) {
@@ -3651,13 +3698,32 @@ export default function App() {
     subscriptionProductId
   );
 
-  const handleSubscriptionCheckout = useCallback((planId) => {
-    const productId = getSubscriptionProductId(planId);
-    setUserSubscriptionType(planId);
-    setSubscriptionProductId(productId);
-    setIsSubscribed(isPremiumSubscribed(planId));
-    setSubscriptionOpen(false);
-  }, []);
+  const handleSubscriptionCheckout = useCallback(
+    async (planId, options = {}) => {
+      const productId = getSubscriptionProductId(planId);
+      setUserSubscriptionType(planId);
+      setSubscriptionProductId(productId);
+      setSubscriptionOpen(false);
+
+      // Stripe Payment Link redirects away — unlock happens on ?upgraded=1 return.
+      if (options?.deferredUnlock) {
+        return;
+      }
+
+      const tier =
+        planId === 'yearly' || planId === 'gift'
+          ? MEMBERSHIP_TIERS.FOUNDING40
+          : MEMBERSHIP_TIERS.GENERAL;
+      const saved = await saveMembershipProfile({
+        tier,
+        planId,
+        email: memberEmail,
+        isSubscribed: isPremiumSubscribed(planId),
+      });
+      applyMembership(saved);
+    },
+    [applyMembership, memberEmail],
+  );
 
   const refreshFoundingGiftsCount = useCallback(async () => {
     const count = await fetchFoundingGiftsClaimCount();
@@ -4271,13 +4337,15 @@ export default function App() {
             <UpgradeOfferSheet
               visible={upgradeSheetOpen}
               onClose={() => setUpgradeSheetOpen(false)}
-              onViewPlans={() => setSubscriptionOpen(true)}
+              onUpgradeMonthly={handleUpgradeMonthly}
+              onUpgradeFounding={handleUpgradeFounding}
             />
 
             <SubscriptionScreen
               visible={subscriptionOpen}
               onClose={() => setSubscriptionOpen(false)}
               onCheckout={handleSubscriptionCheckout}
+              memberEmail={memberEmail}
             />
 
             <VillageRemedyPopup
@@ -7665,13 +7733,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(92, 122, 104, 0.9)',
     borderRadius: 14,
     paddingVertical: 14,
+    paddingHorizontal: 12,
     alignItems: 'center',
     marginBottom: 10,
   },
   upgradePrimaryText: {
     color: '#FFF9F4',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  upgradeSecondaryBtn: {
+    backgroundColor: 'rgba(154, 117, 213, 0.18)',
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 117, 213, 0.35)',
+  },
+  upgradeSecondaryText: {
+    color: '#6A4F9A',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   upgradeGhostBtn: {
     paddingVertical: 10,

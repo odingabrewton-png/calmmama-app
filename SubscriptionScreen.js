@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { openStripeCheckout } from './membershipAccess';
 
 export const SUBSCRIPTION_PLANS = {
   monthly: 'monthly',
@@ -21,24 +22,30 @@ export const SUBSCRIPTION_PLANS = {
 const PLAN_OPTIONS = [
   {
     id: SUBSCRIPTION_PLANS.monthly,
-    title: 'Monthly Circle',
-    price: '$9.99 / month',
-    caption: 'Flexible support, cancel anytime.',
+    title: 'General Access',
+    price: '$5.99 / month',
+    caption: 'Everyday Village tools — bloom, sanctuary, and soft community support.',
     bestValue: false,
+    cta: 'Upgrade ($5.99/mo)',
+    stripeKey: 'monthly',
   },
   {
     id: SUBSCRIPTION_PLANS.yearly,
-    title: 'Yearly Village Pass',
-    price: '$59.99 / year',
-    caption: 'Save over 50%. Complete peace of mind for the toddler years.',
+    title: 'Founding Mother',
+    price: '$25 / year',
+    caption: 'Founding 40 status, launch gifts, AI Oracle, and full registry perks.',
     bestValue: true,
+    cta: 'Upgrade to Founding Mother ($25/yr)',
+    stripeKey: 'annual',
   },
   {
     id: SUBSCRIPTION_PLANS.gift,
     title: 'Gift to a Mama',
-    price: '$39.99 / year',
-    caption: 'Sponsor a beautiful mama in your life with a full year of premium access.',
+    price: '$15 one-time',
+    caption: 'Sponsor a beautiful mama with Founding-level access as a gift.',
     bestValue: false,
+    cta: 'Gift a Mama ($15)',
+    stripeKey: 'gift',
   },
 ];
 
@@ -79,6 +86,7 @@ export default function SubscriptionScreen({
   onClose,
   onCheckout,
   initialPlan = SUBSCRIPTION_PLANS.yearly,
+  memberEmail = null,
 }) {
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
 
@@ -87,16 +95,28 @@ export default function SubscriptionScreen({
   }, [visible, initialPlan]);
 
   const handleCheckout = () => {
+    const plan = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
+    if (!plan) return;
+
+    // Prefer live Stripe Payment Link from within the web app.
+    const opened = openStripeCheckout(plan.stripeKey, { email: memberEmail });
+    if (opened) {
+      onCheckout?.(selectedPlan, { deferredUnlock: true });
+      return;
+    }
+
     if (onCheckout) {
       onCheckout(selectedPlan);
       return;
     }
-    const plan = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
+
     Alert.alert(
       'CalmMama Circle',
-      `Checkout for ${plan?.title ?? 'premium'} will connect to the App Store soon.`
+      `Checkout for ${plan?.title ?? 'premium'} will connect shortly.`,
     );
   };
+
+  const selected = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -115,9 +135,10 @@ export default function SubscriptionScreen({
           </TouchableOpacity>
 
           <Text style={[styles.eyebrow, SERIF]}>CALMMAMA PREMIUM</Text>
-          <Text style={[styles.title, SERIF]}>Join the CalmMama Circle</Text>
+          <Text style={[styles.title, SERIF]}>Upgrade your Village access</Text>
           <Text style={[styles.subtitle, SERIF]}>
-            Mamas aren&apos;t meant to do this alone. Unlock your village.
+            Free Explorer is a beautiful start. Unlock AI Oracle, full registry perks, and founding
+            badges whenever you are ready.
           </Text>
 
           <View style={styles.planStack}>
@@ -132,13 +153,15 @@ export default function SubscriptionScreen({
           </View>
 
           <Text style={styles.finePrint}>
-            Cancel anytime · Secure checkout · Restore purchases on device
+            Secure Stripe checkout · Cancel anytime · Return to /app after payment to unlock
           </Text>
         </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout} activeOpacity={0.9}>
-            <Text style={styles.checkoutBtnText}>Unlock Premium Access</Text>
+            <Text style={styles.checkoutBtnText}>
+              {selected?.cta || 'Unlock Premium Access'}
+            </Text>
           </TouchableOpacity>
           <Pressable onPress={onClose} style={styles.footerGhost}>
             <Text style={styles.footerGhostText}>Not right now</Text>
@@ -180,143 +203,115 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   eyebrow: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    color: '#6A7A68',
-    textAlign: 'center',
-    marginBottom: 10,
+    fontSize: 11,
+    letterSpacing: 2.4,
+    color: '#8A7A6A',
+    fontWeight: '700',
+    marginBottom: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
+    color: '#3D443A',
     fontWeight: '700',
-    color: '#2A382E',
-    textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#5A6A62',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginBottom: 28,
-    paddingHorizontal: 8,
+    color: '#6E7E65',
+    marginBottom: 22,
   },
   planStack: {
-    gap: 14,
+    gap: 12,
   },
   planCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
     borderRadius: 18,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
+    padding: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
     borderWidth: 1.5,
-    borderColor: 'rgba(186, 198, 188, 0.45)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#2A382E',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-      },
-      android: { elevation: 2 },
-      default: {},
-    }),
+    borderColor: 'rgba(186, 198, 188, 0.55)',
   },
   planCardSelected: {
-    borderColor: 'rgba(92, 122, 104, 0.65)',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-  },
-  planCardBest: {
     borderColor: ROSE_GOLD,
-    borderWidth: 2,
-    paddingTop: 26,
+    backgroundColor: 'rgba(255, 252, 248, 0.95)',
     ...Platform.select({
-      ios: {
-        shadowColor: ROSE_GOLD,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.22,
-        shadowRadius: 14,
+      web: { boxShadow: `0 8px 24px ${ROSE_GOLD_SOFT}` },
+      default: {
+        shadowColor: ROSE_GOLD_GLOW,
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
       },
-      android: { elevation: 4 },
-      default: {},
     }),
   },
+  planCardBest: {
+    borderColor: 'rgba(196, 165, 116, 0.65)',
+  },
   bestValueBanner: {
-    position: 'absolute',
-    top: -11,
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: ROSE_GOLD,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: ROSE_GOLD_GLOW,
+    borderRadius: 999,
+    marginBottom: 10,
   },
   bestValueText: {
+    color: '#FFF9F2',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.2,
-    color: '#FFF9F4',
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   planTitle: {
-    fontSize: 17,
+    fontSize: 18,
+    color: '#3D443A',
     fontWeight: '700',
-    color: '#2A382E',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   planPrice: {
-    fontSize: 20,
+    fontSize: 22,
+    color: '#5A4A3A',
     fontWeight: '700',
-    color: '#3D5246',
     marginBottom: 6,
   },
   planCaption: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#6A7A68',
-    fontStyle: 'italic',
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#6E7E65',
   },
   finePrint: {
-    fontSize: 11,
-    color: '#8A9A92',
+    marginTop: 18,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#8A968A',
     textAlign: 'center',
-    marginTop: 20,
-    lineHeight: 16,
   },
   footer: {
     paddingHorizontal: 22,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 18,
     borderTopWidth: 1,
-    borderTopColor: ROSE_GOLD_SOFT,
-    backgroundColor: 'rgba(255, 252, 248, 0.88)',
+    borderTopColor: 'rgba(186, 198, 188, 0.35)',
+    backgroundColor: 'rgba(255, 252, 248, 0.82)',
   },
   checkoutBtn: {
-    backgroundColor: 'rgba(92, 122, 104, 0.92)',
+    backgroundColor: '#3D443A',
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(92, 122, 104, 0.25)',
   },
   checkoutBtnText: {
-    color: '#FFF9F4',
-    fontSize: 16,
+    color: '#FFF9F2',
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
   footerGhost: {
-    paddingVertical: 10,
+    marginTop: 12,
     alignItems: 'center',
+    paddingVertical: 8,
   },
   footerGhostText: {
-    fontSize: 13,
-    color: '#6A7A68',
-    fontWeight: '600',
+    color: '#8A968A',
+    fontSize: 14,
   },
 });

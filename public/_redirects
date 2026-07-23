@@ -1,0 +1,2 @@
+# SPA fallback so /app (and Stripe return URLs) serve the Expo web shell.
+/*    /index.html   200

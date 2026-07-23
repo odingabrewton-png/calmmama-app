@@ -1,7 +1,41 @@
 /**
  * Mama-friend notes for Soul Sanctuary venting entries.
- * Warm, conversational feedback — attached per timeline card.
+ * Uses Gemini when EXPO_PUBLIC_GEMINI_API_KEY is set so replies actually
+ * read what she wrote; otherwise falls back to a warmer local letter.
  */
+
+const GEMINI_API_KEY = (process.env.EXPO_PUBLIC_GEMINI_API_KEY || '').trim();
+const GEMINI_MODEL = 'gemini-flash-latest';
+
+const MOOD_LABELS = {
+  happy: 'Happy 🌻',
+  stressed: 'Stressed 🌧️',
+  overwhelmed: 'Overwhelmed 🌊',
+  exhausted: 'Exhausted ☕',
+  grateful: 'Grateful ✨',
+  anxious: 'Anxious 🦋',
+  hopeful: 'Hopeful 🌅',
+  lonely: 'Lonely 🌙',
+};
+
+const SYSTEM_PROMPT = `You are a mama friend inside Calm Mama Village's Soul Sanctuary — a private journal corner for pregnant and postpartum mamas.
+
+You are NOT a therapist, coach, or chatbot. You are a warm, real-feeling friend who just read her journal entry.
+
+Tone:
+- Soft, conversational, human — like a voice note or a late-night text from someone who gets it
+- Validate first. Never lecture, diagnose, or shame
+- Mirror specific details from what she wrote (words, moments, people, body feelings) so she feels truly heard
+- You may offer one gentle, optional comfort idea — never a checklist of tips
+
+Rules:
+- Write 2–4 short paragraphs (about 120–220 words). Not one short line. Not a long essay.
+- Speak directly to her by first name when given
+- Do not use bullet points, numbered lists, headings, hashtags, or emoji walls
+- Do not start with "As an AI" or mention being a model
+- Do not give medical advice; if something sounds urgent, gently suggest checking with her care team
+- Avoid repeating the same stock phrases ("you've got this", "one day at a time") unless they truly fit
+- End in a way that feels like presence, not a pep rally`;
 
 const MARKERS = {
   pregnancyBody: {
@@ -20,11 +54,8 @@ const MARKERS = {
       'round ligament',
       'fundal',
     ],
-    notes: [
-      "Girl, pregnancy is a whole job nobody clocks you for. That ache you named? Real. You're not being dramatic — your body is doing something huge.",
-      "I hear you. Growing a person while trying to stay upright is a lot. Soften your jaw for a second… you've been bracing all day.",
-      "If something feels new or sharp, text your care team — they would rather hear from you early. And drink a little water when you can. Tiny care still counts.",
-    ],
+    focus:
+      'her changing pregnant body and how much work it is to grow someone while still showing up for life',
   },
   recoveryPain: {
     keywords: [
@@ -39,11 +70,7 @@ const MARKERS = {
       'healing',
       'cramp',
     ],
-    notes: [
-      "Healing while mothering is unfair work. Your pain isn't something to apologize for — it's your body asking for gentleness.",
-      "Heat or ice for twenty minutes if it helps, and please don't tough through a sudden spike alone. Call your people if it feels off.",
-      "Keep a snack and water within reach. Your body is repairing and still showing up. That deserves softness, not guilt.",
-    ],
+    focus: 'healing and physical recovery while still mothering — how unfair and real that pain is',
   },
   feeding: {
     keywords: [
@@ -58,11 +85,7 @@ const MARKERS = {
       'formula',
       'breast',
     ],
-    notes: [
-      "Feeding can make you feel like you're failing when you're actually showing up again and again. Your baby feels that care — even on the messy ones.",
-      "Breathe before the next latch or bottle. Calm hands help both of you. And hydrate yourself too, mama — you matter in this equation.",
-      "You don't have to perfect every feed. Connection over perfection. I mean that.",
-    ],
+    focus: 'feeding pressure and the quiet guilt that shows up when feeds feel messy',
   },
   fatigue: {
     keywords: [
@@ -80,11 +103,7 @@ const MARKERS = {
       'burned out',
       'burnt out',
     ],
-    notes: [
-      "Running on empty and still loving this hard? That's devotion — and it costs you. Ten minutes horizontal with your phone face-down is not laziness. It's medicine.",
-      "I see how wrung out you are. Ask someone for one specific thing tonight — dishes, a bottle wash, holding baby. Specific beats vague.",
-      "Lower the bar on one thing only. Relief counts even when it's small. You don't have to earn rest.",
-    ],
+    focus: 'bone-deep tiredness and how devotion can still cost her body',
   },
   emotional: {
     keywords: [
@@ -93,6 +112,9 @@ const MARKERS = {
       'overwhelm',
       'overwhelming',
       'cry',
+      'cried',
+      'crying',
+      'tears',
       'scared',
       'sad',
       'angry',
@@ -104,12 +126,10 @@ const MARKERS = {
       'loud',
       'too much',
       'validate',
+      'invisible',
+      'alone inside',
     ],
-    notes: [
-      "Big feelings in this season are so normal, even when nobody talks about them. Naming it out loud was brave — I'm right here with you in it.",
-      "You can love your baby deeply and still ache inside. Both can be true. Tonight can be a soft landing: dim light, warm drink, unfinished list.",
-      "When the day felt loud from the jump, needing quiet validation tonight makes complete sense. Breathe in for four, out for six if you can. I'm not rushing you.",
-    ],
+    focus: 'the big, layered feelings that motherhood rarely makes room for out loud',
   },
   partnerSupport: {
     keywords: [
@@ -123,103 +143,222 @@ const MARKERS = {
       'fight',
       'distance',
     ],
-    notes: [
-      "Feeling unseen by your person on top of everything else hits different. Wanting backup isn't needy — it's human.",
-      "Ask for one concrete thing, not the whole mountain: \"Can you take bedtime tonight?\" Specific is kinder to both of you.",
-      "You shouldn't have to mother alone in a two-person home. Naming the need isn't nagging. It's honesty.",
-    ],
+    focus: 'wanting to feel backed up by her person, and how lonely that gap can feel',
   },
 };
 
-const MOOD_NOTES = {
-  happy:
-    "I'm smiling with you. Hold onto this little bright spot — you earned every bit of it.",
-  stressed:
-    "I hear the pressure in what you wrote. One breath, one moment. You're doing better than you think.",
-  overwhelmed:
-    "That weight is real. You don't have to carry the whole world tonight — just the next gentle step.",
-  exhausted:
-    "Tired isn't weak. You've given enough today. Rest is how love refuels, mama.",
-  grateful:
-    "I love that you named something good. Keep that little glow close — it's medicine for harder days too.",
-  anxious:
-    "Anxious thoughts get loud, but they aren't the whole house. You're still home here. I've got you.",
-  hopeful:
-    "Hope is brave work. I'm cheering quietly for whatever you're looking toward.",
-  lonely:
-    "Loneliness in motherhood is more common than people admit. You deserved to be seen tonight — and you are.",
+const MOOD_COLOR = {
+  happy: 'a little light breaking through',
+  stressed: 'pressure sitting on her chest',
+  overwhelmed: 'too much landing at once',
+  exhausted: 'a body and heart that are spent',
+  grateful: 'a soft grateful glow she still managed to notice',
+  anxious: 'a mind that will not quiet down',
+  hopeful: 'a brave little thread of hope',
+  lonely: 'the ache of wanting to be seen',
 };
-
-const GENERIC_NOTES = [
-  "Thank you for trusting me with that. You don't have to polish anything here — raw is welcome.",
-  "I read every word. Nothing you shared is too small or too messy for this corner of the village.",
-  "You showed up for yourself by writing this. That alone counts. I'm proud of you for that.",
-  "I'm glad these words landed somewhere safe. Sit with that for a second — you did something kind for your own heart.",
-];
-
-const SOFT_NUDGES = [
-  "If it helps: unclench your shoulders on the next exhale. Tiny, but your body notices.",
-  "Maybe name one tiny thing that went okay today — even \"we both ate once.\"",
-  "Be as soft with yourself as you are with your little one. You deserve that same gentleness.",
-  "No rush to fix anything. You already did something brave by saying it out loud.",
-];
-
-let usedKeys = new Set();
-
-function pickUnused(pool, key) {
-  const available = pool.filter((_, i) => !usedKeys.has(`${key}-${i}`));
-  const list = available.length ? available : pool;
-  const pick = list[Math.floor(Math.random() * list.length)];
-  usedKeys.add(`${key}-${pool.indexOf(pick)}`);
-  if (usedKeys.size > 80) usedKeys = new Set();
-  return pick;
-}
-
-export function detectVentingMarkers(text) {
-  const lower = (text || '').toLowerCase();
-  const hits = [];
-  for (const [id, topic] of Object.entries(MARKERS)) {
-    if (topic.keywords.some((w) => lower.includes(w))) hits.push(id);
-  }
-  return hits;
-}
 
 function firstName(mamaName) {
   const raw = (mamaName || 'Mama').trim().split(/\s+/)[0];
   return raw || 'Mama';
 }
 
-export function buildVentingGuidance({ text, moodId, moodLabel, priorEntries = [], mamaName = 'Mama' }) {
-  const markers = detectVentingMarkers(text);
-  const primary = markers[0] || null;
-  const topic = primary ? MARKERS[primary] : null;
+export function detectVentingMarkers(text) {
+  const lower = (text || '').toLowerCase();
+  const scored = [];
+  for (const [id, topic] of Object.entries(MARKERS)) {
+    const hits = topic.keywords.filter((w) => lower.includes(w)).length;
+    if (hits > 0) scored.push({ id, hits });
+  }
+  scored.sort((a, b) => b.hits - a.hits);
+  return scored.map((row) => row.id);
+}
+
+const MOOD_PREFERRED_MARKER = {
+  stressed: 'emotional',
+  overwhelmed: 'emotional',
+  exhausted: 'fatigue',
+  anxious: 'emotional',
+  lonely: 'emotional',
+};
+
+function pickPrimaryMarker(markers, moodId) {
+  const preferred = MOOD_PREFERRED_MARKER[moodId];
+  // Mood cloud is her clearest signal — prefer it over a weak keyword like "nap".
+  if (preferred) return preferred;
+  return markers[0] || null;
+}
+
+function extractEcho(text) {
+  const cleaned = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned.length < 18) return cleaned;
+
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 12 && s.length <= 110);
+
+  let echo = sentences[0] || cleaned.slice(0, 100).trim();
+  echo = echo.replace(/^["'“”]+|["'“”]+$/g, '').trim();
+  if (echo.length > 96) {
+    echo = `${echo.slice(0, 93).replace(/\s+\S*$/, '')}…`;
+  }
+  return echo;
+}
+
+function buildLocalVentingGuidance({ text, moodId, moodLabel, priorEntries = [], mamaName = 'Mama' }) {
   const name = firstName(mamaName);
+  const markers = detectVentingMarkers(text);
+  const primary = pickPrimaryMarker(markers, moodId);
+  const topic = primary ? MARKERS[primary] : null;
+  const echo = extractEcho(text);
+  const moodColor = MOOD_COLOR[moodId] || 'whatever she is carrying tonight';
 
-  const mainNote = topic
-    ? pickUnused(topic.notes, `${primary}-note`)
-    : pickUnused(GENERIC_NOTES, 'generic-note');
-
-  const moodNote = MOOD_NOTES[moodId] || MOOD_NOTES.grateful;
-  const nudge = pickUnused(SOFT_NUDGES, 'nudge');
-
-  let patternNote = '';
   const recentSameMood = priorEntries.filter(
-    (e) => e.moodId === moodId && Date.now() - new Date(e.timestamp).getTime() < 7 * 86400000
+    (e) => e.moodId === moodId && Date.now() - new Date(e.timestamp).getTime() < 7 * 86400000,
   ).length;
-  if (recentSameMood >= 2) {
-    const feeling = (moodLabel || 'feeling').replace(/[^\w\s]/g, '').trim() || 'feeling';
-    patternNote = ` I've noticed this ${feeling.toLowerCase()} popping up more than once this week — your heart keeps asking to be held, and I'm holding it with you.`;
+
+  const paragraphs = [];
+
+  paragraphs.push(
+    `Hey ${name} — I just sat with what you wrote. When you said “${echo || 'all of this'}”, I felt the weight of it. That isn’t small, and you didn’t have to tidy it up for me.`,
+  );
+
+  if (topic) {
+    paragraphs.push(
+      `Choosing the ${moodLabel || 'emotion'} cloud makes sense with ${topic.focus}. I’m not here to fix you or hurry you past it — I’m here because what you named deserves to be held exactly as it is.`,
+    );
+  } else {
+    paragraphs.push(
+      `That ${moodLabel || 'feeling'} cloud you tapped — ${moodColor} — matches the heart of your words. Thank you for trusting this quiet corner with something real instead of the polished version.`,
+    );
   }
 
-  const body = `Hey ${name} — ${mainNote}${patternNote}\n\n${moodNote}\n\n${nudge}`;
+  paragraphs.push(
+    `You can love your baby (or this pregnancy) and still ache, still be tired, still want more support. Both can be true in the same breath. Tonight you don’t have to solve the whole story — just knowing someone heard you is enough for this moment.`,
+  );
+
+  if (recentSameMood >= 2) {
+    const feeling = (moodLabel || 'feeling').replace(/[^\w\s]/g, '').trim() || 'feeling';
+    paragraphs.push(
+      `I’ve noticed this ${feeling.toLowerCase()} showing up more than once this week. That tells me your heart keeps asking to be held — and I’m holding it with you, without judging the repeat.`,
+    );
+  } else {
+    paragraphs.push(
+      `If your body lets you, unclench your shoulders on the next exhale. I’m still here after you close this note — no performance needed, mama.`,
+    );
+  }
 
   return {
     title: 'A note from a mama friend',
-    body,
+    body: paragraphs.join('\n\n'),
     markers,
     moodId,
+    source: 'local',
     timestamp: new Date().toISOString(),
   };
+}
+
+async function askGeminiFriendNote({ text, moodId, moodLabel, priorEntries = [], mamaName = 'Mama' }) {
+  if (!GEMINI_API_KEY) return null;
+
+  const name = firstName(mamaName);
+  const recent = priorEntries
+    .slice(-4)
+    .map((entry) => {
+      const snippet = String(entry.text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+      return `- Mood cloud: ${entry.moodLabel || entry.moodId} · “${snippet}${snippet.length >= 160 ? '…' : ''}”`;
+    })
+    .join('\n');
+
+  const userPrompt = `Mama's first name: ${name}
+Emotion cloud she just chose: ${moodLabel || moodId || 'unspecified'}
+
+What she just wrote in her journal (read this carefully and respond to the specifics):
+"""
+${String(text || '').trim()}
+"""
+
+Recent entries from her venting timeline (for continuity — do not copy them; just avoid sounding identical):
+${recent || '- (no recent entries yet)'}
+
+Now write your mama-friend note back to her.`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          temperature: 0.85,
+          maxOutputTokens: 700,
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini request failed (${response.status})`);
+  }
+
+  const payload = await response.json();
+  const raw =
+    payload?.candidates?.[0]?.content?.parts?.map((part) => part.text).join('\n').trim() || '';
+  if (!raw) return null;
+
+  return raw
+    .replace(/^#+\s*/gm, '')
+    .replace(/\*\*/g, '')
+    .trim();
+}
+
+/**
+ * Build a personalized mama-friend note.
+ * Prefers Gemini (reads her actual words); falls back to a local letter.
+ */
+export async function buildVentingGuidance({
+  text,
+  moodId,
+  moodLabel,
+  priorEntries = [],
+  mamaName = 'Mama',
+}) {
+  const markers = detectVentingMarkers(text);
+
+  try {
+    const geminiBody = await askGeminiFriendNote({
+      text,
+      moodId,
+      moodLabel,
+      priorEntries,
+      mamaName,
+    });
+    if (geminiBody) {
+      return {
+        title: 'A note from a mama friend',
+        body: geminiBody,
+        markers,
+        moodId,
+        source: 'gemini',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  } catch (_) {
+    // Fall through to local guidance when Gemini is unavailable.
+  }
+
+  return buildLocalVentingGuidance({
+    text,
+    moodId,
+    moodLabel,
+    priorEntries,
+    mamaName,
+  });
 }
 
 export function createVentingEntry({ text, mood, guidance }) {
@@ -233,6 +372,80 @@ export function createVentingEntry({ text, mood, guidance }) {
       title: guidance.title,
       body: guidance.body,
       markers: guidance.markers,
+      source: guidance.source,
     },
+  };
+}
+
+export function sanctuaryUsesGemini() {
+  return Boolean(GEMINI_API_KEY);
+}
+
+const DAY_MS = 86400000;
+
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function moodMeta(moodId) {
+  const label = MOOD_LABELS[moodId];
+  return label ? { id: moodId, label } : null;
+}
+
+/**
+ * Postpartum emotion-cloud progress from journal mood picks.
+ * Groups the last N days + overall counts for the tracker UI.
+ */
+export function buildMoodCloudTracker(ventingHistory = [], dayCount = 7) {
+  const now = startOfDay(new Date());
+  const days = [];
+
+  for (let offset = dayCount - 1; offset >= 0; offset -= 1) {
+    const day = new Date(now.getTime() - offset * DAY_MS);
+    const dayEnd = day.getTime() + DAY_MS;
+    const entries = (ventingHistory || []).filter((entry) => {
+      const t = new Date(entry.timestamp).getTime();
+      return t >= day.getTime() && t < dayEnd;
+    });
+
+    const moods = entries.map((entry) => ({
+      id: entry.moodId,
+      label: entry.moodLabel || moodMeta(entry.moodId)?.label || entry.moodId,
+    }));
+
+    days.push({
+      key: day.toISOString().slice(0, 10),
+      label: day.toLocaleDateString(undefined, { weekday: 'short' }),
+      dateLabel: day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      isToday: offset === 0,
+      moods,
+      latest: moods.length ? moods[moods.length - 1] : null,
+    });
+  }
+
+  const counts = {};
+  for (const entry of ventingHistory || []) {
+    const age = now.getTime() - startOfDay(entry.timestamp).getTime();
+    if (age > (dayCount - 1) * DAY_MS || age < 0) continue;
+    counts[entry.moodId] = (counts[entry.moodId] || 0) + 1;
+  }
+
+  const ranked = Object.entries(counts)
+    .map(([id, count]) => ({
+      id,
+      count,
+      label: moodMeta(id)?.label || id,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const total = ranked.reduce((sum, row) => sum + row.count, 0);
+
+  return {
+    days,
+    ranked,
+    total,
+    dominant: ranked[0] || null,
   };
 }

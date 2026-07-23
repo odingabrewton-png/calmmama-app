@@ -23,13 +23,15 @@ import {
   useViewportSize,
 } from './mobileWebLayout';
 
-const TAG_GENERAL_ID = '21294780';
-const TAG_FOUNDING_ID = '21294779';
-const STRIPE_LINKS = {
-  monthly: 'https://buy.stripe.com/test_dRmbJ1dsd89l2jTb0P9EI03',
-  gift: 'https://buy.stripe.com/test_fZu3cv5ZL61d2jT1qf9EI01',
-  annual: 'https://buy.stripe.com/test_eVq28rgEp0GT5w5fh59EI02',
-};
+import {
+  APP_ACCESS_URL,
+  MEMBERSHIP_TIERS,
+  STRIPE_LINKS,
+  enterLiveApp,
+  readForceAppMode,
+  saveMembershipProfile,
+} from './membershipAccess';
+import { dispatchWelcomeMamaEmail } from './welcomeEmailClient';
 
 const CHARCOAL = '#3d443a';
 const SAGE_TEXT = '#6e7e65';
@@ -517,9 +519,15 @@ function WaitlistFormCard({
   compact = false,
 }) {
   const isFounding = signupTier === 'founding40';
+  const isFree = signupTier === 'free';
+  const isGeneral = signupTier === 'general';
+
   const waitlistDescription = isFounding
     ? 'Our premier $25/year tier. Founding 40 status, launch gifts, and the full oracle and registry experience are exclusive to Founding Mothers.'
-    : 'Standard Village access for $5.99/month, with the everyday support and sanctuary tools every mama deserves.';
+    : isFree
+      ? 'Explore the Village at $0 — journal, bloom tracking, and soft community tools. Upgrade anytime inside the app for AI Oracle, full registry perks, and founding badges.'
+      : 'Get instant access to the Village and all daily sanctuary tools.';
+
   const tierFeatures = isFounding
     ? [
         'Exclusive Founding 40 Mother status',
@@ -527,43 +535,66 @@ function WaitlistFormCard({
         'Full premium oracle and registry perks',
         'Premier annual access for $25/year',
       ]
-    : [
-        'Standard monthly Village access',
-        'Weekly bloom and sanctuary tools',
-        'Village updates and community access',
-        '$5.99 billed monthly',
-      ];
+    : isFree
+      ? [
+          'Instant access to the live app',
+          'Soul Sanctuary journal & bloom basics',
+          'Soft upgrade path when you are ready',
+          'Welcome email with your permanent app link',
+        ]
+      : [
+          'Standard monthly Village access',
+          'Weekly bloom and sanctuary tools',
+          'Village updates and community access',
+          '$5.99 billed monthly',
+        ];
+
   const waitlistButtonLabel = isSubmitting
-    ? 'Saving your spot…'
+    ? isFree
+      ? 'Opening your sanctuary…'
+      : 'Saving your spot…'
     : isFounding
       ? 'Become a Founding Mother · $25/yr 👑'
-      : 'Join General Access · $5.99/mo 🌸';
-  const successTitle = 'Welcome to the Village! 🌸';
-  const successBody = "We've saved your spot for Village updates and launch-day alerts.";
+      : isFree
+        ? 'Start Free Explorer · $0 🌸'
+        : 'Join Village Access · $5.99/mo 🌸';
+
+  const successTitle = isFree ? 'Welcome, Free Explorer! 🌸' : 'Welcome to the Village! 🌸';
+  const successBody = isFree
+    ? `Check your inbox for your permanent app link (${APP_ACCESS_URL}). You can keep exploring anytime.`
+    : "We've saved your spot for Village updates and launch-day alerts.";
+
+  const selectTier = (tier) => {
+    if (isSubmitting) return;
+    setSignupTier(tier);
+    setIsSubmitted(false);
+  };
 
   return (
     <FrostCard style={[styles.frostedFormCard, compact && styles.frostedFormCardMobile]}>
       <View style={styles.tierToggleRow}>
         <Pressable
-          onPress={() => {
-            if (isSubmitting) return;
-            setSignupTier('general');
-            setIsSubmitted(false);
-          }}
+          onPress={() => selectTier('free')}
           accessibilityRole="tab"
-          accessibilityState={{ selected: !isFounding }}
-          style={[styles.tierTab, !isFounding && styles.tierTabActive]}
+          accessibilityState={{ selected: isFree }}
+          style={[styles.tierTab, isFree && styles.tierTabActiveFree]}
         >
-          <Text style={[styles.tierTabText, !isFounding && styles.tierTabTextActive, SANS]}>
-            {'General Waitlist\n$5.99/mo'}
+          <Text style={[styles.tierTabText, isFree && styles.tierTabTextActiveFree, SANS]}>
+            {'Free Explorer\n$0'}
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => {
-            if (isSubmitting) return;
-            setSignupTier('founding40');
-            setIsSubmitted(false);
-          }}
+          onPress={() => selectTier('general')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: isGeneral }}
+          style={[styles.tierTab, isGeneral && styles.tierTabActive]}
+        >
+          <Text style={[styles.tierTabText, isGeneral && styles.tierTabTextActive, SANS]}>
+            {'Village Access\n$5.99/mo'}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => selectTier('founding40')}
           accessibilityRole="tab"
           accessibilityState={{ selected: isFounding }}
           style={[styles.tierTab, isFounding && styles.tierTabActiveFounding]}
@@ -595,11 +626,22 @@ function WaitlistFormCard({
               <Text style={[styles.premierTierBadgeText, SANS]}>PREMIER ANNUAL TIER</Text>
             </View>
           ) : null}
+          {isFree ? (
+            <View style={styles.freeTierBadge}>
+              <Text style={[styles.freeTierBadgeText, SANS]}>START ANYTIME · NO CARD</Text>
+            </View>
+          ) : null}
           <Text style={[styles.waitlistDescription, SANS]}>{waitlistDescription}</Text>
           <View style={styles.tierFeatureList}>
             {tierFeatures.map((feature) => (
               <View key={feature} style={styles.tierFeatureRow}>
-                <Text style={[styles.tierFeatureCheck, isFounding && styles.tierFeatureCheckFounding]}>
+                <Text
+                  style={[
+                    styles.tierFeatureCheck,
+                    isFounding && styles.tierFeatureCheckFounding,
+                    isFree && styles.tierFeatureCheckFree,
+                  ]}
+                >
                   ✓
                 </Text>
                 <Text style={[styles.tierFeatureText, SANS]}>{feature}</Text>
@@ -626,14 +668,20 @@ function WaitlistFormCard({
             pulsing={!isSubmitting}
             style={styles.waitlistBtn}
           />
-          <Pressable
-            onPress={isSubmitting ? undefined : onOpenGift}
-            disabled={isSubmitting}
-            accessibilityRole="button"
-            style={styles.giftButton}
-          >
-            <Text style={[styles.giftButtonText, SANS]}>Gift a Mama 🎁</Text>
-          </Pressable>
+          {!isFree ? (
+            <Pressable
+              onPress={isSubmitting ? undefined : onOpenGift}
+              disabled={isSubmitting}
+              accessibilityRole="button"
+              style={styles.giftButton}
+            >
+              <Text style={[styles.giftButtonText, SANS]}>Gift a Mama 🎁</Text>
+            </Pressable>
+          ) : (
+            <Text style={[styles.freeAccessNote, SANS]}>
+              We will email you {APP_ACCESS_URL} so you can return anytime.
+            </Text>
+          )}
         </>
       )}
     </FrostCard>
@@ -656,7 +704,9 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   );
   const compact = viewportW < 1100;
 
-  const [isInstalledAppMode, setIsInstalledAppMode] = useState(readInstalledAppMode);
+  const [isInstalledAppMode, setIsInstalledAppMode] = useState(
+    () => readInstalledAppMode() || readForceAppMode(),
+  );
   const [isPhoneBrowser, setIsPhoneBrowser] = useState(readIsPhoneBrowser);
   const floatY = useRef(new Animated.Value(0)).current;
   const floatTilt = useRef(new Animated.Value(0)).current;
@@ -691,7 +741,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
       const isStandalone =
         window.matchMedia('(display-mode: standalone)').matches ||
         window.navigator.standalone === true;
-      setIsInstalledAppMode(!!isStandalone);
+      setIsInstalledAppMode(!!isStandalone || readForceAppMode());
       setIsPhoneBrowser(readIsPhoneBrowser());
     };
     checkMode();
@@ -798,13 +848,16 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
 
     const giftSubmission =
       checkoutOverride && typeof checkoutOverride === 'object' ? checkoutOverride.gift : null;
+    const isFreeExplorer = !giftSubmission && signupTier === 'free';
     const requestedCheckout = giftSubmission
       ? 'gift'
       : typeof checkoutOverride === 'string'
         ? checkoutOverride
         : signupTier === 'founding40'
           ? 'annual'
-          : 'monthly';
+          : signupTier === 'free'
+            ? null
+            : 'monthly';
     const value = String(giftSubmission?.recipientEmail || contactInfo || '').trim();
     if (!value) {
       Alert.alert('Almost there', 'Please enter your email address to save your spot.');
@@ -815,15 +868,11 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     if (!looksLikeEmail) {
       Alert.alert(
         'Email needed',
-        'Please enter a valid email address so we can add you to the village waitlist.',
+        'Please enter a valid email address so we can welcome you to the village.',
       );
       return;
     }
 
-    const activeTagId =
-      signupTier === 'founding40' || requestedCheckout === 'gift'
-        ? TAG_FOUNDING_ID
-        : TAG_GENERAL_ID;
     setIsSubmitting(true);
 
     const showError = (title, message) => {
@@ -835,56 +884,55 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     };
 
     try {
-      const response = await window.fetch(
-        `https://api.convertkit.com/v3/tags/${activeTagId}/subscribe`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-          },
-          body: JSON.stringify({
-            api_secret: '-xoTOTkQ7noQ46t6HWj9D71o-FNL06yC_11_o6j1ONc',
-            email: value,
-            ...(giftSubmission?.recipientName
-              ? { first_name: giftSubmission.recipientName }
-              : {}),
-            skip_incentive: true,
-          }),
-        },
-      );
-
-      const raw = await response.text().catch(() => '');
-      let parsed = null;
-      try {
-        parsed = raw ? JSON.parse(raw) : null;
-      } catch (_) {
-        parsed = null;
-      }
-
-      if (!response.ok) {
-        console.warn('ConvertKit subscribe failed', response.status, raw);
-        const kitMessage =
-          parsed?.message || parsed?.error || parsed?.errors?.[0] || raw || `HTTP ${response.status}`;
-        showError(
-          'Couldn’t save your spot',
-          response.status === 401
-            ? `Kit rejected the API secret (401). Paste your real V3 API Secret from Kit → Settings → Advanced → API.\n\n${kitMessage}`
-            : `Kit could not add this email.\n\n${kitMessage}`,
-        );
-        return;
-      }
-
-      console.log(`🚀 ROUTING TO LIST [${signupTier.toUpperCase()}]:`, {
+      console.log(`🚀 WAITLIST / ACCESS [${signupTier.toUpperCase()}]:`, {
         email: value,
-        tagId: activeTagId,
         tier: signupTier,
         checkout: requestedCheckout,
       });
+
+      // Resend welcome — never block Free Explorer redirect or Stripe checkout.
+      if (!giftSubmission) {
+        try {
+          await dispatchWelcomeMamaEmail({
+            email: value,
+            reason: isFreeExplorer
+              ? 'free_explorer'
+              : signupTier === 'founding40'
+                ? 'founding'
+                : 'signup',
+          });
+        } catch (mailErr) {
+          console.warn('[CalmMama] welcome email non-blocking error', mailErr?.message || mailErr);
+        }
+      } else if (giftSubmission?.recipientEmail) {
+        try {
+          await dispatchWelcomeMamaEmail({
+            email: giftSubmission.recipientEmail,
+            firstName: giftSubmission.recipientName,
+            reason: 'gift',
+          });
+        } catch (mailErr) {
+          console.warn('[CalmMama] gift welcome email non-blocking error', mailErr?.message || mailErr);
+        }
+      }
+
       if (!giftSubmission) {
         setContactInfo('');
       }
 
-      if (typeof window !== 'undefined') {
+      // Free Explorer → save profile + enter live app immediately.
+      if (isFreeExplorer) {
+        await saveMembershipProfile({
+          tier: MEMBERSHIP_TIERS.FREE_EXPLORER,
+          email: value,
+          planId: null,
+          isSubscribed: false,
+        });
+        enterLiveApp({ welcome: 'explorer' });
+        return;
+      }
+
+      if (typeof window !== 'undefined' && requestedCheckout && STRIPE_LINKS[requestedCheckout]) {
         if (giftSubmission) {
           try {
             window.sessionStorage?.setItem(
@@ -898,9 +946,33 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
             // Checkout still works if browser storage is unavailable.
           }
         }
+        await saveMembershipProfile({
+          tier:
+            requestedCheckout === 'annual' || requestedCheckout === 'gift'
+              ? MEMBERSHIP_TIERS.FOUNDING40
+              : MEMBERSHIP_TIERS.GENERAL,
+          email: giftSubmission?.giverEmail || value,
+          planId: requestedCheckout === 'annual' ? 'yearly' : requestedCheckout,
+          // Unlock after Stripe success return — not before payment.
+          isSubscribed: false,
+        });
         const checkoutUrl = new URL(STRIPE_LINKS[requestedCheckout]);
         if (giftSubmission?.giverEmail) {
           checkoutUrl.searchParams.set('prefilled_email', giftSubmission.giverEmail);
+        } else if (value) {
+          checkoutUrl.searchParams.set('prefilled_email', value);
+        }
+        try {
+          window.sessionStorage?.setItem(
+            'calmmama.pendingUpgrade',
+            JSON.stringify({
+              plan: requestedCheckout,
+              email: giftSubmission?.giverEmail || value,
+              at: Date.now(),
+            }),
+          );
+        } catch (_) {
+          /* ignore */
         }
         window.location.href = checkoutUrl.toString();
         return;
@@ -909,9 +981,24 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
       setIsSubmitted(true);
       showError('Checkout unavailable', 'Please open this page in your browser to continue.');
     } catch (err) {
-      console.warn('ConvertKit subscribe network error', err);
+      console.warn('Waitlist / access flow error', err);
+      // Free Explorer should still try to enter the app if email send failed.
+      if (isFreeExplorer) {
+        try {
+          await saveMembershipProfile({
+            tier: MEMBERSHIP_TIERS.FREE_EXPLORER,
+            email: value,
+            planId: null,
+            isSubscribed: false,
+          });
+          enterLiveApp({ welcome: 'explorer' });
+          return;
+        } catch (_) {
+          /* fall through */
+        }
+      }
       showError(
-        'Couldn’t save your spot',
+        'Couldn’t finish signup',
         'Network hiccup — check your connection and try again.',
       );
     } finally {
@@ -1483,11 +1570,18 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
+  tierTabActiveFree: {
+    backgroundColor: 'rgba(143, 179, 154, 0.28)',
+    ...Platform.select({
+      web: { boxShadow: '0 4px 12px rgba(110, 140, 120, 0.18)' },
+      default: {},
+    }),
+  },
   tierTabText: {
     color: SAGE_TEXT,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
     textAlign: 'center',
   },
   tierTabTextActive: {
@@ -1497,6 +1591,36 @@ const styles = StyleSheet.create({
   tierTabTextActiveFounding: {
     color: '#8a6a1a',
     fontWeight: '700',
+  },
+  tierTabTextActiveFree: {
+    color: '#4f6b58',
+    fontWeight: '700',
+  },
+  freeTierBadge: {
+    alignSelf: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(143, 179, 154, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(110, 140, 120, 0.35)',
+  },
+  freeTierBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    color: '#4f6b58',
+  },
+  freeAccessNote: {
+    marginTop: 12,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 17,
+    color: SAGE_TEXT,
+  },
+  tierFeatureCheckFree: {
+    color: '#5C7A68',
   },
   waitlistDescription: {
     color: SAGE_TEXT,

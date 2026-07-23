@@ -19,7 +19,11 @@ import Reanimated, {
   interpolate,
 } from 'react-native-reanimated';
 import { SANCTUARY_MOODS, CLOUD_IMAGES, getFriendOpeningLine } from './soulSanctuaryData';
-import { buildVentingGuidance, createVentingEntry } from './ventingSanctuaryEngine';
+import {
+  buildMoodCloudTracker,
+  buildVentingGuidance,
+  createVentingEntry,
+} from './ventingSanctuaryEngine';
 import { useVillageReveal, useVillageGentleReveal, VILLAGE_SNAPPY_REANIMATED } from './villageScreenTransitions';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import SanctuaryStarsLayer from './SanctuaryStarsLayer';
@@ -58,6 +62,62 @@ const CLOUD_LAYOUT = [
   { top: ROW[2], left: COL.left + PAIR_INSET, width: CLOUD_W, height: CLOUD_H },
   { top: ROW[2], left: COL.mid + PAIR_INSET, width: CLOUD_W, height: CLOUD_H },
 ];
+
+function MoodCloudTracker({ history }) {
+  const tracker = buildMoodCloudTracker(history, 7);
+  if (!tracker.total) {
+    return (
+      <View style={styles.trackerCard}>
+        <Text style={styles.trackerTitle}>Your emotion clouds</Text>
+        <Text style={styles.trackerHint}>
+          Each cloud you tap becomes a quiet map of how your heart is moving through postpartum —
+          day by day, moment by moment.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.trackerCard}>
+      <Text style={styles.trackerTitle}>Your emotion clouds · 7 days</Text>
+      <Text style={styles.trackerHint}>
+        A soft tracker of the moods you chose — your postpartum heart in weather form.
+      </Text>
+
+      <View style={styles.trackerDayRow}>
+        {tracker.days.map((day) => (
+          <View key={day.key} style={[styles.trackerDay, day.isToday && styles.trackerDayToday]}>
+            <Text style={styles.trackerDayLabel}>{day.label}</Text>
+            <Text style={styles.trackerDayMood} numberOfLines={1}>
+              {day.latest ? day.latest.label.replace(/\s+/g, ' ') : '·'}
+            </Text>
+            {day.moods.length > 1 ? (
+              <Text style={styles.trackerDayCount}>{day.moods.length}×</Text>
+            ) : (
+              <Text style={styles.trackerDayCount}> </Text>
+            )}
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.trackerCountWrap}>
+        {tracker.ranked.slice(0, 4).map((row) => (
+          <View key={row.id} style={styles.trackerCountPill}>
+            <Text style={styles.trackerCountText}>
+              {row.label} · {row.count}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {tracker.dominant ? (
+        <Text style={styles.trackerDominant}>
+          Most present lately: {tracker.dominant.label}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 function TimelineCard({ entry, isLast, expanded, onPress }) {
   const when = new Date(entry.timestamp);
@@ -117,6 +177,8 @@ export default function SoulSanctuaryScreen({
   onRequestUpgrade,
   gentleEnter = false,
   loungeSubView = false,
+  /** Postpartum lounge — show emotion-cloud progress tracker */
+  showMoodTracker = false,
 }) {
   const [phase, setPhase] = useState('clouds');
   const [selectedMood, setSelectedMood] = useState(null);
@@ -233,7 +295,9 @@ export default function SoulSanctuaryScreen({
   };
 
   const archiveEntry = async (trimmed) => {
-    const guidance = buildVentingGuidance({
+    // Gemini (when keyed) reads her exact words and writes a warm reply;
+    // local fallback still builds a full letter if the network/key is missing.
+    const guidance = await buildVentingGuidance({
       text: trimmed,
       moodId: selectedMood.id,
       moodLabel: selectedMood.label,
@@ -247,7 +311,7 @@ export default function SoulSanctuaryScreen({
     });
     onAppendVentingEntry?.(entry);
     setJournalText('');
-    setExpandedEntryId(null);
+    setExpandedEntryId(entry.id);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 220);
   };
 
@@ -348,7 +412,11 @@ export default function SoulSanctuaryScreen({
                   disabled={releasing}
                 >
                   <Text style={styles.releaseBtnText}>
-                    {journalText.trim() ? 'Release Thoughts' : 'Done'}
+                    {releasing
+                      ? 'Your friend is reading…'
+                      : journalText.trim()
+                        ? 'Release Thoughts'
+                        : 'Done'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -426,6 +494,8 @@ export default function SoulSanctuaryScreen({
             </View>
           </View>
           ) : null}
+
+          {showMoodTracker ? <MoodCloudTracker history={sortedHistory} /> : null}
 
           {sortedHistory.length > 0 ? (
             <View style={styles.timelineSection}>
@@ -653,6 +723,91 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+  trackerCard: {
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  trackerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'rgba(255, 248, 252, 0.94)',
+    marginBottom: 4,
+    fontStyle: 'italic',
+  },
+  trackerHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(230, 220, 240, 0.62)',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  trackerDayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginBottom: 12,
+  },
+  trackerDay: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  trackerDayToday: {
+    borderWidth: 1,
+    borderColor: 'rgba(233, 184, 212, 0.55)',
+    backgroundColor: 'rgba(233, 184, 212, 0.12)',
+  },
+  trackerDayLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(233, 184, 212, 0.9)',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  trackerDayMood: {
+    fontSize: 10,
+    lineHeight: 13,
+    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'center',
+    minHeight: 26,
+  },
+  trackerDayCount: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  trackerCountWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  trackerCountPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 252, 248, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  trackerCountText: {
+    fontSize: 11,
+    color: 'rgba(255, 248, 244, 0.88)',
+  },
+  trackerDominant: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: 'rgba(233, 184, 212, 0.92)',
   },
   timelineTitle: {
     fontSize: 15,

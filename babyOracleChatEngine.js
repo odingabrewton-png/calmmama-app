@@ -4,7 +4,7 @@
  */
 
 const GEMINI_API_KEY = (process.env.EXPO_PUBLIC_GEMINI_API_KEY || '').trim();
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 const SYSTEM_PROMPT = `You are the 2 AM Baby Oracle inside Calm Mama Village — a gentle, knowledgeable postpartum companion for mamas caring for babies (newborn through toddler).
 

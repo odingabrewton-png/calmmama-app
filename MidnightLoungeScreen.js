@@ -966,6 +966,7 @@ function MidnightLoungeScreen({
             onRequestUpgrade={onRequestUpgrade}
             gentleEnter={false}
             loungeSubView
+            showMoodTracker
           />
         );
       }
