@@ -12,6 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import { MIDNIGHT } from './midnightLoungeTheme';
 import {
   getNextTierProgress,
+  getWeeklyJournalProgress,
   REWARD_TIERS,
 } from './villageRewardsEngine';
 import { useVillageRewards } from './VillageRewardsContext';
@@ -100,14 +101,18 @@ export default function VillageRewardsCard() {
   const [claimBadge, setClaimBadge] = useState(null);
 
   const progress = useMemo(() => getNextTierProgress(rewards.points), [rewards.points]);
+  const weeklyJournal = useMemo(
+    () => getWeeklyJournalProgress(rewards),
+    [rewards],
+  );
   const unlockedSet = useMemo(
     () => new Set(rewards.unlockedBadges || []),
     [rewards.unlockedBadges],
   );
 
   const progressLabel = progress.nextTier
-    ? `${progress.pointsToNext} pts to ${progress.nextTier.title}`
-    : 'All tiers unlocked — you legend';
+    ? `${Number(rewards.points || 0).toLocaleString()} / ${progress.nextThreshold.toLocaleString()} pts · ${progress.pointsToNext} to go`
+    : `${Number(rewards.points || 0).toLocaleString()} pts · all tiers unlocked`;
 
   return (
     <View style={styles.card}>
@@ -130,7 +135,12 @@ export default function VillageRewardsCard() {
         <View style={[styles.trackFill, { width: `${Math.round(progress.progress * 100)}%` }]} />
       </View>
       <Text style={[styles.progressLabel, SANS]}>{progressLabel}</Text>
-      <Text style={[styles.tierMarks, SANS]}>500 · 1000 · 3000</Text>
+      <Text style={[styles.tierMarks, SANS]}>500 · 1,000 · 3,000</Text>
+      <Text style={[styles.weeklyHint, SANS]}>
+        {weeklyJournal.bonusClaimed
+          ? `Weekly Sanctuary Bonus claimed (${weeklyJournal.threshold}/${weeklyJournal.threshold}) 🌸`
+          : `Soul Sanctuary this week: ${weeklyJournal.count}/${weeklyJournal.threshold} entries`}
+      </Text>
 
       <View style={styles.badgeGrid}>
         {REWARD_TIERS.map((tier) => (
@@ -228,10 +238,17 @@ const styles = StyleSheet.create({
   },
   tierMarks: {
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 8,
     fontSize: 11,
     letterSpacing: 1,
     color: MIDNIGHT.textMuted,
+    textAlign: 'center',
+  },
+  weeklyHint: {
+    marginBottom: 16,
+    fontSize: 12,
+    lineHeight: 17,
+    color: MIDNIGHT.lavenderMuted,
     textAlign: 'center',
   },
   badgeGrid: {

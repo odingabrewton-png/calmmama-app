@@ -247,7 +247,7 @@ const MamaDailyWordSearch = memo(function MamaDailyWordSearch({
   useEffect(() => {
     if (allFound && prevFoundRef.current < puzzle.words.length) {
       setShowCompletion(true);
-      addPoints(75, 'dailyPuzzle');
+      addPoints(15, 'dailyPuzzle');
       runNativeGuard('wordSearch:complete', () => {
         safeAssignTiming(completionOpacity, 1, { duration: 360 }, 'wordSearch:opacity');
         safeAssignSequence(

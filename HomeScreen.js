@@ -133,7 +133,7 @@ const DailyMiniCrossword = memo(function DailyMiniCrossword() {
   useEffect(() => {
     if (allSolved && prevSolvedRef.current < puzzle.words.length) {
       setShowSuccess(true);
-      addPoints(75, 'dailyPuzzle');
+      addPoints(15, 'dailyPuzzle');
       runNativeGuard('crossword:successReveal', () => {
         safeAssignTiming(successOpacity, 1, { duration: 280 }, 'crossword:successOpacity');
         safeAssignSequence(

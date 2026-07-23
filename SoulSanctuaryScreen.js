@@ -314,7 +314,7 @@ export default function SoulSanctuaryScreen({
     onAppendVentingEntry?.(entry);
     setJournalText('');
     setExpandedEntryId(entry.id);
-    await addPoints(50, 'dailyJournal');
+    await addPoints(10, 'dailyJournal');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 220);
   };
 

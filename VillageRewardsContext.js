@@ -53,11 +53,11 @@ export function VillageRewardsProvider({ children }) {
     };
   }, []);
 
-  const showToast = useCallback((message) => {
+  const showToast = useCallback((message, durationMs = 2400) => {
     if (!message) return;
     setToast({ id: Date.now(), message });
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 2400);
+    toastTimerRef.current = setTimeout(() => setToast(null), durationMs);
   }, []);
 
   const addPoints = useCallback(async (amount, actionKey) => {
@@ -69,6 +69,16 @@ export function VillageRewardsProvider({ children }) {
     rewardsRef.current = result.rewards;
     setRewards(result.rewards);
     showToast(result.toastMessage);
+
+    // Weekly Sanctuary bonus toast follows the entry toast when 5 journals land.
+    if (result.bonusToastMessage) {
+      const bonusMsg = result.bonusToastMessage;
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        showToast(bonusMsg, 2800);
+      }, 2500);
+    }
+
     try {
       await saveVillageRewards(result.rewards);
     } catch (_) {

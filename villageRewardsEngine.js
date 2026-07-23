@@ -35,12 +35,17 @@ export const REWARD_TIERS = [
 
 /** Point awards by action key. */
 export const REWARD_POINT_VALUES = {
-  dailyJournal: 50,
+  dailyJournal: 10,
+  weeklyJournalBonus: 50,
   pollFeedback: 100,
   registryCompleted: 250,
-  dailyPuzzle: 75,
+  dailyPuzzle: 15,
   encourage: 25,
 };
+
+export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
+export const WEEKLY_JOURNAL_BONUS_TOAST =
+  'Weekly Sanctuary Bonus Unlocked! +50 pts 🌸';
 
 export function createDefaultVillageRewards() {
   return {
@@ -53,6 +58,9 @@ export function createDefaultVillageRewards() {
       dailyPuzzleDate: null,
       dailyEncouragementsCount: 0,
       dailyEncourageDate: null,
+      weeklyJournalWeekKey: null,
+      weeklyJournalCount: 0,
+      weeklyJournalBonusClaimed: false,
     },
     unlockedBadges: [],
   };
@@ -63,6 +71,16 @@ export function calendarDayKey(date = new Date()) {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+/** Monday-start ISO-style week key for rolling 7-day journal bonus. */
+export function calendarWeekKey(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0 Sun … 6 Sat
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
+  return calendarDayKey(d);
 }
 
 function previousCalendarDayKey(date = new Date()) {
@@ -93,6 +111,9 @@ export function normalizeVillageRewards(raw) {
       dailyPuzzleDate: actions.dailyPuzzleDate || null,
       dailyEncouragementsCount: Math.max(0, Number(actions.dailyEncouragementsCount) || 0),
       dailyEncourageDate: actions.dailyEncourageDate || null,
+      weeklyJournalWeekKey: actions.weeklyJournalWeekKey || null,
+      weeklyJournalCount: Math.max(0, Number(actions.weeklyJournalCount) || 0),
+      weeklyJournalBonusClaimed: Boolean(actions.weeklyJournalBonusClaimed),
     },
     unlockedBadges: unlocked,
   };
@@ -118,11 +139,16 @@ export async function clearVillageRewards() {
   await AsyncStorage.removeItem(VILLAGE_REWARDS_STORAGE_KEY);
 }
 
+/**
+ * Progress toward 500 → 1000 → 3000 badge tiers.
+ * Bar fills from the previous unlocked threshold to the next.
+ */
 export function getNextTierProgress(points) {
   const total = Math.max(0, Number(points) || 0);
+  const thresholds = REWARD_TIERS.map((tier) => tier.points);
   const next = REWARD_TIERS.find((tier) => total < tier.points) || null;
   const prevThreshold =
-    REWARD_TIERS.filter((tier) => tier.points <= total).pop()?.points || 0;
+    [...thresholds].reverse().find((mark) => mark <= total) || 0;
 
   if (!next) {
     const last = REWARD_TIERS[REWARD_TIERS.length - 1];
@@ -132,11 +158,13 @@ export function getNextTierProgress(points) {
       nextThreshold: last.points,
       progress: 1,
       pointsToNext: 0,
+      absoluteProgress: 1,
     };
   }
 
   const span = Math.max(1, next.points - prevThreshold);
   const progress = Math.min(1, Math.max(0, (total - prevThreshold) / span));
+  const absoluteProgress = Math.min(1, total / thresholds[thresholds.length - 1]);
 
   return {
     nextTier: next,
@@ -144,6 +172,7 @@ export function getNextTierProgress(points) {
     nextThreshold: next.points,
     progress,
     pointsToNext: Math.max(0, next.points - total),
+    absoluteProgress,
   };
 }
 
@@ -162,17 +191,41 @@ function syncUnlockedBadges(points, unlockedBadges = []) {
   };
 }
 
+function finishAward(current, actions, awardAmount, extras = {}) {
+  const points = current.points + awardAmount;
+  const { unlockedBadges, newlyUnlocked } = syncUnlockedBadges(points, current.unlockedBadges);
+  const next = {
+    ...current,
+    points,
+    completedActions: actions,
+    unlockedBadges,
+    ...extras.state,
+  };
+
+  return {
+    awarded: true,
+    amount: awardAmount,
+    reason: 'ok',
+    rewards: next,
+    newlyUnlocked,
+    toastMessage: extras.toastMessage || `+${awardAmount} pts! 🌸`,
+    bonusToastMessage: extras.bonusToastMessage || null,
+    bonusAmount: extras.bonusAmount || 0,
+  };
+}
+
 /**
  * Pure award attempt. Returns whether points were granted + updated rewards.
  * @param {object} rewards
  * @param {number} amount
- * @param {string} actionKey — dailyJournal | pollFeedback | registryCompleted | dailyPuzzle | encourage
+ * @param {string} actionKey
  */
 export function applyAddPoints(rewards, amount, actionKey) {
   const current = normalizeVillageRewards(rewards);
   const key = String(actionKey || '');
   const awardAmount = Math.max(0, Number(amount) || REWARD_POINT_VALUES[key] || 0);
   const today = calendarDayKey();
+  const weekKey = calendarWeekKey();
   const actions = { ...current.completedActions };
 
   if (!awardAmount || !key) {
@@ -183,42 +236,84 @@ export function applyAddPoints(rewards, amount, actionKey) {
       rewards: current,
       newlyUnlocked: [],
       toastMessage: null,
+      bonusToastMessage: null,
+      bonusAmount: 0,
     };
   }
 
   if (key === 'dailyJournal') {
-    if (actions.dailyJournalDate === today) {
+    // Reset weekly counter when the week rolls over.
+    if (actions.weeklyJournalWeekKey !== weekKey) {
+      actions.weeklyJournalWeekKey = weekKey;
+      actions.weeklyJournalCount = 0;
+      actions.weeklyJournalBonusClaimed = false;
+    }
+
+    const yesterday = previousCalendarDayKey();
+    let nextStreak = current.dailyStreak;
+    if (actions.dailyJournalDate !== today) {
+      nextStreak = actions.dailyJournalDate === yesterday ? current.dailyStreak + 1 : 1;
+      actions.dailyJournalDate = today;
+    }
+
+    actions.weeklyJournalCount += 1;
+
+    let totalAward = awardAmount;
+    let bonusToastMessage = null;
+    let bonusAmount = 0;
+
+    if (
+      actions.weeklyJournalCount >= WEEKLY_JOURNAL_BONUS_THRESHOLD &&
+      !actions.weeklyJournalBonusClaimed
+    ) {
+      actions.weeklyJournalBonusClaimed = true;
+      bonusAmount = REWARD_POINT_VALUES.weeklyJournalBonus;
+      totalAward += bonusAmount;
+      bonusToastMessage = WEEKLY_JOURNAL_BONUS_TOAST;
+    }
+
+    return finishAward(current, actions, totalAward, {
+      state: { dailyStreak: nextStreak },
+      toastMessage: `+${awardAmount} pts! 🌸`,
+      bonusToastMessage,
+      bonusAmount,
+    });
+  }
+
+  if (key === 'weeklyJournalBonus') {
+    if (actions.weeklyJournalWeekKey !== weekKey) {
+      actions.weeklyJournalWeekKey = weekKey;
+      actions.weeklyJournalCount = 0;
+      actions.weeklyJournalBonusClaimed = false;
+    }
+    if (actions.weeklyJournalBonusClaimed) {
       return {
         awarded: false,
         amount: 0,
-        reason: 'already_today',
+        reason: 'already_claimed',
         rewards: current,
         newlyUnlocked: [],
         toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
       };
     }
-    const yesterday = previousCalendarDayKey();
-    const nextStreak =
-      actions.dailyJournalDate === yesterday ? current.dailyStreak + 1 : 1;
-    actions.dailyJournalDate = today;
-
-    const points = current.points + awardAmount;
-    const { unlockedBadges, newlyUnlocked } = syncUnlockedBadges(points, current.unlockedBadges);
-    const next = {
-      ...current,
-      points,
-      dailyStreak: nextStreak,
-      completedActions: actions,
-      unlockedBadges,
-    };
-    return {
-      awarded: true,
-      amount: awardAmount,
-      reason: 'ok',
-      rewards: next,
-      newlyUnlocked,
-      toastMessage: `+${awardAmount} pts! 🌸`,
-    };
+    if (actions.weeklyJournalCount < WEEKLY_JOURNAL_BONUS_THRESHOLD) {
+      return {
+        awarded: false,
+        amount: 0,
+        reason: 'threshold_not_met',
+        rewards: current,
+        newlyUnlocked: [],
+        toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
+      };
+    }
+    actions.weeklyJournalBonusClaimed = true;
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: WEEKLY_JOURNAL_BONUS_TOAST,
+    });
   }
 
   if (key === 'dailyPuzzle') {
@@ -230,6 +325,8 @@ export function applyAddPoints(rewards, amount, actionKey) {
         rewards: current,
         newlyUnlocked: [],
         toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
       };
     }
     actions.dailyPuzzleDate = today;
@@ -242,6 +339,8 @@ export function applyAddPoints(rewards, amount, actionKey) {
         rewards: current,
         newlyUnlocked: [],
         toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
       };
     }
     actions.pollFeedback = true;
@@ -254,6 +353,8 @@ export function applyAddPoints(rewards, amount, actionKey) {
         rewards: current,
         newlyUnlocked: [],
         toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
       };
     }
     actions.registryCompleted = true;
@@ -270,6 +371,8 @@ export function applyAddPoints(rewards, amount, actionKey) {
         rewards: { ...current, completedActions: actions },
         newlyUnlocked: [],
         toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
       };
     }
     actions.dailyEncouragementsCount += 1;
@@ -281,28 +384,32 @@ export function applyAddPoints(rewards, amount, actionKey) {
       rewards: current,
       newlyUnlocked: [],
       toastMessage: null,
+      bonusToastMessage: null,
+      bonusAmount: 0,
     };
   }
 
-  const points = current.points + awardAmount;
-  const { unlockedBadges, newlyUnlocked } = syncUnlockedBadges(points, current.unlockedBadges);
-  const next = {
-    ...current,
-    points,
-    completedActions: actions,
-    unlockedBadges,
-  };
-
-  return {
-    awarded: true,
-    amount: awardAmount,
-    reason: 'ok',
-    rewards: next,
-    newlyUnlocked,
-    toastMessage: `+${awardAmount} pts! 🌸`,
-  };
+  return finishAward(current, actions, awardAmount);
 }
 
 export function getBadgeMeta(badgeId) {
   return REWARD_TIERS.find((tier) => tier.id === badgeId) || null;
+}
+
+/** Current-week journal progress for Me-tab copy (resets each Monday). */
+export function getWeeklyJournalProgress(rewards, date = new Date()) {
+  const actions = normalizeVillageRewards(rewards).completedActions;
+  const weekKey = calendarWeekKey(date);
+  if (actions.weeklyJournalWeekKey !== weekKey) {
+    return {
+      count: 0,
+      threshold: WEEKLY_JOURNAL_BONUS_THRESHOLD,
+      bonusClaimed: false,
+    };
+  }
+  return {
+    count: actions.weeklyJournalCount,
+    threshold: WEEKLY_JOURNAL_BONUS_THRESHOLD,
+    bonusClaimed: actions.weeklyJournalBonusClaimed,
+  };
 }
