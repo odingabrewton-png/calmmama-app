@@ -15,6 +15,7 @@ export default function PostpartumInfantHome({
   mamaName,
   entries,
   onSaveEntry,
+  headerSlot = null,
 }) {
   if (__DEV__ && !POSTPARTUM_INFANT_HOME_LAYOUT_LOCKED) {
     console.warn('[PostpartumInfantHome] POSTPARTUM_INFANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
@@ -34,6 +35,7 @@ export default function PostpartumInfantHome({
       nestedScrollEnabled
       nativeID={POSTPARTUM_INFANT_HOME_STACK[0]}
     >
+      {headerSlot}
       <BabyMilestoneScrapbook
         babyAge={babyAge}
         mamaName={mamaName}

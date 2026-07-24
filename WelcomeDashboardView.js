@@ -86,6 +86,17 @@ export default function WelcomeDashboardView({
   onGetStarted,
 }) {
   const features = useMemo(() => {
+    if (userJourney === 'hybrid') {
+      return [
+        {
+          id: 'hybrid',
+          emoji: '🤰🧸',
+          title: 'Pregnancy + Toddler Mode',
+          body: 'Toggle Home between your pregnancy track and little-one track anytime — one village, both seasons.',
+        },
+        ...BASE_FEATURES,
+      ];
+    }
     const core =
       userJourney === 'pregnant'
         ? BASE_FEATURES
@@ -98,13 +109,13 @@ export default function WelcomeDashboardView({
   }, [userJourney]);
 
   const greeting = mamaName?.trim() && mamaName.trim() !== 'Mama' ? mamaName.trim() : 'beautiful mama';
-  const isPregnant = userJourney === 'pregnant';
-  const isPostpartum = userJourney === 'postpartum';
+  const isPregnant = userJourney === 'pregnant' || userJourney === 'hybrid';
+  const isPostpartum = userJourney === 'postpartum' || userJourney === 'hybrid';
   const usesFullBleedWelcome = isPregnant || isPostpartum;
-  const gradient = isPregnant
-    ? PREGNANT_WELCOME_GRADIENT
-    : isPostpartum
-      ? POSTPARTUM_WELCOME_GRADIENT
+  const gradient = userJourney === 'postpartum'
+    ? POSTPARTUM_WELCOME_GRADIENT
+    : isPregnant
+      ? PREGNANT_WELCOME_GRADIENT
       : DEFAULT_WELCOME_GRADIENT;
 
   const content = (

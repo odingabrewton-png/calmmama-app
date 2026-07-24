@@ -502,6 +502,8 @@ function MidnightLoungeScreen({
   initialTab = 'home',
   focusToken = 0,
   userJourney = 'postpartum',
+  activeMode = 'pregnant',
+  onSelectJourneyMode,
   postpartumLotusOpen = false,
   mamaName = 'Mama',
   onMamaNameChange,
@@ -519,6 +521,7 @@ function MidnightLoungeScreen({
   onAppendGuidanceHistory,
   isSubscribed = false,
   onRequestUpgrade,
+  journeyContext = '',
   renderVillagePortal,
 } = {}) {
   if (__DEV__ && !MIDNIGHT_LOUNGE_LAYOUT_LOCKED) {
@@ -980,6 +983,7 @@ function MidnightLoungeScreen({
             gentleEnter={false}
             loungeSubView
             showMoodTracker
+            journeyContext={journeyContext}
           />
         );
       }
@@ -995,6 +999,7 @@ function MidnightLoungeScreen({
             onRequestUpgrade={onRequestUpgrade}
             gentleEnter={false}
             loungeSubView
+            journeyContext={journeyContext}
           />
         </Suspense>
       );
@@ -1068,6 +1073,8 @@ function MidnightLoungeScreen({
             onPickProfilePhoto={onPickProfilePhoto}
             onOpenBoutique={openBoutique}
             onDeleteAccount={onDeleteAccount}
+            activeMode={activeMode}
+            onSelectJourneyMode={onSelectJourneyMode}
           />
         );
       case 'feed':

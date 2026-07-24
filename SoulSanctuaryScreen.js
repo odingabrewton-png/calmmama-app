@@ -180,6 +180,7 @@ export default function SoulSanctuaryScreen({
   loungeSubView = false,
   /** Postpartum lounge — show emotion-cloud progress tracker */
   showMoodTracker = false,
+  journeyContext = '',
 }) {
   const [phase, setPhase] = useState('clouds');
   const [selectedMood, setSelectedMood] = useState(null);
@@ -305,6 +306,7 @@ export default function SoulSanctuaryScreen({
       moodLabel: selectedMood.label,
       priorEntries: ventingHistory,
       mamaName,
+      journeyContext,
     });
     const entry = createVentingEntry({
       text: trimmed,

@@ -560,7 +560,7 @@ const LoungePage = memo(
     prev.onWordSearchDragChange === next.onWordSearchDragChange,
 );
 
-function HomeScreen() {
+function HomeScreen({ headerSlot = null }) {
   if (__DEV__ && !PREGNANT_HOME_LAYOUT_LOCKED) {
     console.warn('[HomeScreen] PREGNANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
   }
@@ -646,6 +646,7 @@ function HomeScreen() {
         bounces={!isDraggingWord}
       >
         <View style={styles.homeDomainBlock}>
+          {headerSlot}
           <View style={styles.paginationRow}>
             {LOUNGE_PAGES.map((page, index) => (
               <TouchableOpacity

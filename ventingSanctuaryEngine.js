@@ -35,6 +35,8 @@ Rules:
 - Keep the note cohesive and complete — finish every thought and every sentence. Never stop mid-sentence or trail off.
 - Fully express your response within the space you have; land on a warm, finished closing line
 - Speak directly to her by first name when given
+- If the user is both pregnant and parenting a toddler, acknowledge the unique physical and emotional weight of growing a baby while caring for a young child in your responses.
+- Inspect both pregnancy and parenting tracks when journey context is provided — do not assume she is only on one path
 - Do not use bullet points, numbered lists, headings, hashtags, or emoji walls
 - Do not start with "As an AI" or mention being a model
 - Do not give medical advice; if something sounds urgent, gently suggest checking with her care team
@@ -265,7 +267,14 @@ function buildLocalVentingGuidance({ text, moodId, moodLabel, priorEntries = [],
   };
 }
 
-async function askGeminiFriendNote({ text, moodId, moodLabel, priorEntries = [], mamaName = 'Mama' }) {
+async function askGeminiFriendNote({
+  text,
+  moodId,
+  moodLabel,
+  priorEntries = [],
+  mamaName = 'Mama',
+  journeyContext = '',
+}) {
   if (!GEMINI_API_KEY) return null;
 
   const name = firstName(mamaName);
@@ -277,9 +286,13 @@ async function askGeminiFriendNote({ text, moodId, moodLabel, priorEntries = [],
     })
     .join('\n');
 
+  const journeyBlock = String(journeyContext || '').trim()
+    ? `\nJourney context (read carefully — she may be on more than one track):\n${String(journeyContext).trim()}\n`
+    : '';
+
   const userPrompt = `Mama's first name: ${name}
 Emotion cloud she just chose: ${moodLabel || moodId || 'unspecified'}
-
+${journeyBlock}
 What she just wrote in her journal (read this carefully and respond to the specifics):
 """
 ${String(text || '').trim()}
@@ -288,7 +301,7 @@ ${String(text || '').trim()}
 Recent entries from her venting timeline (for continuity — do not copy them; just avoid sounding identical):
 ${recent || '- (no recent entries yet)'}
 
-Now write your mama-friend note back to her. You are a warm, supportive village friend. Write a complete, empathetic 2-paragraph response. Ensure you finish your final sentence completely.`;
+Now write your mama-friend note back to her. You are a warm, supportive village friend. Write a complete, empathetic 2-paragraph response. Ensure you finish your final sentence completely. If she is both pregnant and parenting a toddler, acknowledge the unique physical and emotional weight of growing a baby while caring for a young child.`;
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -345,6 +358,7 @@ export async function buildVentingGuidance({
   moodLabel,
   priorEntries = [],
   mamaName = 'Mama',
+  journeyContext = '',
 }) {
   const markers = detectVentingMarkers(text);
 
@@ -355,6 +369,7 @@ export async function buildVentingGuidance({
       moodLabel,
       priorEntries,
       mamaName,
+      journeyContext,
     });
     if (geminiBody) {
       return {
