@@ -24,6 +24,7 @@ function makeParticles(count) {
 export async function runTextReleaseFlow({
   releaseRef,
   text,
+  isPro,
   isSubscribed,
   onArchive,
   onRequestUpgrade,
@@ -33,7 +34,7 @@ export async function runTextReleaseFlow({
 
   await releaseRef.current?.play(trimmed);
 
-  if (!isSubscribed) {
+  if (!(isPro || isSubscribed)) {
     onRequestUpgrade?.();
     return { released: true, archived: false };
   }

@@ -60,6 +60,7 @@ function LittleHorizonsScreen({
   babyAge = '1 Year',
   history = [],
   onSaveEntry,
+  isPro = false,
   isSubscribed = false,
   isYearlyMember = false,
   onRequestUpgrade,
@@ -72,7 +73,8 @@ function LittleHorizonsScreen({
   const dailyPrompt = useMemo(() => getDailyDiscovery(), []);
   const releaseRef = useRef(null);
 
-  const showVictoryPremiumLock = !isYearlyMember;
+  const hasPro = Boolean(isPro || isSubscribed);
+  const showVictoryPremiumLock = !(isYearlyMember || hasPro);
 
   const openUpgradeSheet = () => {
     setUpgradeSheetOpen(true);
@@ -104,7 +106,8 @@ function LittleHorizonsScreen({
     const { archived } = await runTextReleaseFlow({
       releaseRef,
       text: trimmed,
-      isSubscribed,
+      isPro: hasPro,
+      isSubscribed: hasPro,
       onRequestUpgrade,
       onArchive: async () => {
         onSaveEntry?.({
@@ -121,7 +124,7 @@ function LittleHorizonsScreen({
     setReleasing(false);
     if (!archived) {
       setNotes('');
-      if (!isSubscribed) closePanel();
+      if (!hasPro) closePanel();
     }
   };
 
@@ -166,7 +169,7 @@ function LittleHorizonsScreen({
 
       <Text style={[styles.historyTitle, SERIF]}>Today&apos;s logged rhythm</Text>
       <View style={styles.historySection}>
-        {!isSubscribed && sortedHistory.length > 0 ? (
+        {!hasPro && sortedHistory.length > 0 ? (
           <TouchableOpacity
             style={styles.historyGateTap}
             onPress={() => onOpenSubscription?.()}
@@ -183,7 +186,7 @@ function LittleHorizonsScreen({
         sortedHistory.map((entry) => (
           <View
             key={entry.id}
-            style={[styles.historyRow, !isSubscribed && styles.historyRowBlurred]}
+            style={[styles.historyRow, !hasPro && styles.historyRowBlurred]}
           >
             <Text style={styles.historyEmoji}>{entry.tileEmoji}</Text>
             <View style={styles.historyBody}>

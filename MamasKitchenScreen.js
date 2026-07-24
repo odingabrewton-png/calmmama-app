@@ -1771,9 +1771,11 @@ function MamasKitchenScreen({
   isToddlerKitchen = false,
   isPostpartumKitchen = false,
   isPregnantKitchen = false,
+  isPro = false,
   isSubscribed = false,
   onRequestUpgrade,
 }) {
+  const hasPro = Boolean(isPro || isSubscribed);
   const { columns, cellW, contentW } = useGridLayout();
   const showLittleBitesTab = isToddlerKitchen && !isPregnantKitchen;
   const [activeTab, setActiveTab] = useState(() =>
@@ -1945,7 +1947,7 @@ function MamasKitchenScreen({
   const renderItem = useCallback(
     ({ item, index }) => {
       const locked =
-        !isSubscribed && (item.isPremium === true || isPremiumKitchenRecipe(item, activeTab, index));
+        !hasPro && (item.isPremium === true || isPremiumKitchenRecipe(item, activeTab, index));
       return (
         <GridMealTile
           recipe={item}
@@ -1956,7 +1958,7 @@ function MamasKitchenScreen({
         />
       );
     },
-    [activeTab, cellW, isSubscribed, onRequestUpgrade, openRecipe]
+    [activeTab, cellW, hasPro, onRequestUpgrade, openRecipe]
   );
 
   const kitchenListHeader = useMemo(
@@ -2051,6 +2053,7 @@ export default memo(
     prev.isPostpartumKitchen === next.isPostpartumKitchen &&
     prev.isPregnantKitchen === next.isPregnantKitchen &&
     prev.isSubscribed === next.isSubscribed &&
+    prev.isPro === next.isPro &&
     prev.onRequestUpgrade === next.onRequestUpgrade,
 );
 

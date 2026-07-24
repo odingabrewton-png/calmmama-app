@@ -22,29 +22,43 @@ const PLAYFUL = Platform.select({
 });
 
 /**
- * Celebratory modal after Stripe success return (?upgraded=1&plan=…).
+ * Celebratory modal after Stripe success or VIP promo redeem.
  */
 export default function PremiumUpgradeWelcomeModal({
   visible,
   planLabel,
   onClose,
+  variant = 'premium',
+  title,
+  body,
+  bonusLabel,
 }) {
+  const isVip = variant === 'vip';
+  const header =
+    title ||
+    (isVip
+      ? 'VIP Access Activated! Welcome home, Queen 🌸👑'
+      : 'Welcome to Premium Sanctuary Access! 🌸👑');
+  const copy =
+    body ||
+    (isVip
+      ? 'Your lifetime VIP pass is unlocked on this device. Enjoy unlimited sanctuary tools, AI companion care, and full Village access — forever.'
+      : 'Your account is now fully upgraded. Enjoy unlimited access to all features, AI companion responses, and special rewards!');
+  const bonus =
+    bonusLabel ||
+    (isVip ? '+500 pts VIP Welcome Bonus' : '+250 pts Premium Upgrade Bonus');
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation?.()}>
           <Text style={styles.emoji}>🌸👑</Text>
-          <Text style={[styles.header, PLAYFUL]}>
-            Welcome to Premium Sanctuary Access! 🌸👑
-          </Text>
-          <Text style={[styles.body, SANS]}>
-            Your account is now fully upgraded. Enjoy unlimited access to all features, AI
-            companion responses, and special rewards!
-          </Text>
+          <Text style={[styles.header, PLAYFUL]}>{header}</Text>
+          <Text style={[styles.body, SANS]}>{copy}</Text>
           {planLabel ? (
             <Text style={[styles.planChip, SANS]}>{planLabel}</Text>
           ) : null}
-          <Text style={[styles.bonus, SANS]}>+250 pts Premium Upgrade Bonus</Text>
+          <Text style={[styles.bonus, SANS]}>{bonus}</Text>
           <TouchableOpacity style={styles.cta} onPress={onClose} activeOpacity={0.88}>
             <Text style={[styles.ctaText, SANS]}>Enter Your Sanctuary ✨</Text>
           </TouchableOpacity>

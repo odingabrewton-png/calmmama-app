@@ -174,6 +174,7 @@ export default function SoulSanctuaryScreen({
   onExit,
   ventingHistory = [],
   onAppendVentingEntry,
+  isPro = false,
   isSubscribed = false,
   onRequestUpgrade,
   gentleEnter = false,
@@ -182,6 +183,7 @@ export default function SoulSanctuaryScreen({
   showMoodTracker = false,
   journeyContext = '',
 }) {
+  const hasPro = Boolean(isPro || isSubscribed);
   const [phase, setPhase] = useState('clouds');
   const [selectedMood, setSelectedMood] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
@@ -336,7 +338,7 @@ export default function SoulSanctuaryScreen({
         await archiveEntry(trimmed);
       },
     });
-    if (!isSubscribed) {
+    if (!hasPro) {
       onRequestUpgrade?.();
     }
     setReleasing(false);

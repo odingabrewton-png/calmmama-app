@@ -12,7 +12,12 @@ export function getSubscriptionProductId(planId) {
 
 /** First 40 founding bundle — yearly inner circle only */
 export function isYearlyFoundingGiftTier(userSubscriptionType, productId) {
-  if (userSubscriptionType === SUBSCRIPTION_PLANS.yearly || userSubscriptionType === 'yearly') {
+  if (
+    userSubscriptionType === SUBSCRIPTION_PLANS.yearly ||
+    userSubscriptionType === 'yearly' ||
+    userSubscriptionType === 'vip_lifetime' ||
+    userSubscriptionType === 'vip'
+  ) {
     return true;
   }
   const yearlyProductId = SUBSCRIPTION_PRODUCT_IDS[SUBSCRIPTION_PLANS.yearly];
@@ -23,6 +28,8 @@ export function isPremiumSubscribed(userSubscriptionType) {
   return (
     userSubscriptionType === SUBSCRIPTION_PLANS.monthly ||
     userSubscriptionType === SUBSCRIPTION_PLANS.yearly ||
-    userSubscriptionType === SUBSCRIPTION_PLANS.gift
+    userSubscriptionType === SUBSCRIPTION_PLANS.gift ||
+    userSubscriptionType === 'vip_lifetime' ||
+    userSubscriptionType === 'vip'
   );
 }
