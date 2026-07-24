@@ -58,6 +58,12 @@ function VillageBoutiqueBanner({ onPress }) {
   );
 }
 
+const STAGE_OPTIONS = [
+  { id: 'pregnant', label: 'Pregnant', hint: 'Pregnancy Home' },
+  { id: 'postpartum', label: 'Parenting', hint: 'Little one Home' },
+  { id: 'hybrid', label: 'Both', hint: 'Toggle on Home' },
+];
+
 function MidnightLoungeProfilePanel({
   mamaName,
   onMamaNameChange,
@@ -70,6 +76,8 @@ function MidnightLoungeProfilePanel({
   onOpenBoutique,
   onDeleteAccount,
   onSave,
+  activeMode = 'pregnant',
+  onSelectJourneyMode,
 }) {
   const [nameDraft, setNameDraft] = useState(mamaName || '');
   const [bioDraft, setBioDraft] = useState(shortBio || '');
@@ -141,6 +149,38 @@ function MidnightLoungeProfilePanel({
         onBirthdayChange={onBirthdayChange}
         variant="midnight"
       />
+
+      <Text style={[styles.fieldLabel, SANS]}>Your village stage</Text>
+      <Text style={[styles.stageHint, SANS]}>
+        Pregnant and parenting a little one? Choose Both — then use the Home pills to switch tracks.
+      </Text>
+      <View style={styles.stageRow}>
+        {STAGE_OPTIONS.map((option) => {
+          const selected = activeMode === option.id;
+          return (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.stagePill, selected && styles.stagePillActive]}
+              onPress={() => onSelectJourneyMode?.(option.id)}
+              activeOpacity={0.88}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+            >
+              <Text style={[styles.stagePillLabel, SANS, selected && styles.stagePillLabelActive]}>
+                {option.label}
+              </Text>
+              <Text style={[styles.stagePillHint, SANS, selected && styles.stagePillHintActive]}>
+                {option.hint}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {activeMode === 'hybrid' ? (
+        <Text style={[styles.hybridReadyNote, SANS]}>
+          Hybrid on — open Home for Pregnancy / Toddler pills.
+        </Text>
+      ) : null}
 
       <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.88}>
         <Text style={[styles.saveBtnText, SANS]}>{savedFlash ? 'Saved ✓' : 'Save Changes'}</Text>
@@ -240,6 +280,60 @@ const styles = StyleSheet.create({
   fieldInputMultiline: {
     minHeight: 96,
     paddingTop: 14,
+  },
+  stageHint: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: MIDNIGHT.textMuted,
+    marginBottom: 10,
+    marginTop: -2,
+  },
+  stageRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  stagePill: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 96,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+    backgroundColor: MIDNIGHT.bgCard,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  stagePillActive: {
+    borderColor: MIDNIGHT.lavender,
+    backgroundColor: MIDNIGHT.lavenderTint,
+  },
+  stagePillLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: MIDNIGHT.textPrimary,
+    marginBottom: 3,
+  },
+  stagePillLabelActive: {
+    color: '#2A2540',
+  },
+  stagePillHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: MIDNIGHT.textMuted,
+    textAlign: 'center',
+  },
+  stagePillHintActive: {
+    color: '#5A4E72',
+  },
+  hybridReadyNote: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: MIDNIGHT.lavender,
+    marginBottom: 14,
+    textAlign: 'center',
   },
   saveBtn: {
     backgroundColor: MIDNIGHT.lavender,

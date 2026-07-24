@@ -99,6 +99,25 @@ export default function OnboardingStageScreen({
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity
+        style={[
+          styles.hybridCard,
+          userJourney === 'hybrid' && styles.personaCardActive,
+        ]}
+        onPress={() => onSelectJourney('hybrid')}
+        activeOpacity={0.9}
+      >
+        <Text style={styles.hybridEmoji}>🤰🧸</Text>
+        <View style={styles.hybridCopy}>
+          <Text style={[styles.personaLabel, userJourney === 'hybrid' && styles.personaLabelActive]}>
+            Both — Pregnant & Parenting
+          </Text>
+          <Text style={[styles.personaHint, userJourney === 'hybrid' && styles.personaHintActive]}>
+            Growing a baby while caring for a little one — toggle Home anytime
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.formGroup}>
         <Text style={[styles.formTitle, ONBOARDING_SERIF]}>Your village profile</Text>
         <Text style={styles.fieldLabel}>Mama nickname</Text>
@@ -110,9 +129,11 @@ export default function OnboardingStageScreen({
           onChangeText={onMamaNameChange}
         />
 
-        {userJourney === 'pregnant' ? (
+        {(userJourney === 'pregnant' || userJourney === 'hybrid') ? (
           <View>
-            <Text style={styles.fieldLabel}>Weeks pregnant</Text>
+            <Text style={styles.fieldLabel}>
+              {userJourney === 'hybrid' ? 'Current pregnancy — weeks' : 'Weeks pregnant'}
+            </Text>
             <TextInput
               style={styles.fieldInput}
               value={weeksPregnant}
@@ -122,12 +143,16 @@ export default function OnboardingStageScreen({
             <Text style={styles.fieldLabel}>Estimated due date</Text>
             <TextInput style={styles.fieldInput} value={dueDate} onChangeText={onDueDateChange} />
           </View>
-        ) : (
+        ) : null}
+
+        {(userJourney === 'postpartum' || userJourney === 'hybrid') ? (
           <View>
-            <Text style={styles.fieldLabel}>Baby&apos;s current age</Text>
+            <Text style={styles.fieldLabel}>
+              {userJourney === 'hybrid' ? "Little one's current age" : "Baby's current age"}
+            </Text>
             <BabyAgePicker value={babyAge} onChange={onBabyAgeChange} />
           </View>
-        )}
+        ) : null}
       </View>
 
       <View style={styles.secureBox}>
@@ -226,7 +251,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 12,
+  },
+  hybridCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
     marginBottom: 20,
+  },
+  hybridEmoji: {
+    fontSize: 28,
+  },
+  hybridCopy: {
+    flex: 1,
   },
   personaCard: {
     flex: 1,

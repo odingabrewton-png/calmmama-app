@@ -39,6 +39,7 @@ import SubscriptionScreen from './SubscriptionScreen';
 import VillageCommunityPortal from './src/VillageCommunityPortal';
 import MamasKitchenScreen from './MamasKitchenScreen';
 import HomeScreen from './HomeScreen';
+import HomeModeToggle from './HomeModeToggle';
 import BirthdayBoutiqueModal from './BirthdayBoutiqueModal';
 import TabFreezeBoundary from './TabFreezeBoundary';
 import { TAB_NAV_PERF } from './tabShellConfig';
@@ -70,6 +71,16 @@ import {
 */
 import { isKnownNotificationRoute } from './villageNotificationScheduler';
 import { getHomeJourneyPhase, showsLittleBitesKitchen } from './homeJourneyUtils';
+import {
+  ACTIVE_MODES,
+  buildSanctuaryJourneyContext,
+  createChildEntry,
+  deriveActiveMode,
+  getEffectiveUserJourney,
+  HOME_TRACKS,
+  normalizeChildren,
+  normalizeCurrentPregnancy,
+} from './mamaJourneyProfile';
 import {
   fetchFoundingGiftsClaimCount,
   submitFoundingGiftClaim,
@@ -1544,6 +1555,9 @@ function renderMainTabContent({
   isYearlyMember = false,
   onReleaseUpgradePrompt,
   onOpenSubscription,
+  activeMode = 'pregnant',
+  homeTrack = 'pregnant',
+  onHomeTrackChange,
   isActive = true,
 }) {
   const panelStyle = embedded ? styles.scrollContent : styles.scrollContentFlex;
@@ -1558,11 +1572,21 @@ function renderMainTabContent({
           : [];
   const pregnantTherapeuticHeadline = getTherapeuticHeadlineForSymptoms(selectedSymptoms);
   const postpartumTherapeuticHeadline = getTherapeuticHeadlineForVibes(selectedPostpartumVibes);
-  const homePhase = getHomeJourneyPhase(userJourney, babyAge);
+  const homePhase = getHomeJourneyPhase(userJourney, babyAge, { activeMode, homeTrack });
+  const showHybridHomeToggle = activeMode === 'hybrid';
+
+  const homeToggle = showHybridHomeToggle ? (
+    <HomeModeToggle
+      homeTrack={homeTrack}
+      onChangeTrack={onHomeTrackChange}
+      weeksPregnant={weeksPregnant}
+      babyAge={babyAge}
+    />
+  ) : null;
 
   if (tabId === 'home') {
     if (homePhase === 'pregnant') {
-      return <HomeScreen />;
+      return <HomeScreen headerSlot={homeToggle} />;
     }
 
     if (homePhase === 'infant') {
@@ -1574,6 +1598,7 @@ function renderMainTabContent({
             mamaName={mamaName}
             entries={milestoneScrapbook}
             onSaveEntry={onSaveMilestoneEntry}
+            headerSlot={homeToggle}
           />
         </Suspense>
       );
@@ -1589,6 +1614,7 @@ function renderMainTabContent({
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
           >
+            {homeToggle}
             <VillageTimeCapsule
               babyAge={babyAge}
               entries={timeCapsuleEntries}
@@ -2389,6 +2415,13 @@ function CalmMamaApp() {
   const [premiumWelcomeOpen, setPremiumWelcomeOpen] = useState(false);
   const [premiumWelcomePlan, setPremiumWelcomePlan] = useState(null);
   const [userJourney, setUserJourney] = useState('pregnant');
+  const [activeMode, setActiveMode] = useState(ACTIVE_MODES.PREGNANT);
+  const [homeTrack, setHomeTrack] = useState(HOME_TRACKS.PREGNANT);
+  const [currentPregnancy, setCurrentPregnancy] = useState({
+    weeksPregnant: '24',
+    dueDate: '',
+  });
+  const [children, setChildren] = useState([]);
   const [activeTab, setActiveTab] = useState('home');
   const [inMidnightLounge, setInMidnightLounge] = useState(false);
   const [midnightLoungeMounted, setMidnightLoungeMounted] = useState(false);
@@ -2472,6 +2505,39 @@ function CalmMamaApp() {
   const [weeksPregnant, setWeeksPregnant] = useState('24');
   const [dueDate, setDueDate] = useState('October 2026');
   const [babyAge, setBabyAge] = useState('Newborn');
+
+  const effectiveJourney = useMemo(
+    () => getEffectiveUserJourney(activeMode, homeTrack),
+    [activeMode, homeTrack],
+  );
+
+  const sanctuaryJourneyContext = useMemo(
+    () =>
+      buildSanctuaryJourneyContext({
+        activeMode,
+        currentPregnancy,
+        weeksPregnant,
+        dueDate,
+        children,
+        babyAge,
+      }),
+    [activeMode, currentPregnancy, weeksPregnant, dueDate, children, babyAge],
+  );
+
+  useEffect(() => {
+    setCurrentPregnancy(normalizeCurrentPregnancy(null, weeksPregnant, dueDate));
+  }, [weeksPregnant, dueDate]);
+
+  useEffect(() => {
+    if (activeMode === ACTIVE_MODES.PREGNANT) return;
+    if (!String(babyAge || '').trim()) return;
+    setChildren((prev) => {
+      if (!prev.length) return [createChildEntry({ ageLabel: babyAge })];
+      const next = [...prev];
+      next[0] = { ...next[0], ageLabel: babyAge };
+      return next;
+    });
+  }, [babyAge, activeMode]);
   const [nurseryLogs, setNurseryLogs] = useState([]);
   const [nurseryPerspective, setNurseryPerspective] = useState('baby');
   const [hydrationOz, setHydrationOz] = useState(0);
@@ -2646,6 +2712,10 @@ function CalmMamaApp() {
             setWeeksPregnant,
             setDueDate,
             setBabyAge,
+            setCurrentPregnancy,
+            setChildren,
+            setActiveMode,
+            setHomeTrack,
             setMamaBirthday,
             setApproximateCity,
             setUsState,
@@ -2730,10 +2800,14 @@ function CalmMamaApp() {
       saveVillageProfile(
         buildProfileSnapshot({
           mamaName,
-          userJourney,
+          userJourney: activeMode === ACTIVE_MODES.HYBRID ? ACTIVE_MODES.HYBRID : userJourney,
           weeksPregnant,
           dueDate,
           babyAge,
+          currentPregnancy,
+          children,
+          activeMode,
+          homeTrack,
           mamaBirthday,
           approximateCity,
           usState,
@@ -2751,6 +2825,10 @@ function CalmMamaApp() {
     weeksPregnant,
     dueDate,
     babyAge,
+    currentPregnancy,
+    children,
+    activeMode,
+    homeTrack,
     mamaBirthday,
     approximateCity,
     usState,
@@ -3449,6 +3527,10 @@ function CalmMamaApp() {
             setCandleSanctumOpen(false);
             setActiveTab('home');
             setUserJourney('pregnant');
+            setActiveMode(ACTIVE_MODES.PREGNANT);
+            setHomeTrack(HOME_TRACKS.PREGNANT);
+            setCurrentPregnancy({ weeksPregnant: '24', dueDate: '' });
+            setChildren([]);
             setMamaName('Mama');
             setMamaBirthday(null);
             setMamaDiscovery(DEFAULT_MAMA_DISCOVERY);
@@ -4010,11 +4092,53 @@ function CalmMamaApp() {
     ]);
   };
 
+  const handleSelectOnboardingJourney = useCallback((journey) => {
+    if (journey === 'hybrid') {
+      setActiveMode(ACTIVE_MODES.HYBRID);
+      setUserJourney(ACTIVE_MODES.HYBRID);
+      setHomeTrack(HOME_TRACKS.PREGNANT);
+      setCurrentPregnancy(normalizeCurrentPregnancy(null, weeksPregnant || '24', dueDate));
+      const childAge =
+        babyAge && babyAge !== 'Newborn' ? babyAge : '12-24 months';
+      setBabyAge(childAge);
+      setChildren([createChildEntry({ ageLabel: childAge })]);
+      return;
+    }
+    if (journey === 'pregnant') {
+      setActiveMode(ACTIVE_MODES.PREGNANT);
+      setUserJourney('pregnant');
+      setHomeTrack(HOME_TRACKS.PREGNANT);
+      setCurrentPregnancy(normalizeCurrentPregnancy(null, weeksPregnant || '24', dueDate));
+      setChildren([]);
+      return;
+    }
+    setActiveMode(ACTIVE_MODES.POSTPARTUM);
+    setUserJourney('postpartum');
+    setHomeTrack(HOME_TRACKS.TODDLER);
+    setChildren(normalizeChildren([], babyAge || 'Newborn'));
+  }, [weeksPregnant, dueDate, babyAge]);
+
+  const handleHomeTrackChange = useCallback((track) => {
+    setHomeTrack(track);
+  }, []);
+
   const handleGraduationSwitch = () => {
     setBirthPromptOpen(false);
-    setUserJourney('postpartum');
-    setActiveTab('nursery');
+    const newborn = createChildEntry({ ageLabel: 'Newborn', stage: 'infant' });
+    setChildren((prev) => {
+      const withoutDup = (prev || []).filter(
+        (child) => String(child.ageLabel).toLowerCase() !== 'newborn',
+      );
+      return [newborn, ...withoutDup];
+    });
     setBabyAge('Newborn');
+    setCurrentPregnancy(null);
+    setWeeksPregnant('');
+    setDueDate('');
+    setActiveMode(ACTIVE_MODES.POSTPARTUM);
+    setUserJourney('postpartum');
+    setHomeTrack(HOME_TRACKS.TODDLER);
+    setActiveTab('nursery');
     Alert.alert(
       '🌟 Welcome to Postpartum',
       'Your Cloud Nursery tracker is now live. We are so glad you and baby are here.'
@@ -4064,10 +4188,14 @@ function CalmMamaApp() {
 
     const profile = buildProfileSnapshot({
       mamaName,
-      userJourney,
+      userJourney: activeMode === ACTIVE_MODES.HYBRID ? ACTIVE_MODES.HYBRID : userJourney,
       weeksPregnant,
       dueDate,
       babyAge,
+      currentPregnancy,
+      children,
+      activeMode,
+      homeTrack,
       mamaBirthday,
       approximateCity,
       usState,
@@ -4116,7 +4244,10 @@ function CalmMamaApp() {
 
   const mainTabContentProps = useMemo(
     () => ({
-      userJourney,
+      userJourney: effectiveJourney,
+      activeMode,
+      homeTrack,
+      onHomeTrackChange: handleHomeTrackChange,
       mamaName,
       weeksPregnant,
       dueDate,
@@ -4181,7 +4312,10 @@ function CalmMamaApp() {
       onOpenSubscription: handleOpenSubscription,
     }),
     [
-      userJourney,
+      effectiveJourney,
+      activeMode,
+      homeTrack,
+      handleHomeTrackChange,
       mamaName,
       weeksPregnant,
       dueDate,
@@ -4241,7 +4375,7 @@ function CalmMamaApp() {
   const edgeToEdgePregnantShell =
     !inVillagePortal &&
     !inMidnightLounge &&
-    userJourney === 'pregnant' &&
+    effectiveJourney === 'pregnant' &&
     isOnboarded;
 
   return (
@@ -4268,7 +4402,7 @@ function CalmMamaApp() {
             >
               <MainTabShell
                 activeTab={activeTab}
-                userJourney={userJourney}
+                userJourney={effectiveJourney}
                 mainTabContentProps={mainTabContentProps}
                 flowAnim={flowAnim}
                 pulseAnim={pulseAnim}
@@ -4505,8 +4639,10 @@ function CalmMamaApp() {
                     onExit={handleCloseMidnightLounge}
                     initialTab={loungeFocusTab}
                     focusToken={loungeFocusToken}
-                    userJourney={userJourney}
-                    postpartumLotusOpen={userJourney === 'postpartum' && inMidnightLounge}
+                    userJourney={effectiveJourney}
+                    activeMode={activeMode}
+                    onSelectJourneyMode={handleSelectOnboardingJourney}
+                    postpartumLotusOpen={effectiveJourney === 'postpartum' && inMidnightLounge}
                     mamaName={mamaName}
                     onMamaNameChange={setMamaName}
                     shortBio={mamaDiscovery?.heartSpace || ''}
@@ -4531,6 +4667,7 @@ function CalmMamaApp() {
                     }
                     isSubscribed={isSubscribed}
                     onRequestUpgrade={handleReleaseUpgradePrompt}
+                    journeyContext={sanctuaryJourneyContext}
                     renderVillagePortal={({ onClose }) => (
                       <VillageCommunityPortal
                         villageLogoUri={CALMMAMA_OFFICIAL_LOGO}
@@ -4596,7 +4733,7 @@ function CalmMamaApp() {
                 ) : null}
                 <AppBottomTabBar
                   activeTab={activeTab}
-                  userJourney={userJourney}
+                  userJourney={effectiveJourney}
                   bottomNavStyle={bottomNavStyle}
                   midnightLoungeOpen={inMidnightLounge}
                   onTabPress={runTabTransition}
@@ -4623,7 +4760,7 @@ function CalmMamaApp() {
                       logoUri={CALMMAMA_VILLAGE_BADGE}
                       pulseAnim={pulseAnim}
                       userJourney={userJourney}
-                      onSelectJourney={setUserJourney}
+                      onSelectJourney={handleSelectOnboardingJourney}
                       mamaName={mamaName}
                       onMamaNameChange={setMamaName}
                       weeksPregnant={weeksPregnant}

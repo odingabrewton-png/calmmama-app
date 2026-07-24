@@ -41,7 +41,16 @@ export function showsLittleBitesKitchen(babyAge) {
   return parseBabyAgeMonths(babyAge) >= 10;
 }
 
-export function getHomeJourneyPhase(userJourney, babyAge) {
+export function getHomeJourneyPhase(userJourney, babyAge, options = {}) {
+  const { activeMode, homeTrack } = options || {};
+
+  // Hybrid mamas: Home pills choose pregnancy vs little-one track without wiping data.
+  if (activeMode === 'hybrid' || userJourney === 'hybrid') {
+    if (homeTrack === 'pregnant') return 'pregnant';
+    const months = parseBabyAgeMonths(babyAge);
+    return months >= 12 ? 'toddler' : 'infant';
+  }
+
   if (userJourney === 'pregnant') return 'pregnant';
   const months = parseBabyAgeMonths(babyAge);
   if (months >= 12) return 'toddler';
