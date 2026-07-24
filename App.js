@@ -129,15 +129,18 @@ function consumeSanctuaryJournalDeepLink() {
     const params = new URLSearchParams(window.location?.search || '');
     const wantsSanctuary =
       params.get('sanctuary') === '1' || params.get('emailPrompt') === '1';
-    if (!wantsSanctuary) return null;
+    const wantsRewards = params.get('rewards') === '1';
+    if (!wantsSanctuary && !wantsRewards) return null;
 
     const prompt = String(params.get('journalPrompt') || '').trim();
     const stage = normalizeJournalStage(params.get('stage') || 'pregnant');
 
     const next = new URL(window.location.href);
-    ['sanctuary', 'emailPrompt', 'journalPrompt', 'stage', 'promptId', 'pts'].forEach((key) => {
-      next.searchParams.delete(key);
-    });
+    ['sanctuary', 'emailPrompt', 'journalPrompt', 'stage', 'promptId', 'pts', 'rewards'].forEach(
+      (key) => {
+        next.searchParams.delete(key);
+      },
+    );
     const search = next.searchParams.toString();
     window.history.replaceState(
       {},
@@ -145,7 +148,7 @@ function consumeSanctuaryJournalDeepLink() {
       `${next.pathname}${search ? `?${search}` : ''}`,
     );
 
-    return { prompt, stage };
+    return { prompt, stage, openRewards: wantsRewards, openJournal: wantsSanctuary };
   } catch (_) {
     return null;
   }
@@ -4160,15 +4163,19 @@ function CalmMamaApp() {
       setActiveMode(ACTIVE_MODES.POSTPARTUM);
       setUserJourney('postpartum');
       setHomeTrack(HOME_TRACKS.TODDLER);
-    } else {
+    } else if (deep.openJournal) {
       setActiveMode(ACTIVE_MODES.PREGNANT);
       setUserJourney('pregnant');
       setHomeTrack(HOME_TRACKS.PREGNANT);
     }
 
     const timer = setTimeout(() => {
+      if (deep.openRewards) {
+        handleOpenMidnightLounge({ tab: 'profile' });
+        return;
+      }
       handleOpenMidnightLounge({
-        openJournal: true,
+        openJournal: Boolean(deep.openJournal),
         journalPrompt: deep.prompt || '',
       });
     }, 420);

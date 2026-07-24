@@ -15,6 +15,10 @@ const {
   buildJournalDeepLink,
   normalizeJournalStage,
 } = require('./sanctuaryJournalPrompts');
+const {
+  buildStageContentBlocks,
+  getNextTierProgress,
+} = require('./newsletterStageContent');
 
 const WEEKLY_SUBJECT = 'Your Weekly Village Reflection & Affirmation 🌸';
 const APP_URL = APP_ACCESS_URL || 'https://calmmamavillage.com/app';
@@ -42,8 +46,118 @@ function stageLabel(stage) {
   return 'Pregnancy';
 }
 
+function mapNewsletterRecipient(row) {
+  const props = row?.properties || {};
+  return {
+    email: String(row.email || '')
+      .trim()
+      .toLowerCase(),
+    firstName: row.first_name || row.firstName || '',
+    journey: props.mama_journey || props.journey || row.mama_journey || '',
+    weeksPregnant: props.weeks_pregnant || props.weeksPregnant || row.weeks_pregnant || '',
+    babyAge: props.baby_age || props.babyAge || row.baby_age || '',
+    points: Number(props.village_points ?? props.points ?? row.village_points ?? 0) || 0,
+  };
+}
+
 function pickWeeklyReflection(date = new Date(), stage = 'pregnant') {
   return pickEmailWeeklyPrompt(stage, date);
+}
+
+function buildAppDeepLink(extraParams = {}) {
+  try {
+    const url = new URL(APP_URL);
+    Object.entries(extraParams).forEach(([key, value]) => {
+      if (value != null && value !== '') url.searchParams.set(key, String(value));
+    });
+    return url.toString();
+  } catch (_) {
+    return APP_URL;
+  }
+}
+
+function buildStageSectionsHtml(blocks = []) {
+  if (!blocks.length) return '';
+  return blocks
+    .map((block) => {
+      const cta =
+        block.ctaUrl && block.ctaLabel
+          ? `<p style="margin: 14px 0 0 0; text-align: center;">
+              <a href="${String(block.ctaUrl).replace(/"/g, '&quot;')}" target="_blank" style="color: #8A63BE; font-weight: 700; font-size: 14px; text-decoration: underline;">
+                ${escapeHtml(block.ctaLabel)}
+              </a>
+            </p>`
+          : '';
+      return `
+          <tr>
+            <td align="left" style="padding-top: 14px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#FFF9FC" style="background-color: #FFF9FC; border-radius: 16px; border: 1px solid #F0E6F8;">
+                <tr>
+                  <td style="padding: 16px 16px 14px 16px;">
+                    <p style="color: #A493B8; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px 0; text-align: center;">
+                      ${escapeHtml(block.eyebrow)}
+                    </p>
+                    <p style="color: #4A3B5C; font-size: 16px; font-weight: 700; margin: 0 0 8px 0; text-align: center;">
+                      ${escapeHtml(block.title)}
+                    </p>
+                    <p style="color: #7D6B91; font-size: 14px; line-height: 1.6; margin: 0; text-align: center;">
+                      ${escapeHtml(block.body)}
+                    </p>
+                    ${cta}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+    })
+    .join('');
+}
+
+function buildRewardsFooterHtml({ points = 0, appUrl = APP_URL } = {}) {
+  const progress = getNextTierProgress(points);
+  const pct = Math.round((progress.progress || 0) * 100);
+  const filled = Math.max(0, Math.min(100, pct));
+  const empty = 100 - filled;
+  const pointsLabel = Number(points || 0).toLocaleString();
+  const nextLine = progress.nextTier
+    ? `${progress.pointsToNext} pts to ${progress.nextTitle} · ${progress.nextPerk}`
+    : `You have unlocked every merch reward tier — ${progress.nextPerk}`;
+  const rewardsUrl = String(buildAppDeepLink({ rewards: '1' }) || appUrl).replace(/"/g, '&quot;');
+
+  return `
+          <tr>
+            <td align="left" style="padding-top: 22px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#4A3B5C" style="background-color: #4A3B5C; border-radius: 18px;">
+                <tr>
+                  <td style="padding: 20px 18px;">
+                    <p style="color: #E8DFF5; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 8px 0; text-align: center;">
+                      Village Rewards
+                    </p>
+                    <p style="color: #FFFFFF; font-size: 22px; font-weight: 700; margin: 0 0 6px 0; text-align: center;">
+                      ${pointsLabel} pts
+                    </p>
+                    <p style="color: #D7C8EA; font-size: 13px; line-height: 1.5; margin: 0 0 14px 0; text-align: center;">
+                      ${escapeHtml(nextLine)}
+                    </p>
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-radius: 999px; overflow: hidden;">
+                      <tr>
+                        <td width="${filled}%" bgcolor="#C4A8D8" style="background-color: #C4A8D8; height: 10px; font-size: 0; line-height: 0;">&nbsp;</td>
+                        <td width="${empty}%" bgcolor="#6B5A82" style="background-color: #6B5A82; height: 10px; font-size: 0; line-height: 0;">&nbsp;</td>
+                      </tr>
+                    </table>
+                    <p style="color: #B9A7D0; font-size: 11px; margin: 8px 0 16px 0; text-align: center;">
+                      ${filled}% of the way to your next merch discount tier
+                    </p>
+                    <p style="margin: 0; text-align: center;">
+                      <a href="${rewardsUrl}" target="_blank" style="background-color: #F8F4FC; color: #4A3B5C; text-decoration: none; padding: 12px 22px; border-radius: 99px; font-weight: 700; font-size: 14px; display: inline-block;">
+                        Open Village Rewards in App 🌸
+                      </a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
 }
 
 function buildWeeklyNewsletterHtml({
@@ -53,12 +167,16 @@ function buildWeeklyNewsletterHtml({
   stage = 'pregnant',
   appUrl = APP_URL,
   journalUrl,
+  stageBlocks = [],
+  points = 0,
 } = {}) {
   const name = escapeHtml(String(firstName || '').trim() || 'Mama');
   const safeAffirmation = escapeHtml(affirmation);
   const safePrompt = escapeHtml(prompt);
   const safeStage = escapeHtml(stageLabel(stage));
   const ctaUrl = String(journalUrl || appUrl || APP_URL).replace(/"/g, '&quot;');
+  const stageHtml = buildStageSectionsHtml(stageBlocks);
+  const rewardsHtml = buildRewardsFooterHtml({ points, appUrl });
 
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -117,21 +235,16 @@ function buildWeeklyNewsletterHtml({
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding-top: 28px; padding-bottom: 12px;">
+            <td align="center" style="padding-top: 22px; padding-bottom: 8px;">
               <a href="${ctaUrl}" target="_blank" style="background-color: #8A63BE; color: #ffffff; text-decoration: none; padding: 16px 28px; border-radius: 99px; font-weight: 600; font-size: 15px; display: inline-block;">
                 Journal This Prompt in App (+10 Pts) 🌸
               </a>
             </td>
           </tr>
+          ${stageHtml}
+          ${rewardsHtml}
           <tr>
-            <td align="center" style="padding-bottom: 20px;">
-              <p style="color: #A493B8; font-size: 12px; margin: 0; line-height: 1.5;">
-                Opens Soul Sanctuary with this week’s email prompt ready for you.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="border-top: 1px solid #F2EBF9; padding-top: 20px;">
+            <td align="center" style="border-top: 1px solid #F2EBF9; padding-top: 20px; margin-top: 8px;">
               <p style="color: #A493B8; font-size: 12px; margin: 0; line-height: 1.5;">
                 With warmth & support,<br />
                 <strong style="color: #7D6B91;">The Calm Mama Village Team</strong>
@@ -154,9 +267,29 @@ function buildWeeklyNewsletterText({
   stage = 'pregnant',
   appUrl = APP_URL,
   journalUrl,
+  stageBlocks = [],
+  points = 0,
 } = {}) {
   const name = String(firstName || '').trim() || 'Mama';
   const link = journalUrl || appUrl;
+  const progress = getNextTierProgress(points);
+  const stageLines = (stageBlocks || []).flatMap((block) => [
+    '',
+    `${block.eyebrow}: ${block.title}`,
+    block.body,
+    block.ctaUrl ? `${block.ctaLabel || 'Link'}: ${block.ctaUrl}` : null,
+  ].filter(Boolean));
+
+  const rewardsLines = [
+    '',
+    'Village Rewards',
+    `Your balance: ${Number(points || 0).toLocaleString()} pts`,
+    progress.nextTier
+      ? `${progress.pointsToNext} pts to ${progress.nextTitle} (${progress.nextPerk})`
+      : `All merch tiers unlocked — ${progress.nextPerk}`,
+    `Open Village Rewards: ${buildAppDeepLink({ rewards: '1' })}`,
+  ];
+
   return [
     `Hello, ${name}`,
     '',
@@ -166,6 +299,8 @@ function buildWeeklyNewsletterText({
     prompt,
     '',
     `Journal This Prompt in App (+10 Pts): ${link}`,
+    ...stageLines,
+    ...rewardsLines,
     '',
     'With warmth & support,',
     'The Calm Mama Village Team',
@@ -231,15 +366,7 @@ async function fetchNewsletterRecipients({ apiKey, audienceId } = {}) {
         const rows = Array.isArray(fb.parsed?.data) ? fb.parsed.data : [];
         for (const row of rows) {
           if (row?.email && !row.unsubscribed) {
-            recipients.push({
-              email: String(row.email).trim().toLowerCase(),
-              firstName: row.first_name || row.firstName || '',
-              journey:
-                row.properties?.mama_journey ||
-                row.properties?.journey ||
-                row.mama_journey ||
-                '',
-            });
+            recipients.push(mapNewsletterRecipient(row));
           }
         }
         break;
@@ -255,15 +382,7 @@ async function fetchNewsletterRecipients({ apiKey, audienceId } = {}) {
     const rows = Array.isArray(parsed?.data) ? parsed.data : [];
     for (const row of rows) {
       if (row?.email && !row.unsubscribed) {
-        recipients.push({
-          email: String(row.email).trim().toLowerCase(),
-          firstName: row.first_name || row.firstName || '',
-          journey:
-            row.properties?.mama_journey ||
-            row.properties?.journey ||
-            row.mama_journey ||
-            '',
-        });
+        recipients.push(mapNewsletterRecipient(row));
       }
     }
 
@@ -309,6 +428,14 @@ async function sendWeeklyEmailToRecipient({
     stage: weekly.stage,
     promptId: weekly.id,
   });
+  const weekSeed = isoWeekNumber(new Date());
+  const stageBlocks = buildStageContentBlocks({
+    stage: weekly.stage,
+    weeksPregnant: recipient.weeksPregnant || '24',
+    babyAge: recipient.babyAge || 'Newborn',
+    weekSeed,
+  });
+  const points = Math.max(0, Number(recipient.points) || 0);
 
   const html = buildWeeklyNewsletterHtml({
     firstName: recipient.firstName,
@@ -316,6 +443,8 @@ async function sendWeeklyEmailToRecipient({
     prompt: weekly.prompt,
     stage: weekly.stage,
     journalUrl,
+    stageBlocks,
+    points,
   });
   const text = buildWeeklyNewsletterText({
     firstName: recipient.firstName,
@@ -323,6 +452,8 @@ async function sendWeeklyEmailToRecipient({
     prompt: weekly.prompt,
     stage: weekly.stage,
     journalUrl,
+    stageBlocks,
+    points,
   });
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -478,6 +609,12 @@ async function sendAdminTestNewsletter({
     stage: reflection.stage,
     promptId: reflection.id,
   });
+  const stageBlocks = buildStageContentBlocks({
+    stage: reflection.stage,
+    weeksPregnant: '24',
+    babyAge: '12-24 months',
+    weekSeed: isoWeekNumber(new Date()),
+  });
 
   const html = buildWeeklyNewsletterHtml({
     firstName: firstName || 'Admin',
@@ -485,6 +622,8 @@ async function sendAdminTestNewsletter({
     prompt: reflection.prompt,
     stage: reflection.stage,
     journalUrl,
+    stageBlocks,
+    points: 240,
   });
   const text = buildWeeklyNewsletterText({
     firstName: firstName || 'Admin',
@@ -492,6 +631,8 @@ async function sendAdminTestNewsletter({
     prompt: reflection.prompt,
     stage: reflection.stage,
     journalUrl,
+    stageBlocks,
+    points: 240,
   });
 
   const response = await fetch('https://api.resend.com/emails', {
