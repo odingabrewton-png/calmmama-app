@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking, Platform } from 'react-native';
+import { buildAdminUser } from './adminAccess';
 
 export const MEMBERSHIP_TIERS = Object.freeze({
   FREE_EXPLORER: 'free_explorer',
@@ -154,14 +155,17 @@ export async function saveMembershipProfile(profile) {
   const isPro = Boolean(
     profile?.isPro || profile?.isSubscribed || isPremiumTier(profile?.tier) || isVip,
   );
+  const adminIdentity = buildAdminUser({ email: profile?.email, role: profile?.role });
   const next = {
     tier: profile?.tier || (isVip ? MEMBERSHIP_TIERS.VIP_LIFETIME : MEMBERSHIP_TIERS.FREE_EXPLORER),
-    email: String(profile?.email || '').trim().toLowerCase() || null,
+    email: adminIdentity.email,
+    role: adminIdentity.role,
     planId,
     subscriptionPlan: profile?.subscriptionPlan ?? planId,
     isPro,
     isSubscribed: Boolean(profile?.isSubscribed || isPro),
     promoCode: profile?.promoCode ? normalizeVipPromoCode(profile.promoCode) : null,
+    adminTest: Boolean(profile?.adminTest),
     updatedAt: new Date().toISOString(),
   };
   writeWebJson(STORAGE_KEY, next);

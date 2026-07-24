@@ -409,6 +409,83 @@ async function runWeeklyNewsletter({
 }
 
 /**
+ * Send a single admin smoke-test newsletter.
+ * Never touches the public audience list / analytics.
+ */
+async function sendAdminTestNewsletter({
+  to,
+  firstName = 'Admin',
+  apiKey,
+  from,
+} = {}) {
+  const email = String(to || '')
+    .trim()
+    .toLowerCase();
+  if (!email) {
+    return { ok: false, error: 'missing recipient email', adminTest: true };
+  }
+
+  const reflection = pickWeeklyReflection(new Date());
+  const key = resolveResendApiKey(apiKey);
+  if (!key) {
+    return { ok: false, error: 'Resend API key not configured', adminTest: true };
+  }
+
+  const html = buildWeeklyNewsletterHtml({
+    firstName: firstName || 'Admin',
+    affirmation: reflection.affirmation,
+    prompt: reflection.prompt,
+  });
+  const text = buildWeeklyNewsletterText({
+    firstName: firstName || 'Admin',
+    affirmation: reflection.affirmation,
+    prompt: reflection.prompt,
+  });
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: String(from || DEFAULT_FROM),
+      to: email,
+      subject: `[ADMIN TEST] ${WEEKLY_SUBJECT}`,
+      html,
+      text,
+      tags: [
+        { name: 'admin_test', value: 'true' },
+        { name: 'isolate_analytics', value: 'true' },
+      ],
+      headers: {
+        'X-Entity-Ref-ID': `admin-test-${Date.now()}`,
+      },
+    }),
+  });
+
+  const { raw, parsed } = await parseJsonResponse(response);
+  if (!response.ok) {
+    return {
+      ok: false,
+      adminTest: true,
+      email,
+      error: parsed?.message || raw || `HTTP ${response.status}`,
+      reflection,
+    };
+  }
+
+  return {
+    ok: true,
+    adminTest: true,
+    email,
+    id: parsed?.id || null,
+    reflection,
+    isolated: true,
+  };
+}
+
+/**
  * Authorize Vercel Cron (or manual) callers via CRON_SECRET bearer token.
  */
 function assertCronAuthorized(req) {
@@ -436,5 +513,6 @@ module.exports = {
   buildWeeklyNewsletterText,
   fetchNewsletterRecipients,
   runWeeklyNewsletter,
+  sendAdminTestNewsletter,
   assertCronAuthorized,
 };

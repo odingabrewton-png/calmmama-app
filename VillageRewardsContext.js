@@ -25,6 +25,7 @@ const VillageRewardsContext = createContext({
   rewards: createDefaultVillageRewards(),
   hydrated: false,
   addPoints: async () => ({ awarded: false }),
+  grantTestPoints: async () => ({ awarded: false }),
   resetRewards: async () => {},
 });
 
@@ -87,11 +88,33 @@ export function VillageRewardsProvider({ children }) {
     return result;
   }, [showToast]);
 
+  const grantTestPoints = useCallback(
+    async (amount) => {
+      const result = applyAddPoints(
+        rewardsRef.current,
+        Math.max(0, Number(amount) || 0),
+        'adminTestGrant',
+      );
+      if (!result.awarded) return result;
+      rewardsRef.current = result.rewards;
+      setRewards(result.rewards);
+      showToast(result.toastMessage);
+      try {
+        await saveVillageRewards(result.rewards);
+      } catch (_) {
+        /* ignore */
+      }
+      return { ...result, adminTest: true, message: result.toastMessage };
+    },
+    [showToast],
+  );
+
   const resetRewards = useCallback(async () => {
     const fresh = createDefaultVillageRewards();
     rewardsRef.current = fresh;
     setRewards(fresh);
     await clearVillageRewards();
+    return { ok: true, adminTest: true, message: 'Test points reset' };
   }, []);
 
   const value = useMemo(
@@ -99,9 +122,10 @@ export function VillageRewardsProvider({ children }) {
       rewards,
       hydrated,
       addPoints,
+      grantTestPoints,
       resetRewards,
     }),
-    [rewards, hydrated, addPoints, resetRewards],
+    [rewards, hydrated, addPoints, grantTestPoints, resetRewards],
   );
 
   return (

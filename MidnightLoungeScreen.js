@@ -515,6 +515,15 @@ function MidnightLoungeScreen({
   onPickProfilePhoto,
   onOpenVillagePortal,
   onDeleteAccount,
+  adminUser = null,
+  accountEmail = '',
+  onAccountEmailChange,
+  isVipLifetime = false,
+  onToggleVipLifetime,
+  onSendTestNewsletter,
+  onGrantTestPoints,
+  onResetTestPoints,
+  currentPoints = 0,
   ventingHistory = [],
   onAppendVentingEntry,
   guidanceHistory = [],
@@ -1078,6 +1087,15 @@ function MidnightLoungeScreen({
             onDeleteAccount={onDeleteAccount}
             activeMode={activeMode}
             onSelectJourneyMode={onSelectJourneyMode}
+            adminUser={adminUser}
+            accountEmail={accountEmail}
+            onAccountEmailChange={onAccountEmailChange}
+            isVipLifetime={isVipLifetime}
+            onToggleVipLifetime={onToggleVipLifetime}
+            onSendTestNewsletter={onSendTestNewsletter}
+            onGrantTestPoints={onGrantTestPoints}
+            onResetTestPoints={onResetTestPoints}
+            currentPoints={currentPoints}
           />
         );
       case 'feed':

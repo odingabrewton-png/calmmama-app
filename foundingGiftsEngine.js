@@ -1,11 +1,22 @@
 import { Platform } from 'react-native';
 import { FOUNDING_GIFTS_CAP } from './foundingGiftsConfig';
+import { isAdmin, loadAdminSession, shouldIsolateAdminAnalytics } from './adminAccess';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const LOCAL_COUNT_KEY = 'calmmama_founding_gifts_count';
 const LOCAL_CLAIMED_KEY = 'calmmama_founding_gifts_user_claimed';
+const ADMIN_LOCAL_CLAIMED_KEY = 'calmmama_founding_gifts_admin_test_claimed';
 
 let memoryClaimCount = 0;
+
+async function isAdminSandboxActive(user) {
+  try {
+    const session = await loadAdminSession();
+    return shouldIsolateAdminAnalytics(session, user);
+  } catch (_) {
+    return false;
+  }
+}
 
 function readLocal(key) {
   if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
@@ -64,7 +75,16 @@ export async function fetchFoundingGiftsClaimCount() {
   return getLocalClaimCount();
 }
 
-export async function submitFoundingGiftClaim({ mamaName, email } = {}) {
+export async function submitFoundingGiftClaim({ mamaName, email, user } = {}) {
+  const adminUser = user || { email };
+  if (await isAdminSandboxActive(adminUser) || isAdmin(adminUser)) {
+    // Device-only claim — does not increment public founding gift analytics.
+    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+      localStorage.setItem(ADMIN_LOCAL_CLAIMED_KEY, '1');
+    }
+    return getLocalClaimCount();
+  }
+
   if (API_BASE) {
     const res = await fetch(`${API_BASE}/api/founding-gifts/claim`, {
       method: 'POST',

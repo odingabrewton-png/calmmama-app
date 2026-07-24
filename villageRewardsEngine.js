@@ -44,6 +44,7 @@ export const REWARD_POINT_VALUES = {
   encourage: 25,
   subscriptionUpgrade: 250,
   vipPromo: 500,
+  adminTestGrant: 500,
 };
 
 export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
@@ -52,6 +53,7 @@ export const WEEKLY_JOURNAL_BONUS_TOAST =
 export const DAILY_CHECKLIST_TOAST = 'Daily Care List Complete! +5 pts 🌸';
 export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium Upgrade Bonus! +250 pts 🌸👑';
 export const VIP_PROMO_TOAST = 'VIP Welcome Bonus! +500 pts 🌸👑';
+export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated 🧪';
 
 export function createDefaultVillageRewards() {
   return {
@@ -421,6 +423,11 @@ export function applyAddPoints(rewards, amount, actionKey) {
     return finishAward(current, actions, awardAmount, {
       toastMessage: VIP_PROMO_TOAST,
     });
+  } else if (key === 'adminTestGrant') {
+    // Uncapped sandbox grant — never used for public analytics funnels.
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: `Admin test +${awardAmount} pts 🧪`,
+    });
   } else if (key === 'encourage') {
     if (actions.dailyEncourageDate !== today) {
       actions.dailyEncourageDate = today;
@@ -453,6 +460,31 @@ export function applyAddPoints(rewards, amount, actionKey) {
   }
 
   return finishAward(current, actions, awardAmount);
+}
+
+/** Admin sandbox: set absolute points without public analytics side effects. */
+export function applyAdminSetPoints(rewards, points) {
+  const current = normalizeVillageRewards(rewards);
+  const nextPoints = Math.max(0, Number(points) || 0);
+  const { unlockedBadges, newlyUnlocked } = syncUnlockedBadges(
+    nextPoints,
+    current.unlockedBadges,
+  );
+  return {
+    awarded: true,
+    amount: nextPoints - current.points,
+    reason: 'admin_sandbox',
+    rewards: {
+      ...current,
+      points: nextPoints,
+      unlockedBadges,
+    },
+    newlyUnlocked,
+    toastMessage: ADMIN_TEST_POINTS_TOAST,
+    bonusToastMessage: null,
+    bonusAmount: 0,
+    adminTest: true,
+  };
 }
 
 export function getBadgeMeta(badgeId) {

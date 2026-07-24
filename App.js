@@ -94,12 +94,20 @@ import {
 } from './subscriptionConfig';
 import {
   MEMBERSHIP_TIERS,
+  VIP_LIFETIME_PLAN,
   VIP_WELCOME_POINTS,
   consumeStripeUpgradeReturn,
   loadMembershipProfile,
+  membershipFromPlanId,
   openStripeCheckout,
   saveMembershipProfile,
 } from './membershipAccess';
+import {
+  ADMIN_EMAIL,
+  buildAdminUser,
+  isAdmin,
+  saveAdminSession,
+} from './adminAccess';
 import LotusFlowerButton from './LotusFlowerButton';
 
 import MidnightLoungeScreen from './MidnightLoungeScreen'; // layout locked — midnightLoungeLayoutConfig.js
@@ -2405,7 +2413,7 @@ export default function App() {
 }
 
 function CalmMamaApp() {
-  const { resetRewards, addPoints } = useVillageRewards();
+  const { resetRewards, addPoints, grantTestPoints, rewards } = useVillageRewards();
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [bootHydrated, setBootHydrated] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState('intake');
@@ -2415,6 +2423,7 @@ function CalmMamaApp() {
   const [subscriptionProductId, setSubscriptionProductId] = useState(null);
   const [membershipTier, setMembershipTier] = useState(MEMBERSHIP_TIERS.FREE_EXPLORER);
   const [memberEmail, setMemberEmail] = useState(null);
+  const [memberRole, setMemberRole] = useState('member');
   const [upgradeSheetOpen, setUpgradeSheetOpen] = useState(false);
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [premiumWelcomeOpen, setPremiumWelcomeOpen] = useState(false);
@@ -2559,15 +2568,129 @@ function CalmMamaApp() {
   const applyMembership = useCallback((profile) => {
     if (!profile) return;
     setMembershipTier(profile.tier || MEMBERSHIP_TIERS.FREE_EXPLORER);
-    setMemberEmail(profile.email || null);
+    const user = buildAdminUser({ email: profile.email, role: profile.role });
+    setMemberEmail(user.email);
+    setMemberRole(user.role);
     const nextIsPro = Boolean(profile.isPro || profile.isSubscribed);
     setIsPro(nextIsPro);
     const plan = profile.planId || profile.subscriptionPlan;
     if (plan) {
       setUserSubscriptionType(plan);
       setSubscriptionProductId(getSubscriptionProductId(plan));
+    } else if (profile.isPro === false || profile.isSubscribed === false) {
+      setUserSubscriptionType(null);
+      setSubscriptionProductId(null);
     }
   }, []);
+
+  const adminUser = useMemo(
+    () => buildAdminUser({ email: memberEmail, role: memberRole }),
+    [memberEmail, memberRole],
+  );
+
+  const isVipLifetime =
+    userSubscriptionType === VIP_LIFETIME_PLAN ||
+    membershipTier === MEMBERSHIP_TIERS.VIP_LIFETIME;
+
+  const handleAccountEmailChange = useCallback(async (email) => {
+    const user = buildAdminUser({ email });
+    setMemberEmail(user.email);
+    setMemberRole(user.role);
+    try {
+      const existing = (await loadMembershipProfile()) || {};
+      await saveMembershipProfile({
+        ...existing,
+        email: user.email,
+        role: user.role,
+      });
+      if (isAdmin(user)) {
+        await saveAdminSession({ sandbox: true });
+      }
+    } catch (_) {
+      /* non-blocking */
+    }
+  }, []);
+
+  const handleSendTestNewsletter = useCallback(async () => {
+    if (!isAdmin(adminUser)) {
+      return { ok: false, error: 'Not authorized' };
+    }
+    await saveAdminSession({ sandbox: true });
+    try {
+      const res = await fetch('/api/admin/test-newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: ADMIN_EMAIL,
+          firstName: mamaName || 'Admin',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { ok: false, error: data.error || 'Failed to send test newsletter' };
+      }
+      return {
+        ok: true,
+        message: `Test newsletter sent to ${ADMIN_EMAIL} (analytics excluded)`,
+      };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Network error' };
+    }
+  }, [adminUser, mamaName]);
+
+  const handleGrantTestPoints = useCallback(
+    async (amount) => {
+      if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+      await saveAdminSession({ sandbox: true });
+      const result = await grantTestPoints(amount);
+      return {
+        ok: Boolean(result?.awarded),
+        message: result?.message || `Granted ${amount} test points`,
+        adminTest: true,
+      };
+    },
+    [adminUser, grantTestPoints],
+  );
+
+  const handleResetTestPoints = useCallback(async () => {
+    if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+    await saveAdminSession({ sandbox: true });
+    await resetRewards();
+    return { ok: true, message: 'Test points reset (sandbox)' };
+  }, [adminUser, resetRewards]);
+
+  const handleToggleVipLifetime = useCallback(
+    async (enabled) => {
+      if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+      await saveAdminSession({ sandbox: true });
+      if (enabled) {
+        const saved = await saveMembershipProfile({
+          ...membershipFromPlanId(VIP_LIFETIME_PLAN),
+          email: adminUser.email,
+          role: adminUser.role,
+          adminTest: true,
+        });
+        applyMembership(saved);
+        return { ok: true, message: 'VIP lifetime ON (device sandbox)' };
+      }
+      const saved = await saveMembershipProfile({
+        tier: MEMBERSHIP_TIERS.FREE_EXPLORER,
+        planId: null,
+        subscriptionPlan: null,
+        isPro: false,
+        isSubscribed: false,
+        email: adminUser.email,
+        role: adminUser.role,
+        adminTest: true,
+      });
+      applyMembership(saved);
+      setIsPro(false);
+      setUserSubscriptionType(null);
+      setSubscriptionProductId(null);
+      return { ok: true, message: 'VIP lifetime OFF' };
+    },
+    [adminUser, applyMembership],
+  );
 
   const handleVipRedeemed = useCallback(
     (membership) => {
@@ -3556,6 +3679,12 @@ function CalmMamaApp() {
             setChildren([]);
             setMamaName('Mama');
             setMamaBirthday(null);
+            setMemberEmail(null);
+            setMemberRole('member');
+            setIsPro(false);
+            setUserSubscriptionType(null);
+            setSubscriptionProductId(null);
+            setMembershipTier(MEMBERSHIP_TIERS.FREE_EXPLORER);
             setMamaDiscovery(DEFAULT_MAMA_DISCOVERY);
             setGuidanceHistory([]);
             setVentingHistory([]);
@@ -3877,6 +4006,7 @@ function CalmMamaApp() {
       const nextCount = await submitFoundingGiftClaim({
         mamaName,
         email: checkoutEmail,
+        user: adminUser,
       });
       setFoundingGiftsClaimCount(nextCount);
       setFoundingGiftsUserClaimed(true);
@@ -3891,6 +4021,7 @@ function CalmMamaApp() {
       setFoundingGiftsClaiming(false);
     }
   }, [
+    adminUser,
     checkoutEmail,
     foundingGiftsClaimCount,
     foundingGiftsUserClaimed,
@@ -4677,6 +4808,15 @@ function CalmMamaApp() {
                     onPickProfilePhoto={handlePickProfilePhoto}
                     onOpenVillagePortal={handleOpenVillagePortal}
                     onDeleteAccount={handleDestroyAccount}
+                    adminUser={adminUser}
+                    accountEmail={memberEmail || ''}
+                    onAccountEmailChange={handleAccountEmailChange}
+                    isVipLifetime={isVipLifetime}
+                    onToggleVipLifetime={handleToggleVipLifetime}
+                    onSendTestNewsletter={handleSendTestNewsletter}
+                    onGrantTestPoints={handleGrantTestPoints}
+                    onResetTestPoints={handleResetTestPoints}
+                    currentPoints={rewards?.points || 0}
                     ventingHistory={ventingHistory}
                     onAppendVentingEntry={(entry) =>
                       setVentingHistory((prev) =>

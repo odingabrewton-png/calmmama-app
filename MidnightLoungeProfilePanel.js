@@ -12,6 +12,8 @@ import {
 import { MIDNIGHT } from './midnightLoungeTheme';
 import MamaBirthdayField from './MamaBirthdayField.js';
 import VillageRewardsCard from './VillageRewardsCard.js';
+import AdminPortalPanel from './AdminPortalPanel.js';
+import { isAdmin } from './adminAccess.js';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -78,10 +80,20 @@ function MidnightLoungeProfilePanel({
   onSave,
   activeMode = 'pregnant',
   onSelectJourneyMode,
+  adminUser = null,
+  accountEmail = '',
+  onAccountEmailChange,
+  isVipLifetime = false,
+  onToggleVipLifetime,
+  onSendTestNewsletter,
+  onGrantTestPoints,
+  onResetTestPoints,
+  currentPoints = 0,
 }) {
   const [nameDraft, setNameDraft] = useState(mamaName || '');
   const [bioDraft, setBioDraft] = useState(shortBio || '');
   const [savedFlash, setSavedFlash] = useState(false);
+  const showAdminPortal = isAdmin(adminUser);
 
   useEffect(() => {
     setNameDraft(mamaName || '');
@@ -150,6 +162,18 @@ function MidnightLoungeProfilePanel({
         variant="midnight"
       />
 
+      <Text style={[styles.fieldLabel, SANS]}>Account email</Text>
+      <TextInput
+        style={[styles.fieldInput, SANS]}
+        value={accountEmail || ''}
+        onChangeText={onAccountEmailChange}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        placeholder="Used for membership & village mail"
+        placeholderTextColor={MIDNIGHT.textMuted}
+      />
+
       <Text style={[styles.fieldLabel, SANS]}>Your village stage</Text>
       <Text style={[styles.stageHint, SANS]}>
         Pregnant and parenting a little one? Choose Both — then use the Home pills to switch tracks.
@@ -187,6 +211,19 @@ function MidnightLoungeProfilePanel({
       </TouchableOpacity>
 
       <VillageRewardsCard />
+
+      {showAdminPortal ? (
+        <AdminPortalPanel
+          accountEmail={accountEmail}
+          onAccountEmailChange={onAccountEmailChange}
+          isVipLifetime={isVipLifetime}
+          onToggleVipLifetime={onToggleVipLifetime}
+          onSendTestNewsletter={onSendTestNewsletter}
+          onGrantTestPoints={onGrantTestPoints}
+          onResetTestPoints={onResetTestPoints}
+          currentPoints={currentPoints}
+        />
+      ) : null}
 
       <VillageBoutiqueBanner onPress={openBoutique} />
 

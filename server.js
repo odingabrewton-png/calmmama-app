@@ -7,7 +7,9 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { sendWelcomeMamaEmail, addResendAudienceContact, resolveResendApiKey } = require('./welcomeEmail');
-const { runWeeklyNewsletter, assertCronAuthorized } = require('./weeklyNewsletter');
+const { runWeeklyNewsletter, sendAdminTestNewsletter, assertCronAuthorized } = require('./weeklyNewsletter');
+
+const ADMIN_EMAIL = 'odingabrewton@gmail.com';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -113,6 +115,43 @@ app.get('/api/weekly-newsletter', async (req, res) => {
   } catch (err) {
     console.warn('[CalmMama] weekly newsletter route error', err?.message || err);
     res.status(500).json({ ok: false, error: 'Unexpected newsletter error' });
+  }
+});
+
+/** Admin sandbox: single test newsletter to allowlisted email only. */
+app.post('/api/admin/test-newsletter', async (req, res) => {
+  const email = String(req.body?.email || '')
+    .trim()
+    .toLowerCase();
+  if (email !== ADMIN_EMAIL) {
+    res.status(403).json({
+      ok: false,
+      error: 'Forbidden — admin allowlist only',
+      adminTest: true,
+    });
+    return;
+  }
+
+  try {
+    const result = await sendAdminTestNewsletter({
+      to: email,
+      firstName: req.body?.firstName || 'Admin',
+      apiKey: resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY),
+      from: process.env.RESEND_FROM || undefined,
+    });
+    const status = result.ok ? 200 : 502;
+    res.status(status).json({
+      ...result,
+      isolated: true,
+      analyticsExcluded: true,
+    });
+  } catch (err) {
+    console.warn('[CalmMama] admin test newsletter error', err?.message || err);
+    res.status(500).json({
+      ok: false,
+      error: 'Unexpected admin newsletter error',
+      adminTest: true,
+    });
   }
 });
 
