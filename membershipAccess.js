@@ -12,12 +12,18 @@ export const MEMBERSHIP_TIERS = Object.freeze({
   FREE_EXPLORER: 'free_explorer',
   GENERAL: 'general',
   FOUNDING40: 'founding40',
+  FOUNDING_MOTHER: 'founding_mother',
   VIP_LIFETIME: 'vip_lifetime',
 });
 
 export const VIP_PROMO_CODES = Object.freeze(['VILLAGEMAMA', 'FOUNDINGQUEEN', 'CALMVIP']);
+export const FOUNDING_MOTHER_CODE = 'FOUNDINGQUEEN';
+export const FOUNDING_MOTHER_PLAN = 'founding_mother';
 export const VIP_LIFETIME_PLAN = 'vip_lifetime';
 export const VIP_ACTIVATED_TOAST = 'VIP Access Activated! Welcome home, Queen 🌸👑';
+export const FOUNDING_MOTHER_WELCOME =
+  'Welcome Founding Mother! Your lifetime access is active 🌸👑';
+export const FOUNDING_MOTHER_CODE_ERROR = "That code isn't quite right. Try again mama!";
 export const VIP_WELCOME_POINTS = 500;
 
 export const STRIPE_LINKS = Object.freeze({
@@ -79,8 +85,13 @@ export function isPremiumTier(tier) {
   return (
     tier === MEMBERSHIP_TIERS.GENERAL ||
     tier === MEMBERSHIP_TIERS.FOUNDING40 ||
+    tier === MEMBERSHIP_TIERS.FOUNDING_MOTHER ||
     tier === MEMBERSHIP_TIERS.VIP_LIFETIME
   );
+}
+
+export function isFoundingMotherCode(raw) {
+  return normalizeVipPromoCode(raw) === FOUNDING_MOTHER_CODE;
 }
 
 export function normalizeVipPromoCode(raw) {
@@ -105,6 +116,17 @@ export function membershipFromPlanId(planId) {
       tier: MEMBERSHIP_TIERS.VIP_LIFETIME,
       planId: VIP_LIFETIME_PLAN,
       subscriptionPlan: VIP_LIFETIME_PLAN,
+      membershipTier: MEMBERSHIP_TIERS.VIP_LIFETIME,
+      isPro: true,
+      isSubscribed: true,
+    };
+  }
+  if (planId === FOUNDING_MOTHER_PLAN || planId === 'founding_mother') {
+    return {
+      tier: MEMBERSHIP_TIERS.FOUNDING_MOTHER,
+      planId: FOUNDING_MOTHER_PLAN,
+      subscriptionPlan: FOUNDING_MOTHER_PLAN,
+      membershipTier: MEMBERSHIP_TIERS.FOUNDING_MOTHER,
       isPro: true,
       isSubscribed: true,
     };
@@ -136,29 +158,79 @@ export function membershipFromPlanId(planId) {
   };
 }
 
-/** Redeem a secret VIP promo code → lifetime Pro on this device. */
+/**
+ * Redeem a Founding Mother / VIP code — bypasses Stripe entirely.
+ * FOUNDINGQUEEN → founding_mother lifetime Pro.
+ * Other VIP codes → vip_lifetime.
+ */
 export async function redeemVipPromoCode(rawCode, { email } = {}) {
-  if (!isValidVipPromoCode(rawCode)) {
-    return { ok: false, error: 'That code is not recognized. Please try again.' };
+  const normalized = normalizeVipPromoCode(rawCode);
+  if (!normalized) {
+    return { ok: false, error: FOUNDING_MOTHER_CODE_ERROR };
   }
+
+  if (isFoundingMotherCode(normalized)) {
+    const membership = membershipFromPlanId(FOUNDING_MOTHER_PLAN);
+    const saved = await saveMembershipProfile({
+      ...membership,
+      email: email || null,
+      promoCode: normalized,
+    });
+    return {
+      ok: true,
+      membership: saved,
+      toast: FOUNDING_MOTHER_WELCOME,
+      variant: 'founding_mother',
+      bypassStripe: true,
+    };
+  }
+
+  if (!isValidVipPromoCode(normalized)) {
+    return { ok: false, error: FOUNDING_MOTHER_CODE_ERROR };
+  }
+
   const membership = membershipFromPlanId(VIP_LIFETIME_PLAN);
   const saved = await saveMembershipProfile({
     ...membership,
     email: email || null,
-    promoCode: normalizeVipPromoCode(rawCode),
+    promoCode: normalized,
   });
-  return { ok: true, membership: saved, toast: VIP_ACTIVATED_TOAST };
+  return {
+    ok: true,
+    membership: saved,
+    toast: VIP_ACTIVATED_TOAST,
+    variant: 'vip',
+    bypassStripe: true,
+  };
 }
 
 export async function saveMembershipProfile(profile) {
   const planId = profile?.planId ?? profile?.subscriptionPlan ?? null;
   const isVip = planId === VIP_LIFETIME_PLAN || profile?.tier === MEMBERSHIP_TIERS.VIP_LIFETIME;
+  const isFoundingMother =
+    planId === FOUNDING_MOTHER_PLAN ||
+    profile?.tier === MEMBERSHIP_TIERS.FOUNDING_MOTHER ||
+    profile?.membershipTier === MEMBERSHIP_TIERS.FOUNDING_MOTHER;
   const isPro = Boolean(
-    profile?.isPro || profile?.isSubscribed || isPremiumTier(profile?.tier) || isVip,
+    profile?.isPro ||
+      profile?.isSubscribed ||
+      isPremiumTier(profile?.tier) ||
+      isPremiumTier(profile?.membershipTier) ||
+      isVip ||
+      isFoundingMother,
   );
   const adminIdentity = buildAdminUser({ email: profile?.email, role: profile?.role });
+  const resolvedTier =
+    profile?.tier ||
+    profile?.membershipTier ||
+    (isFoundingMother
+      ? MEMBERSHIP_TIERS.FOUNDING_MOTHER
+      : isVip
+        ? MEMBERSHIP_TIERS.VIP_LIFETIME
+        : MEMBERSHIP_TIERS.FREE_EXPLORER);
   const next = {
-    tier: profile?.tier || (isVip ? MEMBERSHIP_TIERS.VIP_LIFETIME : MEMBERSHIP_TIERS.FREE_EXPLORER),
+    tier: resolvedTier,
+    membershipTier: resolvedTier,
     email: adminIdentity.email,
     role: adminIdentity.role,
     planId,

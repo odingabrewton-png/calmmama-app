@@ -2602,7 +2602,9 @@ function CalmMamaApp() {
 
   const applyMembership = useCallback((profile) => {
     if (!profile) return;
-    setMembershipTier(profile.tier || MEMBERSHIP_TIERS.FREE_EXPLORER);
+    setMembershipTier(
+      profile.tier || profile.membershipTier || MEMBERSHIP_TIERS.FREE_EXPLORER,
+    );
     const user = buildAdminUser({ email: profile.email, role: profile.role });
     setMemberEmail(user.email);
     setMemberRole(user.role);
@@ -2625,7 +2627,9 @@ function CalmMamaApp() {
 
   const isVipLifetime =
     userSubscriptionType === VIP_LIFETIME_PLAN ||
-    membershipTier === MEMBERSHIP_TIERS.VIP_LIFETIME;
+    userSubscriptionType === 'founding_mother' ||
+    membershipTier === MEMBERSHIP_TIERS.VIP_LIFETIME ||
+    membershipTier === MEMBERSHIP_TIERS.FOUNDING_MOTHER;
 
   const handleAccountEmailChange = useCallback(async (email) => {
     const user = buildAdminUser({ email });
@@ -2728,12 +2732,27 @@ function CalmMamaApp() {
   );
 
   const handleVipRedeemed = useCallback(
-    (membership) => {
+    (membership, result = {}) => {
       applyMembership(membership);
-      setPremiumWelcomeVariant('vip');
-      setPremiumWelcomePlan('VIP Lifetime Access');
+      const isFoundingMother =
+        result?.variant === 'founding_mother' ||
+        membership?.tier === MEMBERSHIP_TIERS.FOUNDING_MOTHER ||
+        membership?.membershipTier === MEMBERSHIP_TIERS.FOUNDING_MOTHER;
+      setPremiumWelcomeVariant(isFoundingMother ? 'founding_mother' : 'vip');
+      setPremiumWelcomePlan(
+        isFoundingMother ? 'Founding Mother · Lifetime Access' : 'VIP Lifetime Access',
+      );
       setPremiumWelcomeOpen(true);
       setSubscriptionOpen(false);
+      setUpgradeSheetOpen(false);
+      // Stay in / return to the main app dashboard with Pro unlocked.
+      if (typeof window !== 'undefined' && window.location?.pathname !== '/app') {
+        try {
+          window.history.replaceState({}, document.title, '/app');
+        } catch (_) {
+          /* ignore */
+        }
+      }
       setTimeout(() => {
         addPoints(VIP_WELCOME_POINTS, 'vipPromo');
       }, 400);

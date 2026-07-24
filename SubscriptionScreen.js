@@ -11,6 +11,7 @@ import {
   Alert,
   TextInput,
   Animated,
+  Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { openStripeCheckout, redeemVipPromoCode } from './membershipAccess';
@@ -63,40 +64,6 @@ const SANS = Platform.select({
   default: { fontFamily: 'sans-serif' },
 });
 
-function SoftToast({ message }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(10)).current;
-
-  useEffect(() => {
-    if (!message) return undefined;
-    opacity.setValue(0);
-    translateY.setValue(10);
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        friction: 8,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    const hide = setTimeout(() => {
-      Animated.timing(opacity, { toValue: 0, duration: 280, useNativeDriver: true }).start();
-    }, 2600);
-    return () => clearTimeout(hide);
-  }, [message, opacity, translateY]);
-
-  if (!message) return null;
-
-  return (
-    <View pointerEvents="none" style={styles.toastHost}>
-      <Animated.View style={[styles.toastPill, { opacity, transform: [{ translateY }] }]}>
-        <Text style={[styles.toastText, SANS]}>{message}</Text>
-      </Animated.View>
-    </View>
-  );
-}
-
 function PricingCard({ plan, selected, onSelect }) {
   const isBest = plan.bestValue;
   const isSelected = selected === plan.id;
@@ -132,26 +99,36 @@ export default function SubscriptionScreen({
   memberEmail = null,
 }) {
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
+  const [codeExpanded, setCodeExpanded] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
+  const expandAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setSelectedPlan(initialPlan);
+      setCodeExpanded(false);
       setPromoCode('');
       setPromoError('');
       setPromoBusy(false);
-      setToastMessage(null);
+      expandAnim.setValue(0);
     }
-  }, [visible, initialPlan]);
+  }, [visible, initialPlan, expandAnim]);
+
+  useEffect(() => {
+    Animated.timing(expandAnim, {
+      toValue: codeExpanded ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [codeExpanded, expandAnim]);
 
   const handleCheckout = async () => {
     const plan = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
     if (!plan) return;
 
-    // Checkout Session (promo codes) with Payment Link fallback.
     const opened = await openStripeCheckout(plan.stripeKey, { email: memberEmail });
     if (opened) {
       onCheckout?.(selectedPlan, { deferredUnlock: true });
@@ -176,17 +153,25 @@ export default function SubscriptionScreen({
     try {
       const result = await redeemVipPromoCode(promoCode, { email: memberEmail });
       if (!result.ok) {
-        setPromoError(result.error || 'That code is not recognized.');
+        setPromoError(result.error || "That code isn't quite right. Try again mama!");
         return;
       }
-      setToastMessage(result.toast);
-      onVipRedeemed?.(result.membership);
+      // Bypass Stripe — unlock Pro + celebratory modal via parent.
+      onVipRedeemed?.(result.membership, result);
     } finally {
       setPromoBusy(false);
     }
   };
 
   const selected = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
+  const inputMaxHeight = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 118],
+  });
+  const inputOpacity = expandAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 0.4, 1],
+  });
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -223,38 +208,64 @@ export default function SubscriptionScreen({
             ))}
           </View>
 
-          <View style={styles.promoBlock}>
-            <Text style={[styles.promoLabel, SERIF]}>Promo / VIP Code</Text>
-            <View style={styles.promoRow}>
-              <TextInput
-                style={[styles.promoInput, SANS]}
-                value={promoCode}
-                onChangeText={(text) => {
-                  setPromoCode(text);
-                  if (promoError) setPromoError('');
-                }}
-                placeholder="Enter your code"
-                placeholderTextColor="#9AA89A"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoComplete="off"
-                returnKeyType="done"
-                onSubmitEditing={handleRedeemPromo}
-                editable={!promoBusy}
-                accessibilityLabel="Promo or VIP code"
-              />
-              <TouchableOpacity
-                style={[styles.promoBtn, promoBusy && styles.promoBtnDisabled]}
-                onPress={handleRedeemPromo}
-                activeOpacity={0.88}
-                disabled={promoBusy || !String(promoCode || '').trim()}
-              >
-                <Text style={[styles.promoBtnText, SANS]}>
-                  {promoBusy ? '…' : 'Redeem'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {promoError ? <Text style={[styles.promoError, SANS]}>{promoError}</Text> : null}
+          <View style={styles.foundingCodeBlock}>
+            <TouchableOpacity
+              onPress={() => {
+                setCodeExpanded((open) => !open);
+                if (promoError) setPromoError('');
+              }}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: codeExpanded }}
+              hitSlop={8}
+            >
+              <Text style={[styles.foundingCodeLink, SANS]}>
+                {codeExpanded ? 'Hide Founding Mother Code' : 'Have a Founding Mother Code?'}
+              </Text>
+            </TouchableOpacity>
+
+            <Animated.View
+              style={[
+                styles.foundingCodePanel,
+                {
+                  maxHeight: inputMaxHeight,
+                  opacity: inputOpacity,
+                  overflow: 'hidden',
+                },
+              ]}
+              pointerEvents={codeExpanded ? 'auto' : 'none'}
+            >
+              <View style={styles.promoRow}>
+                <TextInput
+                  style={[styles.promoInput, SANS]}
+                  value={promoCode}
+                  onChangeText={(text) => {
+                    setPromoCode(text);
+                    if (promoError) setPromoError('');
+                  }}
+                  placeholder="Enter your code"
+                  placeholderTextColor="#9AA89A"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  returnKeyType="done"
+                  onSubmitEditing={handleRedeemPromo}
+                  editable={!promoBusy}
+                  accessibilityLabel="Founding Mother code"
+                />
+                <TouchableOpacity
+                  style={[styles.promoBtn, promoBusy && styles.promoBtnDisabled]}
+                  onPress={handleRedeemPromo}
+                  activeOpacity={0.88}
+                  disabled={promoBusy || !String(promoCode || '').trim()}
+                >
+                  <Text style={[styles.promoBtnText, SANS]}>
+                    {promoBusy ? '…' : 'Redeem'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {promoError ? <Text style={[styles.promoError, SANS]}>{promoError}</Text> : null}
+            </Animated.View>
           </View>
 
           <Text style={styles.finePrint}>
@@ -272,8 +283,6 @@ export default function SubscriptionScreen({
             <Text style={styles.footerGhostText}>Not right now</Text>
           </Pressable>
         </View>
-
-        <SoftToast message={toastMessage} />
       </LinearGradient>
     </Modal>
   );
@@ -386,19 +395,21 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: '#6E7E65',
   },
-  promoBlock: {
+  foundingCodeBlock: {
     marginTop: 22,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 252, 248, 0.78)',
-    borderWidth: 1,
-    borderColor: 'rgba(196, 165, 116, 0.35)',
+    alignItems: 'center',
   },
-  promoLabel: {
+  foundingCodeLink: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#5A4A3A',
-    marginBottom: 10,
+    color: '#8A6A4A',
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  foundingCodePanel: {
+    width: '100%',
+    marginTop: 12,
   },
   promoRow: {
     flexDirection: 'row',
@@ -440,6 +451,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#B45A5A',
     fontWeight: '600',
+    textAlign: 'center',
   },
   finePrint: {
     marginTop: 18,
@@ -475,38 +487,5 @@ const styles = StyleSheet.create({
   footerGhostText: {
     color: '#8A968A',
     fontSize: 14,
-  },
-  toastHost: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: Platform.select({ ios: 72, default: 56 }),
-    zIndex: 50,
-  },
-  toastPill: {
-    maxWidth: '90%',
-    backgroundColor: 'rgba(252, 238, 245, 0.97)',
-    borderWidth: 1,
-    borderColor: 'rgba(196, 168, 216, 0.55)',
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderRadius: 999,
-    ...Platform.select({
-      web: { boxShadow: '0 10px 28px rgba(110, 80, 140, 0.16)' },
-      default: {
-        shadowColor: '#6E508C',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 16,
-        elevation: 8,
-      },
-    }),
-  },
-  toastText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#5A4570',
-    letterSpacing: 0.2,
-    textAlign: 'center',
   },
 });

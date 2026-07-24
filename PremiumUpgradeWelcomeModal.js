@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Dimensions,
+  Easing,
   Modal,
   Platform,
   Pressable,
@@ -7,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Animated,
 } from 'react-native';
 
 const SANS = Platform.select({
@@ -21,8 +24,83 @@ const PLAYFUL = Platform.select({
   default: { fontFamily: 'serif' },
 });
 
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+const { height: SCREEN_H } = Dimensions.get('window');
+const CONFETTI_PIECES = ['🌸', '👑', '✨', '💗', '🎉', '⭐', '💫', '🎀', '🫧'];
+
+function ConfettiPiece({ emoji, index }) {
+  const fall = useRef(new Animated.Value(-40)).current;
+  const sway = useRef(new Animated.Value(0)).current;
+  const left = (index * 17 + 8) % 92;
+  const delay = (index * 137) % 900;
+  const duration = 2600 + ((index * 211) % 1200);
+
+  useEffect(() => {
+    const loopFall = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(fall, {
+          toValue: SCREEN_H,
+          duration,
+          easing: Easing.linear,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(fall, {
+          toValue: -40,
+          duration: 0,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]),
+    );
+    const loopSway = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sway, {
+          toValue: 14,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.timing(sway, {
+          toValue: -14,
+          duration: 900,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]),
+    );
+    loopFall.start();
+    loopSway.start();
+    return () => {
+      loopFall.stop();
+      loopSway.stop();
+    };
+  }, [delay, duration, fall, sway]);
+
+  return (
+    <Animated.Text
+      style={[
+        styles.confettiPiece,
+        { left: `${left}%`, transform: [{ translateY: fall }, { translateX: sway }] },
+      ]}
+    >
+      {emoji}
+    </Animated.Text>
+  );
+}
+
+function ConfettiLayer({ active }) {
+  if (!active) return null;
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {CONFETTI_PIECES.map((emoji, index) => (
+        <ConfettiPiece key={`${emoji}-${index}`} emoji={emoji} index={index} />
+      ))}
+    </View>
+  );
+}
+
 /**
- * Celebratory modal after Stripe success or VIP promo redeem.
+ * Celebratory modal after Stripe success, VIP, or Founding Mother code redeem.
  */
 export default function PremiumUpgradeWelcomeModal({
   visible,
@@ -34,23 +112,33 @@ export default function PremiumUpgradeWelcomeModal({
   bonusLabel,
 }) {
   const isVip = variant === 'vip';
+  const isFoundingMother = variant === 'founding_mother';
+  const showConfetti = isVip || isFoundingMother;
+
   const header =
     title ||
-    (isVip
-      ? 'VIP Access Activated! Welcome home, Queen 🌸👑'
-      : 'Welcome to Premium Sanctuary Access! 🌸👑');
+    (isFoundingMother
+      ? 'Welcome Founding Mother! Your lifetime access is active 🌸👑'
+      : isVip
+        ? 'VIP Access Activated! Welcome home, Queen 🌸👑'
+        : 'Welcome to Premium Sanctuary Access! 🌸👑');
   const copy =
     body ||
-    (isVip
-      ? 'Your lifetime VIP pass is unlocked on this device. Enjoy unlimited sanctuary tools, AI companion care, and full Village access — forever.'
-      : 'Your account is now fully upgraded. Enjoy unlimited access to all features, AI companion responses, and special rewards!');
+    (isFoundingMother
+      ? 'Stripe skipped — your Founding Mother lifetime pass is unlocked. Enjoy the full Village, forever.'
+      : isVip
+        ? 'Your lifetime VIP pass is unlocked on this device. Enjoy unlimited sanctuary tools, AI companion care, and full Village access — forever.'
+        : 'Your account is now fully upgraded. Enjoy unlimited access to all features, AI companion responses, and special rewards!');
   const bonus =
     bonusLabel ||
-    (isVip ? '+500 pts VIP Welcome Bonus' : '+250 pts Premium Upgrade Bonus');
+    (isFoundingMother || isVip
+      ? '+500 pts Welcome Bonus'
+      : '+250 pts Premium Upgrade Bonus');
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
+        <ConfettiLayer active={visible && showConfetti} />
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation?.()}>
           <Text style={styles.emoji}>🌸👑</Text>
           <Text style={[styles.header, PLAYFUL]}>{header}</Text>
@@ -76,6 +164,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  confettiPiece: {
+    position: 'absolute',
+    top: 0,
+    fontSize: 16,
+    opacity: 0.9,
+    zIndex: 1,
+  },
   card: {
     width: '100%',
     maxWidth: 400,
@@ -86,6 +181,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(196, 168, 216, 0.5)',
     alignItems: 'center',
+    zIndex: 2,
     ...Platform.select({
       web: { boxShadow: '0 18px 40px rgba(110, 80, 140, 0.22)' },
       default: {

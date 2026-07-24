@@ -16,6 +16,7 @@ export function isYearlyFoundingGiftTier(userSubscriptionType, productId) {
     userSubscriptionType === SUBSCRIPTION_PLANS.yearly ||
     userSubscriptionType === 'yearly' ||
     userSubscriptionType === 'vip_lifetime' ||
+    userSubscriptionType === 'founding_mother' ||
     userSubscriptionType === 'vip'
   ) {
     return true;
@@ -30,6 +31,7 @@ export function isPremiumSubscribed(userSubscriptionType) {
     userSubscriptionType === SUBSCRIPTION_PLANS.yearly ||
     userSubscriptionType === SUBSCRIPTION_PLANS.gift ||
     userSubscriptionType === 'vip_lifetime' ||
+    userSubscriptionType === 'founding_mother' ||
     userSubscriptionType === 'vip'
   );
 }
