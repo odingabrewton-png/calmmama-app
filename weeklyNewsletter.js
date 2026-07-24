@@ -9,53 +9,15 @@ const {
   resolveResendApiKey,
   resolveResendAudienceId,
 } = require('./welcomeEmail');
+const {
+  pickEmailWeeklyPrompt,
+  inferNewsletterStage,
+  buildJournalDeepLink,
+  normalizeJournalStage,
+} = require('./sanctuaryJournalPrompts');
 
 const WEEKLY_SUBJECT = 'Your Weekly Village Reflection & Affirmation 🌸';
 const APP_URL = APP_ACCESS_URL || 'https://calmmamavillage.com/app';
-
-/** Soft weekly prompts for Soul Sanctuary journaling — rotates by ISO week. */
-const WEEKLY_REFLECTIONS = [
-  {
-    affirmation: 'You are allowed to take up soft space today.',
-    prompt:
-      'What is one feeling you’ve been carrying quietly this week? Write it down in Soul Sanctuary without fixing it — just naming it is enough.',
-  },
-  {
-    affirmation: 'Rest is not a reward you have to earn.',
-    prompt:
-      'Where in your body are you holding tension right now? Journal what that place might be asking for — even if the answer is simply “a pause.”',
-  },
-  {
-    affirmation: 'You can love your baby and still miss yourself.',
-    prompt:
-      'What part of you feels a little unseen lately? Write one sentence to her in Soul Sanctuary, as if she were a dear friend.',
-  },
-  {
-    affirmation: 'Small moments of care still count as mothering yourself.',
-    prompt:
-      'List three tiny things that made this week softer — a warm drink, a kind text, a quiet minute. Which one do you want more of next week?',
-  },
-  {
-    affirmation: 'You are not behind. You are becoming.',
-    prompt:
-      'What pressure have you been measuring yourself against? Write what “enough” would feel like in your body today.',
-  },
-  {
-    affirmation: 'Support is sacred — you do not have to hold it all alone.',
-    prompt:
-      'Who or what has held you this week (even a little)? Journal one way you might ask for or receive support next week.',
-  },
-  {
-    affirmation: 'Your softness is strength, not weakness.',
-    prompt:
-      'What emotion showed up most often this week? Sit with it in Soul Sanctuary and finish this line: “What I needed was…”',
-  },
-  {
-    affirmation: 'You are already someone’s safe place — including your own.',
-    prompt:
-      'Write a short note to yourself for a hard moment later this week. Keep it gentle, specific, and real.',
-  },
-];
 
 function isoWeekNumber(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -65,14 +27,38 @@ function isoWeekNumber(date = new Date()) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-function pickWeeklyReflection(date = new Date()) {
-  const index = (isoWeekNumber(date) - 1) % WEEKLY_REFLECTIONS.length;
-  return WEEKLY_REFLECTIONS[index];
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function buildWeeklyNewsletterHtml({ firstName, affirmation, prompt, appUrl = APP_URL } = {}) {
-  const name = String(firstName || '').trim() || 'Mama';
-  const safeUrl = String(appUrl || APP_URL).replace(/"/g, '&quot;');
+function stageLabel(stage) {
+  const key = normalizeJournalStage(stage);
+  if (key === 'hybrid') return 'Pregnant & Parenting';
+  if (key === 'postpartum') return 'Postpartum';
+  return 'Pregnancy';
+}
+
+function pickWeeklyReflection(date = new Date(), stage = 'pregnant') {
+  return pickEmailWeeklyPrompt(stage, date);
+}
+
+function buildWeeklyNewsletterHtml({
+  firstName,
+  affirmation,
+  prompt,
+  stage = 'pregnant',
+  appUrl = APP_URL,
+  journalUrl,
+} = {}) {
+  const name = escapeHtml(String(firstName || '').trim() || 'Mama');
+  const safeAffirmation = escapeHtml(affirmation);
+  const safePrompt = escapeHtml(prompt);
+  const safeStage = escapeHtml(stageLabel(stage));
+  const ctaUrl = String(journalUrl || appUrl || APP_URL).replace(/"/g, '&quot;');
 
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -117,23 +103,31 @@ function buildWeeklyNewsletterHtml({ firstName, affirmation, prompt, appUrl = AP
             <td align="center" style="padding-bottom: 22px;">
               <p style="color: #7D6B91; font-size: 15px; line-height: 1.6; margin: 0;">
                 Your weekly affirmation:<br />
-                <strong style="color: #4A3B5C;">“${affirmation}”</strong>
+                <strong style="color: #4A3B5C;">“${safeAffirmation}”</strong>
               </p>
             </td>
           </tr>
           <tr>
-            <td align="left" bgcolor="#F8F4FC" style="background-color: #F8F4FC; border-radius: 18px; padding: 20px 18px; margin: 0;">
-              <p style="color: #A493B8; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px 0; text-align: center;">Soul Sanctuary prompt</p>
+            <td align="left" bgcolor="#F8F4FC" style="background-color: #F8F4FC; border-radius: 18px; padding: 20px 18px;">
+              <p style="color: #A493B8; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px 0; text-align: center;">Email Reflection Prompt of the Week</p>
+              <p style="color: #8A63BE; font-size: 12px; font-weight: 700; margin: 0 0 10px 0; text-align: center;">${safeStage} · Exclusive to your inbox</p>
               <p style="color: #7D6B91; font-size: 15px; line-height: 1.65; margin: 0; text-align: center;">
-                ${prompt}
+                ${safePrompt}
               </p>
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding-top: 28px; padding-bottom: 28px;">
-              <a href="${safeUrl}" target="_blank" style="background-color: #8A63BE; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 99px; font-weight: 600; font-size: 15px; display: inline-block;">
-                Open Soul Sanctuary ✨
+            <td align="center" style="padding-top: 28px; padding-bottom: 12px;">
+              <a href="${ctaUrl}" target="_blank" style="background-color: #8A63BE; color: #ffffff; text-decoration: none; padding: 16px 28px; border-radius: 99px; font-weight: 600; font-size: 15px; display: inline-block;">
+                Journal This Prompt in App (+10 Pts) 🌸
               </a>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom: 20px;">
+              <p style="color: #A493B8; font-size: 12px; margin: 0; line-height: 1.5;">
+                Opens Soul Sanctuary with this week’s email prompt ready for you.
+              </p>
             </td>
           </tr>
           <tr>
@@ -153,17 +147,25 @@ function buildWeeklyNewsletterHtml({ firstName, affirmation, prompt, appUrl = AP
 `.trim();
 }
 
-function buildWeeklyNewsletterText({ firstName, affirmation, prompt, appUrl = APP_URL } = {}) {
+function buildWeeklyNewsletterText({
+  firstName,
+  affirmation,
+  prompt,
+  stage = 'pregnant',
+  appUrl = APP_URL,
+  journalUrl,
+} = {}) {
   const name = String(firstName || '').trim() || 'Mama';
+  const link = journalUrl || appUrl;
   return [
     `Hello, ${name}`,
     '',
     `Your weekly affirmation: "${affirmation}"`,
     '',
-    'Soul Sanctuary prompt:',
+    `Email Reflection Prompt of the Week (${stageLabel(stage)} · exclusive):`,
     prompt,
     '',
-    `Open your sanctuary: ${appUrl}`,
+    `Journal This Prompt in App (+10 Pts): ${link}`,
     '',
     'With warmth & support,',
     'The Calm Mama Village Team',
@@ -232,6 +234,11 @@ async function fetchNewsletterRecipients({ apiKey, audienceId } = {}) {
             recipients.push({
               email: String(row.email).trim().toLowerCase(),
               firstName: row.first_name || row.firstName || '',
+              journey:
+                row.properties?.mama_journey ||
+                row.properties?.journey ||
+                row.mama_journey ||
+                '',
             });
           }
         }
@@ -251,6 +258,11 @@ async function fetchNewsletterRecipients({ apiKey, audienceId } = {}) {
         recipients.push({
           email: String(row.email).trim().toLowerCase(),
           firstName: row.first_name || row.firstName || '',
+          journey:
+            row.properties?.mama_journey ||
+            row.properties?.journey ||
+            row.mama_journey ||
+            '',
         });
       }
     }
@@ -284,15 +296,33 @@ async function sendWeeklyEmailToRecipient({
     return { ok: false, email, error: 'missing key or email' };
   }
 
+  const stage = normalizeJournalStage(
+    reflection?.stage || inferNewsletterStage(recipient),
+  );
+  const weekly =
+    reflection?.source === 'email_exclusive'
+      ? reflection
+      : pickEmailWeeklyPrompt(stage, new Date());
+  const journalUrl = buildJournalDeepLink({
+    appUrl: APP_URL,
+    prompt: weekly.prompt,
+    stage: weekly.stage,
+    promptId: weekly.id,
+  });
+
   const html = buildWeeklyNewsletterHtml({
     firstName: recipient.firstName,
-    affirmation: reflection.affirmation,
-    prompt: reflection.prompt,
+    affirmation: weekly.affirmation,
+    prompt: weekly.prompt,
+    stage: weekly.stage,
+    journalUrl,
   });
   const text = buildWeeklyNewsletterText({
     firstName: recipient.firstName,
-    affirmation: reflection.affirmation,
-    prompt: reflection.prompt,
+    affirmation: weekly.affirmation,
+    prompt: weekly.prompt,
+    stage: weekly.stage,
+    journalUrl,
   });
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -307,6 +337,11 @@ async function sendWeeklyEmailToRecipient({
       subject: WEEKLY_SUBJECT,
       html,
       text,
+      tags: [
+        { name: 'newsletter', value: 'weekly' },
+        { name: 'mama_stage', value: weekly.stage },
+        { name: 'prompt_id', value: String(weekly.id || '').slice(0, 48) },
+      ],
     }),
   });
 
@@ -336,7 +371,6 @@ async function runWeeklyNewsletter({
   dryRun = false,
   limit,
 } = {}) {
-  const reflection = pickWeeklyReflection(new Date());
   const listed = await fetchNewsletterRecipients({ apiKey, audienceId });
   if (!listed.ok) {
     return {
@@ -345,7 +379,6 @@ async function runWeeklyNewsletter({
       sent: 0,
       failed: 0,
       total: 0,
-      reflection,
     };
   }
 
@@ -355,14 +388,18 @@ async function runWeeklyNewsletter({
   }
 
   if (dryRun) {
+    const sample = recipients.slice(0, 3).map((r) => {
+      const stage = inferNewsletterStage(r);
+      const weekly = pickEmailWeeklyPrompt(stage, new Date());
+      return { email: r.email, stage: weekly.stage, promptId: weekly.id };
+    });
     return {
       ok: true,
       dryRun: true,
       sent: 0,
       failed: 0,
       total: recipients.length,
-      reflection,
-      sample: recipients.slice(0, 3).map((r) => r.email),
+      sample,
     };
   }
 
@@ -372,6 +409,8 @@ async function runWeeklyNewsletter({
 
   for (let i = 0; i < recipients.length; i += 1) {
     const recipient = recipients[i];
+    const stage = inferNewsletterStage(recipient);
+    const reflection = pickEmailWeeklyPrompt(stage, new Date());
     try {
       const result = await sendWeeklyEmailToRecipient({
         recipient,
@@ -403,7 +442,6 @@ async function runWeeklyNewsletter({
     sent,
     failed,
     total: recipients.length,
-    reflection,
     errors: errors.length ? errors : undefined,
   };
 }
@@ -425,21 +463,35 @@ async function sendAdminTestNewsletter({
     return { ok: false, error: 'missing recipient email', adminTest: true };
   }
 
-  const reflection = pickWeeklyReflection(new Date());
+  const reflection = pickEmailWeeklyPrompt(
+    inferNewsletterStage({ email, journey: 'pregnant' }),
+    new Date(),
+  );
   const key = resolveResendApiKey(apiKey);
   if (!key) {
     return { ok: false, error: 'Resend API key not configured', adminTest: true };
   }
 
+  const journalUrl = buildJournalDeepLink({
+    appUrl: APP_URL,
+    prompt: reflection.prompt,
+    stage: reflection.stage,
+    promptId: reflection.id,
+  });
+
   const html = buildWeeklyNewsletterHtml({
     firstName: firstName || 'Admin',
     affirmation: reflection.affirmation,
     prompt: reflection.prompt,
+    stage: reflection.stage,
+    journalUrl,
   });
   const text = buildWeeklyNewsletterText({
     firstName: firstName || 'Admin',
     affirmation: reflection.affirmation,
     prompt: reflection.prompt,
+    stage: reflection.stage,
+    journalUrl,
   });
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -507,7 +559,6 @@ function assertCronAuthorized(req) {
 
 module.exports = {
   WEEKLY_SUBJECT,
-  WEEKLY_REFLECTIONS,
   pickWeeklyReflection,
   buildWeeklyNewsletterHtml,
   buildWeeklyNewsletterText,
@@ -515,4 +566,5 @@ module.exports = {
   runWeeklyNewsletter,
   sendAdminTestNewsletter,
   assertCronAuthorized,
+  isoWeekNumber,
 };

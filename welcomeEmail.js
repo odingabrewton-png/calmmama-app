@@ -188,6 +188,7 @@ async function sendWelcomeMamaEmail({
 async function addResendAudienceContact({
   email,
   firstName,
+  journey,
   apiKey,
   audienceId,
 } = {}) {
@@ -217,6 +218,12 @@ async function addResendAudienceContact({
   };
   const name = String(firstName || '').trim();
   if (name) payload.first_name = name.slice(0, 48);
+  const stage = String(journey || '')
+    .trim()
+    .toLowerCase();
+  if (stage === 'pregnant' || stage === 'postpartum' || stage === 'hybrid') {
+    payload.properties = { mama_journey: stage };
+  }
 
   try {
     const response = await fetchFn(

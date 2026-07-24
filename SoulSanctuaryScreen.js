@@ -30,6 +30,11 @@ import SanctuaryStarsLayer from './SanctuaryStarsLayer';
 import TextDissolveRelease, { runTextReleaseFlow } from './TextDissolveRelease';
 import { SANCTUARY_ZEN } from './designTypography';
 import { useVillageRewards } from './VillageRewardsContext';
+import {
+  normalizeJournalStage,
+  pickInAppPromptBatch,
+  shuffleInAppPromptBatch,
+} from './sanctuaryJournalPrompts';
 
 const JOURNAL_SPRING = VILLAGE_SNAPPY_REANIMATED;
 const JOURNAL_SPRING_GENTLE = { damping: 20, stiffness: 68 };
@@ -182,8 +187,13 @@ export default function SoulSanctuaryScreen({
   /** Postpartum lounge — show emotion-cloud progress tracker */
   showMoodTracker = false,
   journeyContext = '',
+  /** pregnant | postpartum | hybrid — drives Inspiration pills */
+  journeyStage = 'pregnant',
+  /** Prefill from email deep link / newsletter CTA */
+  initialJournalPrompt = '',
 }) {
   const hasPro = Boolean(isPro || isSubscribed);
+  const stage = normalizeJournalStage(journeyStage);
   const [phase, setPhase] = useState('clouds');
   const [selectedMood, setSelectedMood] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
@@ -191,6 +201,11 @@ export default function SoulSanctuaryScreen({
   const [releasing, setReleasing] = useState(false);
   const [expandedEntryId, setExpandedEntryId] = useState(null);
   const [openingPrompt, setOpeningPrompt] = useState('');
+  const [inspirationPrompts, setInspirationPrompts] = useState(() =>
+    pickInAppPromptBatch(stage, { count: 4, seed: 1 }),
+  );
+  const [selectedPromptId, setSelectedPromptId] = useState(null);
+  const pendingEmailPromptRef = useRef(String(initialJournalPrompt || '').trim());
 
   const othersFade = useRef(new Animated.Value(1)).current;
   const journalReveal = useSharedValue(0);
@@ -203,6 +218,15 @@ export default function SoulSanctuaryScreen({
   const scrollRef = useRef(null);
   const releaseRef = useRef(null);
   const { addPoints } = useVillageRewards();
+
+  useEffect(() => {
+    setInspirationPrompts(pickInAppPromptBatch(stage, { count: 4, seed: Date.now() % 1000 }));
+    setSelectedPromptId(null);
+  }, [stage]);
+
+  useEffect(() => {
+    pendingEmailPromptRef.current = String(initialJournalPrompt || '').trim();
+  }, [initialJournalPrompt]);
 
   useEffect(() => {
     const floatLoops = cloudFloats.map((anim, index) => {
@@ -254,10 +278,22 @@ export default function SoulSanctuaryScreen({
     setJournalText('');
     setExpandedEntryId(null);
     setOpeningPrompt('');
+    setSelectedPromptId(null);
     othersFade.setValue(1);
     journalReveal.value = 0;
     cloudDrifts.forEach((d) => d.setValue(0));
     cloudScales.forEach((s) => s.setValue(1));
+  };
+
+  const handleSelectInspiration = (prompt) => {
+    if (!prompt?.text || releasing) return;
+    setSelectedPromptId(prompt.id);
+    setJournalText(prompt.text);
+  };
+
+  const handleShuffleInspiration = () => {
+    setInspirationPrompts((prev) => shuffleInAppPromptBatch(stage, prev, { count: 4 }));
+    setSelectedPromptId(null);
   };
 
   const handleTimelineEntryPress = (entryId) => {
@@ -273,7 +309,10 @@ export default function SoulSanctuaryScreen({
     if (phase !== 'clouds') return;
     setSelectedMood(mood);
     setSelectedIndex(index);
-    setJournalText('');
+    const seeded = pendingEmailPromptRef.current;
+    setJournalText(seeded || '');
+    if (seeded) pendingEmailPromptRef.current = '';
+    setSelectedPromptId(null);
     setOpeningPrompt(getFriendOpeningLine(mood.id, mamaName));
     setPhase('journal');
 
@@ -394,6 +433,46 @@ export default function SoulSanctuaryScreen({
                 {openingPrompt ? (
                   <Text style={styles.openingPrompt}>{openingPrompt}</Text>
                 ) : null}
+
+                <View style={styles.inspirationBlock}>
+                  <View style={styles.inspirationHeader}>
+                    <Text style={styles.inspirationPillLabel}>Journaling Inspiration 💡</Text>
+                    <TouchableOpacity
+                      style={styles.shuffleBtn}
+                      onPress={handleShuffleInspiration}
+                      activeOpacity={0.85}
+                      disabled={releasing}
+                      accessibilityRole="button"
+                      accessibilityLabel="Shuffle journaling prompts"
+                    >
+                      <Text style={styles.shuffleBtnText}>Shuffle 🎲</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.inspirationList}>
+                    {inspirationPrompts.map((prompt) => {
+                      const selected = selectedPromptId === prompt.id;
+                      return (
+                        <TouchableOpacity
+                          key={prompt.id}
+                          style={[styles.inspirationChip, selected && styles.inspirationChipActive]}
+                          onPress={() => handleSelectInspiration(prompt)}
+                          activeOpacity={0.88}
+                          disabled={releasing}
+                        >
+                          <Text
+                            style={[
+                              styles.inspirationChipText,
+                              selected && styles.inspirationChipTextActive,
+                            ]}
+                          >
+                            {prompt.text}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
                 <View style={styles.releaseStage}>
                   <TextInput
                     style={[styles.diaryInput, releasing && styles.diaryInputReleasing]}
@@ -403,7 +482,10 @@ export default function SoulSanctuaryScreen({
                     scrollEnabled
                     textAlignVertical="top"
                     value={journalText}
-                    onChangeText={setJournalText}
+                    onChangeText={(text) => {
+                      setJournalText(text);
+                      if (selectedPromptId) setSelectedPromptId(null);
+                    }}
                     editable={!releasing}
                   />
                   <TextDissolveRelease
@@ -677,6 +759,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 10,
     ...SANCTUARY_ZEN,
+  },
+  inspirationBlock: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  inspirationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 8,
+  },
+  inspirationPillLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: 'rgba(255, 244, 250, 0.95)',
+    letterSpacing: 0.2,
+  },
+  shuffleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  shuffleBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255, 244, 250, 0.92)',
+  },
+  inspirationList: {
+    gap: 8,
+  },
+  inspirationChip: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 200, 240, 0.28)',
+  },
+  inspirationChipActive: {
+    backgroundColor: 'rgba(232, 223, 245, 0.28)',
+    borderColor: 'rgba(196, 168, 216, 0.7)',
+  },
+  inspirationChipText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(245, 238, 255, 0.88)',
+    ...SANCTUARY_ZEN,
+  },
+  inspirationChipTextActive: {
+    color: '#FFF9FC',
+    fontWeight: '600',
   },
   diaryInput: {
     minHeight: 140,

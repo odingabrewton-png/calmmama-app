@@ -108,6 +108,7 @@ import {
   isAdmin,
   saveAdminSession,
 } from './adminAccess';
+import { normalizeJournalStage } from './sanctuaryJournalPrompts';
 import LotusFlowerButton from './LotusFlowerButton';
 
 import MidnightLoungeScreen from './MidnightLoungeScreen'; // layout locked — midnightLoungeLayoutConfig.js
@@ -119,6 +120,35 @@ function AppStatusBar() {
   return (
     <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
   );
+}
+
+/** Consume newsletter → Soul Sanctuary deep link (?sanctuary=1&journalPrompt=…). */
+function consumeSanctuaryJournalDeepLink() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location?.search || '');
+    const wantsSanctuary =
+      params.get('sanctuary') === '1' || params.get('emailPrompt') === '1';
+    if (!wantsSanctuary) return null;
+
+    const prompt = String(params.get('journalPrompt') || '').trim();
+    const stage = normalizeJournalStage(params.get('stage') || 'pregnant');
+
+    const next = new URL(window.location.href);
+    ['sanctuary', 'emailPrompt', 'journalPrompt', 'stage', 'promptId', 'pts'].forEach((key) => {
+      next.searchParams.delete(key);
+    });
+    const search = next.searchParams.toString();
+    window.history.replaceState(
+      {},
+      document.title,
+      `${next.pathname}${search ? `?${search}` : ''}`,
+    );
+
+    return { prompt, stage };
+  } catch (_) {
+    return null;
+  }
 }
 import { isBirthdayToday } from './mamaBirthdayUtils';
 import { MAMA_KITCHEN_RECIPES } from './mealsData';
@@ -2442,6 +2472,8 @@ function CalmMamaApp() {
   const [midnightLoungeMounted, setMidnightLoungeMounted] = useState(false);
   const [loungeFocusTab, setLoungeFocusTab] = useState('home');
   const [loungeFocusToken, setLoungeFocusToken] = useState(0);
+  const [sanctuaryJournalPrompt, setSanctuaryJournalPrompt] = useState('');
+  const [autoOpenSanctuaryJournal, setAutoOpenSanctuaryJournal] = useState(false);
   const [postpartumLoungeOverlayActive, setPostpartumLoungeOverlayActive] = useState(false);
   const midnightLoungeOpacity = useRef(new Animated.Value(0)).current;
   const midnightLoungeScale = useRef(new Animated.Value(0.07)).current;
@@ -2843,12 +2875,16 @@ function CalmMamaApp() {
   const skipInitialFlowRef = useRef(true);
   const skipJourneyFlowAfterOnboardingRef = useRef(false);
 
+  const pendingSanctuaryDeepLinkRef = useRef(null);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const boot = await loadBootState();
         if (!mounted) return;
+
+        pendingSanctuaryDeepLinkRef.current = consumeSanctuaryJournalDeepLink();
 
         if (boot.profile) {
           applyProfileSnapshot(boot.profile, {
@@ -4041,6 +4077,10 @@ function CalmMamaApp() {
     const nextTab = opts?.tab === 'profile' ? 'profile' : 'home';
     setLoungeFocusTab(nextTab);
     setLoungeFocusToken((token) => token + 1);
+    setAutoOpenSanctuaryJournal(Boolean(opts?.openJournal));
+    if (typeof opts?.journalPrompt === 'string') {
+      setSanctuaryJournalPrompt(opts.journalPrompt);
+    }
 
     warmMidnightLounge(userJourney);
     setInVillagePortal(false);
@@ -4107,10 +4147,39 @@ function CalmMamaApp() {
     bottomNavTranslateY,
   ]);
 
+  useEffect(() => {
+    if (!bootHydrated || !isOnboarded) return;
+    const deep = pendingSanctuaryDeepLinkRef.current;
+    if (!deep) return;
+    pendingSanctuaryDeepLinkRef.current = null;
+
+    if (deep.stage === 'hybrid') {
+      setActiveMode(ACTIVE_MODES.HYBRID);
+      setUserJourney(ACTIVE_MODES.HYBRID);
+    } else if (deep.stage === 'postpartum') {
+      setActiveMode(ACTIVE_MODES.POSTPARTUM);
+      setUserJourney('postpartum');
+      setHomeTrack(HOME_TRACKS.TODDLER);
+    } else {
+      setActiveMode(ACTIVE_MODES.PREGNANT);
+      setUserJourney('pregnant');
+      setHomeTrack(HOME_TRACKS.PREGNANT);
+    }
+
+    const timer = setTimeout(() => {
+      handleOpenMidnightLounge({
+        openJournal: true,
+        journalPrompt: deep.prompt || '',
+      });
+    }, 420);
+    return () => clearTimeout(timer);
+  }, [bootHydrated, isOnboarded, handleOpenMidnightLounge]);
+
   const handleCloseMidnightLounge = useCallback(() => {
     if (midnightLoungeAnimatingRef.current || !inMidnightLounge) return;
 
     midnightLoungeAnimatingRef.current = true;
+    setAutoOpenSanctuaryJournal(false);
 
     Animated.parallel([
       animateMidnightLoungeClose({
@@ -4833,6 +4902,8 @@ function CalmMamaApp() {
                     isSubscribed={isPro}
                     onRequestUpgrade={handleReleaseUpgradePrompt}
                     journeyContext={sanctuaryJourneyContext}
+                    initialJournalPrompt={sanctuaryJournalPrompt}
+                    autoOpenJournal={autoOpenSanctuaryJournal}
                     renderVillagePortal={({ onClose }) => (
                       <VillageCommunityPortal
                         villageLogoUri={CALMMAMA_OFFICIAL_LOGO}

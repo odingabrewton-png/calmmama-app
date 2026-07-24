@@ -532,6 +532,8 @@ function MidnightLoungeScreen({
   isSubscribed = false,
   onRequestUpgrade,
   journeyContext = '',
+  initialJournalPrompt = '',
+  autoOpenJournal = false,
   renderVillagePortal,
 } = {}) {
   if (__DEV__ && !MIDNIGHT_LOUNGE_LAYOUT_LOCKED) {
@@ -570,8 +572,8 @@ function MidnightLoungeScreen({
   useEffect(() => {
     if (!focusToken) return;
     setLoungeTab(initialTab || 'home');
-    setActiveSubView(null);
-  }, [focusToken, initialTab]);
+    setActiveSubView(autoOpenJournal ? 'journal' : null);
+  }, [focusToken, initialTab, autoOpenJournal]);
 
   useEffect(() => {
     if (userJourney === 'pregnant') {
@@ -995,6 +997,8 @@ function MidnightLoungeScreen({
             loungeSubView
             showMoodTracker
             journeyContext={journeyContext}
+            journeyStage={activeMode === 'hybrid' ? 'hybrid' : userJourney}
+            initialJournalPrompt={initialJournalPrompt}
           />
         );
       }
@@ -1012,6 +1016,8 @@ function MidnightLoungeScreen({
             gentleEnter={false}
             loungeSubView
             journeyContext={journeyContext}
+            journeyStage={activeMode === 'hybrid' ? 'hybrid' : userJourney}
+            initialJournalPrompt={initialJournalPrompt}
           />
         </Suspense>
       );
