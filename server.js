@@ -8,6 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const { sendWelcomeMamaEmail, addResendAudienceContact, resolveResendApiKey } = require('./welcomeEmail');
 const { runWeeklyNewsletter, sendAdminTestNewsletter, assertCronAuthorized } = require('./weeklyNewsletter');
+const {
+  createSubscriptionCheckoutSession,
+  resolveAppOrigin,
+} = require('./stripeCheckoutSession');
 
 const ADMIN_EMAIL = 'odingabrewton@gmail.com';
 
@@ -117,6 +121,27 @@ app.get('/api/weekly-newsletter', async (req, res) => {
     res.status(500).json({ ok: false, error: 'Unexpected newsletter error' });
   }
 });
+
+/**
+ * Stripe Checkout Session for monthly / annual subscriptions.
+ * Both plans set allow_promotion_codes: true.
+ */
+async function handleStripeCheckoutSession(req, res) {
+  try {
+    const plan = req.body?.plan || req.body?.tier || req.query?.plan;
+    const email = req.body?.email || req.body?.customer_email || req.query?.email;
+    const origin = req.body?.origin || resolveAppOrigin(req);
+    const result = await createSubscriptionCheckoutSession({ plan, email, origin });
+    const status = result.ok ? 200 : result.status || 500;
+    res.status(status).json(result);
+  } catch (err) {
+    console.warn('[CalmMama] checkout-session route error', err?.message || err);
+    res.status(500).json({ ok: false, error: 'Unexpected checkout error' });
+  }
+}
+
+app.post('/api/stripe/checkout-session', handleStripeCheckoutSession);
+app.post('/api/checkout', handleStripeCheckoutSession);
 
 /** Admin sandbox: single test newsletter to allowlisted email only. */
 app.post('/api/admin/test-newsletter', async (req, res) => {

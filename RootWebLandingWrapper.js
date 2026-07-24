@@ -28,6 +28,7 @@ import {
   MEMBERSHIP_TIERS,
   STRIPE_LINKS,
   enterLiveApp,
+  openStripeCheckout,
   readForceAppMode,
   saveMembershipProfile,
 } from './membershipAccess';
@@ -956,26 +957,10 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
           // Unlock after Stripe success return — not before payment.
           isSubscribed: false,
         });
-        const checkoutUrl = new URL(STRIPE_LINKS[requestedCheckout]);
-        if (giftSubmission?.giverEmail) {
-          checkoutUrl.searchParams.set('prefilled_email', giftSubmission.giverEmail);
-        } else if (value) {
-          checkoutUrl.searchParams.set('prefilled_email', value);
-        }
-        try {
-          window.sessionStorage?.setItem(
-            'calmmama.pendingUpgrade',
-            JSON.stringify({
-              plan: requestedCheckout,
-              email: giftSubmission?.giverEmail || value,
-              at: Date.now(),
-            }),
-          );
-        } catch (_) {
-          /* ignore */
-        }
-        window.location.href = checkoutUrl.toString();
-        return;
+        const opened = await openStripeCheckout(requestedCheckout, {
+          email: giftSubmission?.giverEmail || value,
+        });
+        if (opened) return;
       }
 
       setIsSubmitted(true);

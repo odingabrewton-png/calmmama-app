@@ -1,6 +1,7 @@
 /**
  * Membership / Free Explorer access — shared by landing + in-app upgrade flows.
- * Persists tier in AsyncStorage (+ web localStorage mirror) and opens Stripe Payment Links.
+ * Persists tier in AsyncStorage (+ web localStorage mirror) and opens Stripe Checkout
+ * (Checkout Sessions with promotion codes for monthly/annual; Payment Links as fallback).
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -220,23 +221,55 @@ export function enterLiveApp(extraParams = {}) {
 }
 
 /**
- * Open Stripe Payment Link for monthly / annual / gift.
- * Stores pending upgrade so a success return URL can unlock access.
+ * Create a hosted Checkout Session (monthly / annual) with promotion codes enabled.
+ * Falls back to Payment Links when the API is unavailable.
+ * Gift still uses the Payment Link.
  *
- * Configure each Payment Link success URL in Stripe to:
- *   https://calmmamavillage.com/app?upgraded=1&plan=monthly
- *   https://calmmamavillage.com/app?upgraded=1&plan=annual
+ * Success return (Checkout Session + Payment Links):
+ *   https://calmmamavillage.com/app?upgraded=1&plan=monthly|annual
  */
-export function openStripeCheckout(planKey, { email } = {}) {
+export async function openStripeCheckout(planKey, { email } = {}) {
   const key = planKey === 'yearly' ? 'annual' : planKey;
-  const href = STRIPE_LINKS[key];
-  if (!href) return false;
+  if (!STRIPE_LINKS[key] && key !== 'monthly' && key !== 'annual') return false;
 
   writeSessionJson(PENDING_UPGRADE_KEY, {
     plan: key,
     email: email || null,
     at: Date.now(),
   });
+
+  // Prefer Checkout Sessions API for subscriptions so allow_promotion_codes works.
+  if (canUseWebStorage() && (key === 'monthly' || key === 'annual')) {
+    try {
+      const origin = window.location?.origin || undefined;
+      const response = await fetch('/api/stripe/checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: key,
+          email: email || undefined,
+          origin,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.ok && data?.url) {
+        window.location.assign(data.url);
+        return true;
+      }
+      console.warn(
+        '[CalmMama] checkout-session unavailable, falling back to Payment Link',
+        data?.error || response.status,
+      );
+    } catch (err) {
+      console.warn(
+        '[CalmMama] checkout-session request failed, falling back to Payment Link',
+        err?.message || err,
+      );
+    }
+  }
+
+  const href = STRIPE_LINKS[key];
+  if (!href) return false;
 
   try {
     const url = new URL(href);

@@ -147,12 +147,12 @@ export default function SubscriptionScreen({
     }
   }, [visible, initialPlan]);
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     const plan = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
     if (!plan) return;
 
-    // Prefer live Stripe Payment Link from within the web app.
-    const opened = openStripeCheckout(plan.stripeKey, { email: memberEmail });
+    // Checkout Session (promo codes) with Payment Link fallback.
+    const opened = await openStripeCheckout(plan.stripeKey, { email: memberEmail });
     if (opened) {
       onCheckout?.(selectedPlan, { deferredUnlock: true });
       return;

@@ -2750,11 +2750,11 @@ function CalmMamaApp() {
   }, []);
 
   const handleUpgradeMonthly = useCallback(() => {
-    openStripeCheckout('monthly', { email: memberEmail });
+    void openStripeCheckout('monthly', { email: memberEmail });
   }, [memberEmail]);
 
   const handleUpgradeFounding = useCallback(() => {
-    openStripeCheckout('annual', { email: memberEmail });
+    void openStripeCheckout('annual', { email: memberEmail });
   }, [memberEmail]);
   const [ventingHistory, setVentingHistory] = useState([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
