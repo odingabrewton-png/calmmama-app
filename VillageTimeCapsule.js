@@ -20,8 +20,8 @@ import {
   persistTimeCapsulePhotos,
 } from './timeCapsuleStorage';
 
-function isPremiumCapsuleMonth(month, entries, isSubscribed) {
-  if (isSubscribed) return false;
+function isPremiumCapsuleMonth(month, entries, isPro) {
+  if (isPro) return false;
   if (entryHasContent(entries[month.id])) return false;
   return month.id > 1;
 }
@@ -82,10 +82,12 @@ export default function VillageTimeCapsule({
   babyAge = '1 Year',
   entries = {},
   onSaveMonth,
+  isPro = false,
   isSubscribed = false,
   onRequestUpgrade,
   onOpenSubscription,
 }) {
+  const hasPro = Boolean(isPro || isSubscribed);
   const [activeMonth, setActiveMonth] = useState(null);
   const [draft, setDraft] = useState('');
   const [photoUris, setPhotoUris] = useState([]);
@@ -156,7 +158,7 @@ export default function VillageTimeCapsule({
   };
 
   const openMonth = (month) => {
-    if (isPremiumCapsuleMonth(month, entries, isSubscribed)) {
+    if (isPremiumCapsuleMonth(month, entries, hasPro)) {
       onOpenSubscription?.();
       return;
     }
@@ -248,7 +250,8 @@ export default function VillageTimeCapsule({
       const { archived } = await runTextReleaseFlow({
         releaseRef,
         text: trimmed,
-        isSubscribed,
+        isPro: hasPro,
+        isSubscribed: hasPro,
         onRequestUpgrade,
         onArchive: async () => {
           onSaveMonth?.(activeMonth.id, {
@@ -261,7 +264,7 @@ export default function VillageTimeCapsule({
       setReleasing(false);
       if (!archived) {
         setDraft('');
-        if (!isSubscribed) closeModal();
+        if (!hasPro) closeModal();
       }
       return;
     }
@@ -280,7 +283,7 @@ export default function VillageTimeCapsule({
   };
 
   const openSlideshow = () => {
-    if (!isSubscribed) {
+    if (!hasPro) {
       onOpenSubscription?.();
       return;
     }
@@ -308,7 +311,7 @@ export default function VillageTimeCapsule({
         {MONTHS.map((month) => {
           const saved = entries[month.id];
           const photos = getEntryPhotos(saved);
-          const premiumLocked = isPremiumCapsuleMonth(month, entries, isSubscribed);
+          const premiumLocked = isPremiumCapsuleMonth(month, entries, hasPro);
           return (
             <TouchableOpacity
               key={month.id}

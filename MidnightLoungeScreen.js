@@ -519,6 +519,7 @@ function MidnightLoungeScreen({
   onAppendVentingEntry,
   guidanceHistory = [],
   onAppendGuidanceHistory,
+  isPro = false,
   isSubscribed = false,
   onRequestUpgrade,
   journeyContext = '',
@@ -978,7 +979,8 @@ function MidnightLoungeScreen({
             onExit={closeLoungeSubView}
             ventingHistory={ventingHistory}
             onAppendVentingEntry={onAppendVentingEntry}
-            isSubscribed={isSubscribed}
+            isPro={isPro || isSubscribed}
+            isSubscribed={isPro || isSubscribed}
             onRequestUpgrade={onRequestUpgrade}
             gentleEnter={false}
             loungeSubView
@@ -995,7 +997,8 @@ function MidnightLoungeScreen({
             onExit={closeLoungeSubView}
             ventingHistory={ventingHistory}
             onAppendVentingEntry={onAppendVentingEntry}
-            isSubscribed={isSubscribed}
+            isPro={isPro || isSubscribed}
+            isSubscribed={isPro || isSubscribed}
             onRequestUpgrade={onRequestUpgrade}
             gentleEnter={false}
             loungeSubView

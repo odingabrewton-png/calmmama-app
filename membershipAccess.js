@@ -10,7 +10,13 @@ export const MEMBERSHIP_TIERS = Object.freeze({
   FREE_EXPLORER: 'free_explorer',
   GENERAL: 'general',
   FOUNDING40: 'founding40',
+  VIP_LIFETIME: 'vip_lifetime',
 });
+
+export const VIP_PROMO_CODES = Object.freeze(['VILLAGEMAMA', 'FOUNDINGQUEEN', 'CALMVIP']);
+export const VIP_LIFETIME_PLAN = 'vip_lifetime';
+export const VIP_ACTIVATED_TOAST = 'VIP Access Activated! Welcome home, Queen 🌸👑';
+export const VIP_WELCOME_POINTS = 500;
 
 export const STRIPE_LINKS = Object.freeze({
   monthly: 'https://buy.stripe.com/test_dRmbJ1dsd89l2jTb0P9EI03',
@@ -68,14 +74,45 @@ function readSessionJson(key) {
 }
 
 export function isPremiumTier(tier) {
-  return tier === MEMBERSHIP_TIERS.GENERAL || tier === MEMBERSHIP_TIERS.FOUNDING40;
+  return (
+    tier === MEMBERSHIP_TIERS.GENERAL ||
+    tier === MEMBERSHIP_TIERS.FOUNDING40 ||
+    tier === MEMBERSHIP_TIERS.VIP_LIFETIME
+  );
+}
+
+export function normalizeVipPromoCode(raw) {
+  return String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+}
+
+export function isValidVipPromoCode(raw) {
+  return VIP_PROMO_CODES.includes(normalizeVipPromoCode(raw));
+}
+
+/** Feature gates: VIP lifetime + Stripe Pro both unlock paywalls. */
+export function hasPremiumAccess({ isPro, isSubscribed } = {}) {
+  return Boolean(isPro || isSubscribed);
 }
 
 export function membershipFromPlanId(planId) {
+  if (planId === VIP_LIFETIME_PLAN || planId === 'vip') {
+    return {
+      tier: MEMBERSHIP_TIERS.VIP_LIFETIME,
+      planId: VIP_LIFETIME_PLAN,
+      subscriptionPlan: VIP_LIFETIME_PLAN,
+      isPro: true,
+      isSubscribed: true,
+    };
+  }
   if (planId === 'yearly' || planId === 'annual' || planId === 'gift') {
     return {
       tier: MEMBERSHIP_TIERS.FOUNDING40,
       planId: planId === 'gift' ? 'gift' : 'yearly',
+      subscriptionPlan: planId === 'gift' ? 'gift' : 'yearly',
+      isPro: true,
       isSubscribed: true,
     };
   }
@@ -83,22 +120,48 @@ export function membershipFromPlanId(planId) {
     return {
       tier: MEMBERSHIP_TIERS.GENERAL,
       planId: 'monthly',
+      subscriptionPlan: 'monthly',
+      isPro: true,
       isSubscribed: true,
     };
   }
   return {
     tier: MEMBERSHIP_TIERS.FREE_EXPLORER,
     planId: null,
+    subscriptionPlan: null,
+    isPro: false,
     isSubscribed: false,
   };
 }
 
+/** Redeem a secret VIP promo code → lifetime Pro on this device. */
+export async function redeemVipPromoCode(rawCode, { email } = {}) {
+  if (!isValidVipPromoCode(rawCode)) {
+    return { ok: false, error: 'That code is not recognized. Please try again.' };
+  }
+  const membership = membershipFromPlanId(VIP_LIFETIME_PLAN);
+  const saved = await saveMembershipProfile({
+    ...membership,
+    email: email || null,
+    promoCode: normalizeVipPromoCode(rawCode),
+  });
+  return { ok: true, membership: saved, toast: VIP_ACTIVATED_TOAST };
+}
+
 export async function saveMembershipProfile(profile) {
+  const planId = profile?.planId ?? profile?.subscriptionPlan ?? null;
+  const isVip = planId === VIP_LIFETIME_PLAN || profile?.tier === MEMBERSHIP_TIERS.VIP_LIFETIME;
+  const isPro = Boolean(
+    profile?.isPro || profile?.isSubscribed || isPremiumTier(profile?.tier) || isVip,
+  );
   const next = {
-    tier: profile?.tier || MEMBERSHIP_TIERS.FREE_EXPLORER,
+    tier: profile?.tier || (isVip ? MEMBERSHIP_TIERS.VIP_LIFETIME : MEMBERSHIP_TIERS.FREE_EXPLORER),
     email: String(profile?.email || '').trim().toLowerCase() || null,
-    planId: profile?.planId ?? null,
-    isSubscribed: Boolean(profile?.isSubscribed ?? isPremiumTier(profile?.tier)),
+    planId,
+    subscriptionPlan: profile?.subscriptionPlan ?? planId,
+    isPro,
+    isSubscribed: Boolean(profile?.isSubscribed || isPro),
+    promoCode: profile?.promoCode ? normalizeVipPromoCode(profile.promoCode) : null,
     updatedAt: new Date().toISOString(),
   };
   writeWebJson(STORAGE_KEY, next);

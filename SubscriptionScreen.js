@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  TextInput,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { openStripeCheckout } from './membershipAccess';
+import { openStripeCheckout, redeemVipPromoCode } from './membershipAccess';
 
 export const SUBSCRIPTION_PLANS = {
   monthly: 'monthly',
@@ -55,6 +57,46 @@ const SERIF = Platform.select({
   default: { fontFamily: 'serif' },
 });
 
+const SANS = Platform.select({
+  web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
+  ios: { fontFamily: 'System' },
+  default: { fontFamily: 'sans-serif' },
+});
+
+function SoftToast({ message }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    if (!message) return undefined;
+    opacity.setValue(0);
+    translateY.setValue(10);
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        friction: 8,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    const hide = setTimeout(() => {
+      Animated.timing(opacity, { toValue: 0, duration: 280, useNativeDriver: true }).start();
+    }, 2600);
+    return () => clearTimeout(hide);
+  }, [message, opacity, translateY]);
+
+  if (!message) return null;
+
+  return (
+    <View pointerEvents="none" style={styles.toastHost}>
+      <Animated.View style={[styles.toastPill, { opacity, transform: [{ translateY }] }]}>
+        <Text style={[styles.toastText, SANS]}>{message}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 function PricingCard({ plan, selected, onSelect }) {
   const isBest = plan.bestValue;
   const isSelected = selected === plan.id;
@@ -85,13 +127,24 @@ export default function SubscriptionScreen({
   visible,
   onClose,
   onCheckout,
+  onVipRedeemed,
   initialPlan = SUBSCRIPTION_PLANS.yearly,
   memberEmail = null,
 }) {
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   useEffect(() => {
-    if (visible) setSelectedPlan(initialPlan);
+    if (visible) {
+      setSelectedPlan(initialPlan);
+      setPromoCode('');
+      setPromoError('');
+      setPromoBusy(false);
+      setToastMessage(null);
+    }
   }, [visible, initialPlan]);
 
   const handleCheckout = () => {
@@ -116,6 +169,23 @@ export default function SubscriptionScreen({
     );
   };
 
+  const handleRedeemPromo = async () => {
+    if (promoBusy) return;
+    setPromoError('');
+    setPromoBusy(true);
+    try {
+      const result = await redeemVipPromoCode(promoCode, { email: memberEmail });
+      if (!result.ok) {
+        setPromoError(result.error || 'That code is not recognized.');
+        return;
+      }
+      setToastMessage(result.toast);
+      onVipRedeemed?.(result.membership);
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
   const selected = PLAN_OPTIONS.find((p) => p.id === selectedPlan);
 
   return (
@@ -129,6 +199,7 @@ export default function SubscriptionScreen({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={false}
+          keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} hitSlop={12} activeOpacity={0.8}>
             <Text style={styles.closeBtnText}>✕</Text>
@@ -152,6 +223,40 @@ export default function SubscriptionScreen({
             ))}
           </View>
 
+          <View style={styles.promoBlock}>
+            <Text style={[styles.promoLabel, SERIF]}>Promo / VIP Code</Text>
+            <View style={styles.promoRow}>
+              <TextInput
+                style={[styles.promoInput, SANS]}
+                value={promoCode}
+                onChangeText={(text) => {
+                  setPromoCode(text);
+                  if (promoError) setPromoError('');
+                }}
+                placeholder="Enter your code"
+                placeholderTextColor="#9AA89A"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                autoComplete="off"
+                returnKeyType="done"
+                onSubmitEditing={handleRedeemPromo}
+                editable={!promoBusy}
+                accessibilityLabel="Promo or VIP code"
+              />
+              <TouchableOpacity
+                style={[styles.promoBtn, promoBusy && styles.promoBtnDisabled]}
+                onPress={handleRedeemPromo}
+                activeOpacity={0.88}
+                disabled={promoBusy || !String(promoCode || '').trim()}
+              >
+                <Text style={[styles.promoBtnText, SANS]}>
+                  {promoBusy ? '…' : 'Redeem'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {promoError ? <Text style={[styles.promoError, SANS]}>{promoError}</Text> : null}
+          </View>
+
           <Text style={styles.finePrint}>
             Secure Stripe checkout · Cancel anytime · Return to /app after payment to unlock
           </Text>
@@ -167,6 +272,8 @@ export default function SubscriptionScreen({
             <Text style={styles.footerGhostText}>Not right now</Text>
           </Pressable>
         </View>
+
+        <SoftToast message={toastMessage} />
       </LinearGradient>
     </Modal>
   );
@@ -279,6 +386,61 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: '#6E7E65',
   },
+  promoBlock: {
+    marginTop: 22,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 252, 248, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 165, 116, 0.35)',
+  },
+  promoLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#5A4A3A',
+    marginBottom: 10,
+  },
+  promoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  promoInput: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(186, 198, 188, 0.65)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3D443A',
+    letterSpacing: 0.6,
+  },
+  promoBtn: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: ROSE_GOLD,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoBtnDisabled: {
+    opacity: 0.55,
+  },
+  promoBtnText: {
+    color: '#FFF9F2',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  promoError: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#B45A5A',
+    fontWeight: '600',
+  },
   finePrint: {
     marginTop: 18,
     fontSize: 12,
@@ -313,5 +475,38 @@ const styles = StyleSheet.create({
   footerGhostText: {
     color: '#8A968A',
     fontSize: 14,
+  },
+  toastHost: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: Platform.select({ ios: 72, default: 56 }),
+    zIndex: 50,
+  },
+  toastPill: {
+    maxWidth: '90%',
+    backgroundColor: 'rgba(252, 238, 245, 0.97)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 168, 216, 0.55)',
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderRadius: 999,
+    ...Platform.select({
+      web: { boxShadow: '0 10px 28px rgba(110, 80, 140, 0.16)' },
+      default: {
+        shadowColor: '#6E508C',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.16,
+        shadowRadius: 16,
+        elevation: 8,
+      },
+    }),
+  },
+  toastText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#5A4570',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
 });

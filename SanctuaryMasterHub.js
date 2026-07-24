@@ -106,11 +106,13 @@ function SanctuaryMasterHub({
   onOpenSanctuaryVenting,
   onOpenMamasGuidance,
   onOpenMindfulPause,
+  isPro = false,
   isSubscribed = false,
   onRequestUpgrade,
 }) {
+  const hasPro = Boolean(isPro || isSubscribed);
   const handleMindfulPause = () => {
-    if (!isSubscribed) {
+    if (!hasPro) {
       onRequestUpgrade?.();
       return;
     }

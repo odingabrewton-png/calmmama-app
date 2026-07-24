@@ -43,6 +43,7 @@ export const REWARD_POINT_VALUES = {
   dailyPuzzle: 15,
   encourage: 25,
   subscriptionUpgrade: 250,
+  vipPromo: 500,
 };
 
 export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
@@ -50,6 +51,7 @@ export const WEEKLY_JOURNAL_BONUS_TOAST =
   'Weekly Sanctuary Bonus Unlocked! +50 pts 🌸';
 export const DAILY_CHECKLIST_TOAST = 'Daily Care List Complete! +5 pts 🌸';
 export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium Upgrade Bonus! +250 pts 🌸👑';
+export const VIP_PROMO_TOAST = 'VIP Welcome Bonus! +500 pts 🌸👑';
 
 export function createDefaultVillageRewards() {
   return {
@@ -59,6 +61,7 @@ export function createDefaultVillageRewards() {
       pollFeedback: false,
       registryCompleted: false,
       subscriptionUpgrade: false,
+      vipPromo: false,
       dailyJournalDate: null,
       dailyPuzzleDate: null,
       dailyChecklistDate: null,
@@ -114,6 +117,7 @@ export function normalizeVillageRewards(raw) {
       pollFeedback: Boolean(actions.pollFeedback),
       registryCompleted: Boolean(actions.registryCompleted),
       subscriptionUpgrade: Boolean(actions.subscriptionUpgrade),
+      vipPromo: Boolean(actions.vipPromo),
       dailyJournalDate: actions.dailyJournalDate || null,
       dailyPuzzleDate: actions.dailyPuzzleDate || null,
       dailyChecklistDate: actions.dailyChecklistDate || null,
@@ -399,6 +403,23 @@ export function applyAddPoints(rewards, amount, actionKey) {
     actions.subscriptionUpgrade = true;
     return finishAward(current, actions, awardAmount, {
       toastMessage: SUBSCRIPTION_UPGRADE_TOAST,
+    });
+  } else if (key === 'vipPromo') {
+    if (actions.vipPromo) {
+      return {
+        awarded: false,
+        amount: 0,
+        reason: 'already_done',
+        rewards: current,
+        newlyUnlocked: [],
+        toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
+      };
+    }
+    actions.vipPromo = true;
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: VIP_PROMO_TOAST,
     });
   } else if (key === 'encourage') {
     if (actions.dailyEncourageDate !== today) {

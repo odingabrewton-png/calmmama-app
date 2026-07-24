@@ -94,6 +94,7 @@ import {
 } from './subscriptionConfig';
 import {
   MEMBERSHIP_TIERS,
+  VIP_WELCOME_POINTS,
   consumeStripeUpgradeReturn,
   loadMembershipProfile,
   openStripeCheckout,
@@ -1619,6 +1620,7 @@ function renderMainTabContent({
               babyAge={babyAge}
               entries={timeCapsuleEntries}
               onSaveMonth={onSaveTimeCapsuleMonth}
+              isPro={isSubscribed}
               isSubscribed={isSubscribed}
               onRequestUpgrade={onReleaseUpgradePrompt}
               onOpenSubscription={onOpenSubscription}
@@ -1739,6 +1741,7 @@ function renderMainTabContent({
             babyAge={babyAge}
             history={littleHorizonsHistory}
             onSaveEntry={onSaveLittleHorizonsEntry}
+            isPro={isSubscribed}
             isSubscribed={isSubscribed}
             isYearlyMember={isYearlyMember}
             onRequestUpgrade={onReleaseUpgradePrompt}
@@ -1774,6 +1777,7 @@ function renderMainTabContent({
         isToddlerKitchen={userJourney !== 'pregnant' && showsLittleBitesKitchen(babyAge)}
         isPostpartumKitchen={userJourney === 'postpartum'}
         isPregnantKitchen={userJourney === 'pregnant'}
+        isPro={isSubscribed}
         isSubscribed={isSubscribed}
         onRequestUpgrade={onOpenSubscription}
       />
@@ -2405,7 +2409,8 @@ function CalmMamaApp() {
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [bootHydrated, setBootHydrated] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState('intake');
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isPro, setIsPro] = useState(false);
+  const isSubscribed = isPro;
   const [userSubscriptionType, setUserSubscriptionType] = useState(null);
   const [subscriptionProductId, setSubscriptionProductId] = useState(null);
   const [membershipTier, setMembershipTier] = useState(MEMBERSHIP_TIERS.FREE_EXPLORER);
@@ -2414,6 +2419,7 @@ function CalmMamaApp() {
   const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [premiumWelcomeOpen, setPremiumWelcomeOpen] = useState(false);
   const [premiumWelcomePlan, setPremiumWelcomePlan] = useState(null);
+  const [premiumWelcomeVariant, setPremiumWelcomeVariant] = useState('premium');
   const [userJourney, setUserJourney] = useState('pregnant');
   const [activeMode, setActiveMode] = useState(ACTIVE_MODES.PREGNANT);
   const [homeTrack, setHomeTrack] = useState(HOME_TRACKS.PREGNANT);
@@ -2554,12 +2560,28 @@ function CalmMamaApp() {
     if (!profile) return;
     setMembershipTier(profile.tier || MEMBERSHIP_TIERS.FREE_EXPLORER);
     setMemberEmail(profile.email || null);
-    setIsSubscribed(Boolean(profile.isSubscribed));
-    if (profile.planId) {
-      setUserSubscriptionType(profile.planId);
-      setSubscriptionProductId(getSubscriptionProductId(profile.planId));
+    const nextIsPro = Boolean(profile.isPro || profile.isSubscribed);
+    setIsPro(nextIsPro);
+    const plan = profile.planId || profile.subscriptionPlan;
+    if (plan) {
+      setUserSubscriptionType(plan);
+      setSubscriptionProductId(getSubscriptionProductId(plan));
     }
   }, []);
+
+  const handleVipRedeemed = useCallback(
+    (membership) => {
+      applyMembership(membership);
+      setPremiumWelcomeVariant('vip');
+      setPremiumWelcomePlan('VIP Lifetime Access');
+      setPremiumWelcomeOpen(true);
+      setSubscriptionOpen(false);
+      setTimeout(() => {
+        addPoints(VIP_WELCOME_POINTS, 'vipPromo');
+      }, 400);
+    },
+    [applyMembership, addPoints],
+  );
 
   const handleOpenSubscription = useCallback(() => {
     setSubscriptionOpen(true);
@@ -2740,6 +2762,7 @@ function CalmMamaApp() {
                 ? 'Gift membership'
                 : 'Village Access · Monthly',
           );
+          setPremiumWelcomeVariant('premium');
           setPremiumWelcomeOpen(true);
           // Soft delay so rewards hydrate before the upgrade bonus lands.
           setTimeout(() => {
@@ -4530,6 +4553,7 @@ function CalmMamaApp() {
               visible={subscriptionOpen}
               onClose={() => setSubscriptionOpen(false)}
               onCheckout={handleSubscriptionCheckout}
+              onVipRedeemed={handleVipRedeemed}
               memberEmail={memberEmail}
             />
 
@@ -4665,7 +4689,8 @@ function CalmMamaApp() {
                     onAppendGuidanceHistory={(entry) =>
                       setGuidanceHistory((prev) => [...prev, entry].slice(-50))
                     }
-                    isSubscribed={isSubscribed}
+                    isPro={isPro}
+                    isSubscribed={isPro}
                     onRequestUpgrade={handleReleaseUpgradePrompt}
                     journeyContext={sanctuaryJourneyContext}
                     renderVillagePortal={({ onClose }) => (
@@ -4793,6 +4818,7 @@ function CalmMamaApp() {
 
         <PremiumUpgradeWelcomeModal
           visible={premiumWelcomeOpen}
+          variant={premiumWelcomeVariant}
           planLabel={premiumWelcomePlan}
           onClose={() => setPremiumWelcomeOpen(false)}
         />
