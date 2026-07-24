@@ -100,6 +100,7 @@ import {
   loadMembershipProfile,
   membershipFromPlanId,
   openStripeCheckout,
+  redeemVipPromoCode,
   saveMembershipProfile,
 } from './membershipAccess';
 import {
@@ -2392,7 +2393,43 @@ function VillageInfoModal({
   );
 }
 
-function UpgradeOfferSheet({ visible, onClose, onUpgradeMonthly, onUpgradeFounding }) {
+function UpgradeOfferSheet({
+  visible,
+  onClose,
+  onUpgradeMonthly,
+  onUpgradeFounding,
+  onVipRedeemed,
+  memberEmail = null,
+}) {
+  const [codeExpanded, setCodeExpanded] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setCodeExpanded(false);
+    setPromoCode('');
+    setPromoError('');
+    setPromoBusy(false);
+  }, [visible]);
+
+  const handleRedeemPromo = async () => {
+    if (promoBusy) return;
+    setPromoError('');
+    setPromoBusy(true);
+    try {
+      const result = await redeemVipPromoCode(promoCode, { email: memberEmail });
+      if (!result.ok) {
+        setPromoError(result.error || "That code isn't quite right. Try again mama!");
+        return;
+      }
+      onVipRedeemed?.(result.membership, result);
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.upgradeBackdrop} onPress={onClose}>
@@ -2424,6 +2461,63 @@ function UpgradeOfferSheet({ visible, onClose, onUpgradeMonthly, onUpgradeFoundi
           >
             <Text style={styles.upgradeSecondaryText}>Upgrade ($5.99/mo)</Text>
           </TouchableOpacity>
+
+          <View style={styles.foundingCodeBlock}>
+            <TouchableOpacity
+              onPress={() => {
+                setCodeExpanded((open) => !open);
+                if (promoError) setPromoError('');
+              }}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: codeExpanded }}
+              hitSlop={8}
+            >
+              <Text style={styles.foundingCodeLink}>
+                {codeExpanded ? 'Hide Founding Mother Code' : 'Have a Founding Mother Code?'}
+              </Text>
+            </TouchableOpacity>
+
+            {codeExpanded ? (
+              <View style={styles.foundingCodePanel}>
+                <View style={styles.foundingCodeRow}>
+                  <TextInput
+                    style={styles.foundingCodeInput}
+                    value={promoCode}
+                    onChangeText={(text) => {
+                      setPromoCode(text);
+                      if (promoError) setPromoError('');
+                    }}
+                    placeholder="Enter your code"
+                    placeholderTextColor="#9AA89A"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    autoComplete="off"
+                    returnKeyType="done"
+                    onSubmitEditing={handleRedeemPromo}
+                    editable={!promoBusy}
+                    accessibilityLabel="Founding Mother code"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.foundingCodeRedeemBtn,
+                      (promoBusy || !String(promoCode || '').trim()) &&
+                        styles.foundingCodeRedeemBtnDisabled,
+                    ]}
+                    onPress={handleRedeemPromo}
+                    activeOpacity={0.88}
+                    disabled={promoBusy || !String(promoCode || '').trim()}
+                  >
+                    <Text style={styles.foundingCodeRedeemText}>
+                      {promoBusy ? '…' : 'Redeem'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {promoError ? <Text style={styles.foundingCodeError}>{promoError}</Text> : null}
+              </View>
+            ) : null}
+          </View>
+
           <TouchableOpacity style={styles.upgradeGhostBtn} onPress={onClose} activeOpacity={0.85}>
             <Text style={styles.upgradeGhostText}>Keep exploring free</Text>
           </TouchableOpacity>
@@ -4773,6 +4867,8 @@ function CalmMamaApp() {
               onClose={() => setUpgradeSheetOpen(false)}
               onUpgradeMonthly={handleUpgradeMonthly}
               onUpgradeFounding={handleUpgradeFounding}
+              onVipRedeemed={handleVipRedeemed}
+              memberEmail={memberEmail}
             />
 
             <SubscriptionScreen
@@ -8216,6 +8312,65 @@ const styles = StyleSheet.create({
     color: '#6A4F9A',
     fontSize: 14,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  foundingCodeBlock: {
+    marginTop: 6,
+    marginBottom: 4,
+    alignItems: 'center',
+  },
+  foundingCodeLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8A6A4A',
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+    paddingVertical: 6,
+  },
+  foundingCodePanel: {
+    width: '100%',
+    marginTop: 8,
+  },
+  foundingCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  foundingCodeInput: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(186, 198, 188, 0.65)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3D443A',
+    letterSpacing: 0.5,
+  },
+  foundingCodeRedeemBtn: {
+    minHeight: 46,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#C4A574',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  foundingCodeRedeemBtnDisabled: {
+    opacity: 0.55,
+  },
+  foundingCodeRedeemText: {
+    color: '#FFF9F2',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  foundingCodeError: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#B45A5A',
+    fontWeight: '600',
     textAlign: 'center',
   },
   upgradeGhostBtn: {
