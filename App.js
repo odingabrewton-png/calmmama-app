@@ -1568,6 +1568,7 @@ function renderMainTabContent({
   weightEntries,
   setWeeksPregnant,
   setWeightEntries,
+  onNotify,
   onOpenBirthPrompt,
   embedded,
   selectedSymptoms,
@@ -1778,7 +1779,7 @@ function renderMainTabContent({
             const rest = prev.filter((e) => e.week !== entry.week);
             return [...rest, entry].sort((a, b) => a.week - b.week);
           });
-          notify({
+          onNotify?.({
             category: 'bloom',
             title: 'Weekly Bloom',
             message: `Week ${entry.week} weight saved — your bloom is tracked.`,
@@ -4648,6 +4649,7 @@ function CalmMamaApp() {
       weightEntries,
       setWeeksPregnant,
       setWeightEntries,
+      onNotify: notify,
       onOpenBirthPrompt: handleOpenBirthPrompt,
       embedded: true,
       selectedSymptoms,
@@ -4732,6 +4734,7 @@ function CalmMamaApp() {
       foundingGiftsYearlyEligible,
       handleReleaseUpgradePrompt,
       handleOpenSubscription,
+      notify,
     ]
   );
 
