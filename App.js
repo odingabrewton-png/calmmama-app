@@ -158,6 +158,11 @@ function consumeSanctuaryJournalDeepLink() {
 import { isBirthdayToday } from './mamaBirthdayUtils';
 import { MAMA_KITCHEN_RECIPES } from './mealsData';
 import { getPostpartumDailyWins, getPostpartumWinsDayKey } from './postpartumDailyWins';
+import { getToddlerDailyAnchors, getToddlerAnchorsDayKey } from './toddlerDailyAnchors';
+import {
+  loadToddlerDailyState,
+  saveToddlerDailyState,
+} from './toddlerDailyStorage';
 import { getPostpartumVibeMeals } from './postpartumVibeKitchen';
 import { getPregnantSymptomMeals } from './pregnantSymptomKitchen';
 import {
@@ -752,13 +757,7 @@ const TODDLER_VIBES = [
   { id: 'emotions', emoji: '😮‍💨', label: 'Big Emotions' },
 ];
 
-const DEFAULT_TODDLER_WINS = [
-  { id: 1, text: 'Nap Window Secured 💤', done: false },
-  { id: 2, text: 'Real Food / Solid Hydration Check 🥦', done: false },
-  { id: 3, text: 'Energy Release (Outdoor Play) ☀️', done: false },
-  { id: 4, text: 'Drank a hot beverage in peace ☕', done: false },
-  { id: 5, text: 'Logged a funny quote or win to the Time Capsule ✏️', done: false },
-];
+const DEFAULT_TODDLER_WINS = getToddlerDailyAnchors();
 
 function getPregnancyTrimester(weeksPregnant) {
   const week = parseInt(String(weeksPregnant), 10);
@@ -1288,9 +1287,15 @@ function PostpartumDailyTracker({
   vibesList = POSTPARTUM_VIBES,
   winsSectionTitle = '📝 Mama-First Daily Wins',
   winsSectionHint = 'Micro-intentions that honor you, not just output',
+  enableVibeNotes = false,
+  onSaveVibeEntry,
+  vibeHistoryTitle = "Today's vibe log",
 }) {
   const { addPoints, notify } = useVillageRewards();
   const [showFireworks, setShowFireworks] = useState(false);
+  const [noteModalVibe, setNoteModalVibe] = useState(null);
+  const [vibeNoteDraft, setVibeNoteDraft] = useState('');
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
   const celebrationTimers = useRef([]);
@@ -1364,11 +1369,47 @@ function PostpartumDailyTracker({
     [mamaWinsTasks, onToggleMamaWin, startWinsCelebration, addPoints, notify]
   );
 
+  const handleVibePress = useCallback(
+    (vibe) => {
+      const active = selectedVibes.includes(vibe.id);
+      if (active) {
+        onToggleVibe(vibe.id);
+        return;
+      }
+      if (enableVibeNotes) {
+        setNoteModalVibe(vibe);
+        setVibeNoteDraft('');
+        return;
+      }
+      onToggleVibe(vibe.id);
+    },
+    [enableVibeNotes, onToggleVibe, selectedVibes],
+  );
+
+  const handleSaveVibeNote = useCallback(() => {
+    if (!noteModalVibe) return;
+    const note = String(vibeNoteDraft || '').trim();
+    if (typeof onSaveVibeEntry === 'function') {
+      onSaveVibeEntry({
+        vibeId: noteModalVibe.id,
+        emoji: noteModalVibe.emoji,
+        label: noteModalVibe.label,
+        note,
+      });
+    } else {
+      onToggleVibe(noteModalVibe.id);
+    }
+    setNoteModalVibe(null);
+    setVibeNoteDraft('');
+  }, [noteModalVibe, vibeNoteDraft, onSaveVibeEntry, onToggleVibe]);
+
   useEffect(() => () => {
     clearCelebrationTimers();
     burstAnim.stopAnimation();
     bloomAnim.stopAnimation();
   }, [burstAnim, bloomAnim]);
+
+  const visibleHistory = historyExpanded ? vibeHistory.slice(0, 20) : vibeHistory.slice(0, 5);
 
   return (
     <View style={panelStyle}>
@@ -1379,7 +1420,11 @@ function PostpartumDailyTracker({
 
       <View style={styles.homeGlassCard}>
         <Text style={styles.homeCardTitle}>{vibeSectionTitle}</Text>
-        <Text style={styles.homeCardHint}>{vibeSectionHint}</Text>
+        <Text style={styles.homeCardHint}>
+          {enableVibeNotes
+            ? `${vibeSectionHint} Tap a mood to add a short note about what your toddler is showing you — saved so you can reread anytime.`
+            : vibeSectionHint}
+        </Text>
         <View style={styles.symptomRow}>
           {vibesList.map((vibe) => {
             const active = selectedVibes.includes(vibe.id);
@@ -1387,7 +1432,7 @@ function PostpartumDailyTracker({
               <TouchableOpacity
                 key={vibe.id}
                 style={[styles.vibeChip, active && styles.vibeChipActive]}
-                onPress={() => onToggleVibe(vibe.id)}
+                onPress={() => handleVibePress(vibe)}
                 activeOpacity={0.85}
               >
                 <Text style={styles.symptomEmoji}>{vibe.emoji}</Text>
@@ -1400,12 +1445,30 @@ function PostpartumDailyTracker({
         </View>
         {vibeHistory.length > 0 ? (
           <View style={styles.symptomHistoryBox}>
-            <Text style={styles.symptomHistoryTitle}>Today's vibe log</Text>
-            {vibeHistory.slice(0, 5).map((entry) => (
-              <Text key={entry.id} style={styles.symptomHistoryLine}>
-                {entry.emoji} {entry.label} · {entry.time}
-              </Text>
+            <Text style={styles.symptomHistoryTitle}>{vibeHistoryTitle}</Text>
+            {visibleHistory.map((entry) => (
+              <View key={entry.id} style={styles.vibeHistoryEntry}>
+                <Text style={styles.symptomHistoryLine}>
+                  {entry.emoji} {entry.label}
+                  {entry.date ? ` · ${entry.date}` : ''}
+                  {entry.time ? ` · ${entry.time}` : ''}
+                </Text>
+                {entry.note ? (
+                  <Text style={styles.vibeHistoryNote}>{entry.note}</Text>
+                ) : null}
+              </View>
             ))}
+            {vibeHistory.length > 5 ? (
+              <TouchableOpacity
+                onPress={() => setHistoryExpanded((open) => !open)}
+                activeOpacity={0.8}
+                style={styles.vibeHistoryToggle}
+              >
+                <Text style={styles.vibeHistoryToggleText}>
+                  {historyExpanded ? 'Show less' : `Read earlier notes (${vibeHistory.length})`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : null}
 
@@ -1429,6 +1492,58 @@ function PostpartumDailyTracker({
           ))}
         </View>
       </View>
+
+      <Modal
+        visible={Boolean(noteModalVibe)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setNoteModalVibe(null);
+          setVibeNoteDraft('');
+        }}
+      >
+        <Pressable
+          style={styles.vibeNoteBackdrop}
+          onPress={() => {
+            setNoteModalVibe(null);
+            setVibeNoteDraft('');
+          }}
+        >
+          <Pressable style={styles.vibeNoteCard} onPress={(e) => e.stopPropagation?.()}>
+            <Text style={styles.vibeNoteEyebrow}>TODDLER MOOD NOTE</Text>
+            <Text style={styles.vibeNoteTitle}>
+              {noteModalVibe ? `${noteModalVibe.emoji} ${noteModalVibe.label}` : ''}
+            </Text>
+            <Text style={styles.vibeNoteHint}>
+              What is your toddler showing you right now? A few words help you remember this day.
+            </Text>
+            <TextInput
+              style={styles.vibeNoteInput}
+              value={vibeNoteDraft}
+              onChangeText={setVibeNoteDraft}
+              placeholder="e.g. Clung to me after daycare — needed closeness more than toys…"
+              placeholderTextColor="#9AA89A"
+              multiline
+              textAlignVertical="top"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={styles.vibeNoteSaveBtn}
+              onPress={handleSaveVibeNote}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.vibeNoteSaveText}>Save mood note</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.vibeNoteSkipBtn}
+              onPress={handleSaveVibeNote}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.vibeNoteSkipText}>Save without a note</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={showFireworks}
@@ -1591,6 +1706,7 @@ function renderMainTabContent({
   postpartumVibeHistory,
   selectedToddlerVibes,
   onToggleToddlerVibe,
+  onSaveToddlerVibeEntry,
   toddlerVibeHistory,
   mamaWinsTasks,
   onToggleMamaWin,
@@ -1730,10 +1846,13 @@ function renderMainTabContent({
           onOpenKitchen={onOpenKitchenTab}
           dailySub="Toddler routines & mama-first intentions"
           vibeSectionTitle="🌸 Mood Vibe Check"
-          vibeSectionHint="How is your toddler day unfolding? Tap what feels true."
+          vibeSectionHint="How is your toddler day unfolding?"
           vibesList={TODDLER_VIBES}
           winsSectionTitle="📝 Daily Toddler Anchors"
-          winsSectionHint="Gentle anchors for busy toddler days — check what you claimed."
+          winsSectionHint="A fresh set of gentle anchors each day — check what you claimed."
+          enableVibeNotes
+          onSaveVibeEntry={onSaveToddlerVibeEntry}
+          vibeHistoryTitle="Saved toddler mood notes"
         />
       </ScrollView>
     );
@@ -2904,6 +3023,8 @@ function CalmMamaApp() {
   const [toddlerWinsTasks, setToddlerWinsTasks] = useState(DEFAULT_TODDLER_WINS);
   const [littleHorizonsHistory, setLittleHorizonsHistory] = useState([]);
   const toddlerVibeLogIdRef = useRef(0);
+  const toddlerWinsDayRef = useRef(getToddlerAnchorsDayKey());
+  const toddlerDailyHydratedRef = useRef(false);
   const [milestoneScrapbook, setMilestoneScrapbook] = useState({});
   const [timeCapsuleEntries, setTimeCapsuleEntries] = useState({});
   const [goldenHourKeepsakes, setGoldenHourKeepsakes] = useState([]);
@@ -2950,6 +3071,61 @@ function CalmMamaApp() {
     const intervalId = setInterval(applyDailyWins, 60_000);
     return () => clearInterval(intervalId);
   }, [userJourney]);
+
+  // Rotate Daily Toddler Anchors once per calendar day (same pattern as mama wins).
+  useEffect(() => {
+    if (userJourney !== 'postpartum') return undefined;
+
+    const applyToddlerAnchors = () => {
+      const today = getToddlerAnchorsDayKey();
+      setToddlerWinsTasks((prev) => {
+        if (prev?.length && String(prev[0]?.id || '').startsWith(today)) {
+          return prev;
+        }
+        toddlerWinsDayRef.current = today;
+        return getToddlerDailyAnchors();
+      });
+    };
+
+    applyToddlerAnchors();
+    const intervalId = setInterval(applyToddlerAnchors, 60_000);
+    return () => clearInterval(intervalId);
+  }, [userJourney]);
+
+  // Hydrate toddler vibe notes + anchors from disk once.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await loadToddlerDailyState();
+      if (cancelled) return;
+      toddlerDailyHydratedRef.current = true;
+      setSelectedToddlerVibes(saved.selectedVibes || []);
+      setToddlerVibeHistory(saved.vibeHistory || []);
+      setToddlerWinsTasks(saved.winsTasks || getToddlerDailyAnchors());
+      toddlerWinsDayRef.current = saved.winsDayKey || getToddlerAnchorsDayKey();
+      if (saved.vibeHistory?.length) {
+        const maxId = saved.vibeHistory.reduce((max, entry) => {
+          const n = Number(entry?.id);
+          return Number.isFinite(n) ? Math.max(max, n) : max;
+        }, 0);
+        toddlerVibeLogIdRef.current = maxId;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist toddler daily village whenever notes / anchors change.
+  useEffect(() => {
+    if (!toddlerDailyHydratedRef.current) return;
+    saveToddlerDailyState({
+      selectedVibes: selectedToddlerVibes,
+      vibeHistory: toddlerVibeHistory,
+      winsTasks: toddlerWinsTasks,
+      winsDayKey: toddlerWinsDayRef.current || getToddlerAnchorsDayKey(),
+    });
+  }, [selectedToddlerVibes, toddlerVibeHistory, toddlerWinsTasks]);
 
   useEffect(() => {
     try {
@@ -3363,10 +3539,22 @@ function CalmMamaApp() {
       const next = isActive ? prev.filter((id) => id !== vibeId) : [...prev, vibeId];
       const tags = collectTherapeuticTagsFromVibes(next);
       setKitchenTherapeuticTags(tags.length ? tags : null);
+      return next;
+    });
+  };
 
-      if (isActive) {
+  const handleSaveToddlerVibeEntry = useCallback(
+    ({ vibeId, emoji, label, note }) => {
+      const option = TODDLER_VIBES.find((v) => v.id === vibeId);
+      if (!option && !label) return;
+
+      setSelectedToddlerVibes((prev) => {
+        const next = prev.includes(vibeId) ? prev : [...prev, vibeId];
+        const tags = collectTherapeuticTagsFromVibes(next);
+        setKitchenTherapeuticTags(tags.length ? tags : null);
         return next;
-      }
+      });
+
       const now = new Date();
       toddlerVibeLogIdRef.current += 1;
       setToddlerVibeHistory((history) =>
@@ -3374,17 +3562,27 @@ function CalmMamaApp() {
           {
             id: toddlerVibeLogIdRef.current,
             vibeId,
-            emoji: option.emoji,
-            label: option.label,
+            emoji: emoji || option?.emoji || '✨',
+            label: label || option?.label || 'Mood',
+            note: String(note || '').trim(),
             time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
             date: now.toLocaleDateString(),
+            at: now.toISOString(),
           },
           ...history,
-        ].slice(0, 40)
+        ].slice(0, 80),
       );
-      return next;
-    });
-  };
+
+      notify({
+        category: 'nursery',
+        title: 'Toddler Mood Note',
+        message: String(note || '').trim()
+          ? 'Mood + note saved — you can reread it anytime.'
+          : 'Mood saved to your toddler vibe journal.',
+      });
+    },
+    [notify],
+  );
 
   const handleToggleToddlerWin = (taskId) => {
     setToddlerWinsTasks((prev) =>
@@ -3888,7 +4086,7 @@ function CalmMamaApp() {
             setMamaWinsTasks(getPostpartumDailyWins());
             setSelectedToddlerVibes([]);
             setToddlerVibeHistory([]);
-            setToddlerWinsTasks(DEFAULT_TODDLER_WINS);
+            setToddlerWinsTasks(getToddlerDailyAnchors());
             setLittleHorizonsHistory([]);
             setOnboardingStep('intake');
             onboardingStepBlend.setValue(0);
@@ -4724,6 +4922,7 @@ function CalmMamaApp() {
       postpartumVibeHistory,
       selectedToddlerVibes,
       onToggleToddlerVibe: handleToggleToddlerVibe,
+      onSaveToddlerVibeEntry: handleSaveToddlerVibeEntry,
       toddlerVibeHistory,
       mamaWinsTasks,
       onToggleMamaWin: handleToggleMamaWin,
@@ -4779,6 +4978,7 @@ function CalmMamaApp() {
       toddlerVibeHistory,
       mamaWinsTasks,
       toddlerWinsTasks,
+      handleSaveToddlerVibeEntry,
       littleHorizonsHistory,
       pulseAnim,
       kitchenTherapeuticTags,
@@ -7821,6 +8021,92 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#3D4F44',
     marginBottom: 3,
+  },
+  vibeHistoryEntry: {
+    marginBottom: 8,
+  },
+  vibeHistoryNote: {
+    marginTop: 2,
+    marginLeft: 2,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#5A6A62',
+    fontStyle: 'italic',
+  },
+  vibeHistoryToggle: {
+    marginTop: 4,
+    paddingVertical: 4,
+  },
+  vibeHistoryToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6A7A68',
+    textDecorationLine: 'underline',
+  },
+  vibeNoteBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(36, 42, 38, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  vibeNoteCard: {
+    borderRadius: 22,
+    padding: 20,
+    backgroundColor: 'rgba(255, 252, 248, 0.98)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 165, 116, 0.35)',
+  },
+  vibeNoteEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: '#8A6A4A',
+    marginBottom: 6,
+  },
+  vibeNoteTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#3D443A',
+    marginBottom: 8,
+  },
+  vibeNoteHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#6E7E65',
+    marginBottom: 12,
+  },
+  vibeNoteInput: {
+    minHeight: 110,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(186, 198, 188, 0.65)',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#3D443A',
+    marginBottom: 12,
+  },
+  vibeNoteSaveBtn: {
+    borderRadius: 14,
+    backgroundColor: 'rgba(92, 122, 104, 0.92)',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  vibeNoteSaveText: {
+    color: '#FFF9F2',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  vibeNoteSkipBtn: {
+    marginTop: 10,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  vibeNoteSkipText: {
+    color: '#8A968A',
+    fontSize: 13,
+    fontWeight: '600',
   },
   kickMetaRow: {
     flexDirection: 'row',
