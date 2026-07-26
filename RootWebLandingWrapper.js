@@ -30,8 +30,10 @@ import {
   enterLiveApp,
   openStripeCheckout,
   readForceAppMode,
+  redeemVipPromoCode,
   saveMembershipProfile,
 } from './membershipAccess';
+import PremiumUpgradeWelcomeModal from './PremiumUpgradeWelcomeModal';
 import { dispatchWelcomeMamaEmail } from './welcomeEmailClient';
 
 const CHARCOAL = '#3d443a';
@@ -518,6 +520,13 @@ function WaitlistFormCard({
   onSubmit,
   onOpenGift,
   compact = false,
+  foundingCodeOpen = false,
+  onToggleFoundingCode,
+  foundingCode = '',
+  onFoundingCodeChange,
+  foundingCodeError = '',
+  foundingCodeBusy = false,
+  onRedeemFoundingCode,
 }) {
   const isFounding = signupTier === 'founding40';
   const isFree = signupTier === 'free';
@@ -683,6 +692,56 @@ function WaitlistFormCard({
               We will email you {APP_ACCESS_URL} so you can return anytime.
             </Text>
           )}
+
+          <View style={styles.foundingCodeBlock}>
+            <Pressable
+              onPress={onToggleFoundingCode}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: foundingCodeOpen }}
+              disabled={isSubmitting}
+            >
+              <Text style={[styles.foundingCodeLink, SANS]}>
+                {foundingCodeOpen ? 'Hide Founding Mother Code' : 'Have a Founding Mother Code?'}
+              </Text>
+            </Pressable>
+
+            {foundingCodeOpen ? (
+              <View style={styles.foundingCodePanel}>
+                <View style={styles.foundingCodeRow}>
+                  <TextInput
+                    value={foundingCode}
+                    onChangeText={onFoundingCodeChange}
+                    placeholder="Enter your code"
+                    placeholderTextColor="rgba(110, 126, 101, 0.55)"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    editable={!foundingCodeBusy}
+                    style={[styles.foundingCodeInput, SANS]}
+                    onSubmitEditing={onRedeemFoundingCode}
+                    returnKeyType="done"
+                    accessibilityLabel="Founding Mother code"
+                  />
+                  <Pressable
+                    onPress={onRedeemFoundingCode}
+                    disabled={foundingCodeBusy || !String(foundingCode || '').trim()}
+                    accessibilityRole="button"
+                    style={[
+                      styles.foundingCodeRedeemBtn,
+                      (foundingCodeBusy || !String(foundingCode || '').trim()) &&
+                        styles.foundingCodeRedeemBtnDisabled,
+                    ]}
+                  >
+                    <Text style={[styles.foundingCodeRedeemText, SANS]}>
+                      {foundingCodeBusy ? '…' : 'Redeem'}
+                    </Text>
+                  </Pressable>
+                </View>
+                {foundingCodeError ? (
+                  <Text style={[styles.foundingCodeError, SANS]}>{foundingCodeError}</Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
         </>
       )}
     </FrostCard>
@@ -718,6 +777,11 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGiftModalVisible, setIsGiftModalVisible] = useState(false);
+  const [foundingCodeOpen, setFoundingCodeOpen] = useState(false);
+  const [foundingCode, setFoundingCode] = useState('');
+  const [foundingCodeError, setFoundingCodeError] = useState('');
+  const [foundingCodeBusy, setFoundingCodeBusy] = useState(false);
+  const [foundingWelcomeOpen, setFoundingWelcomeOpen] = useState(false);
   const installPrimaryRef = useRef(() => {});
 
   const bindInstallPrimary = useCallback((handler) => {
@@ -991,6 +1055,41 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     }
   }, [contactInfo, isSubmitting, signupTier]);
 
+  const handleToggleFoundingCode = useCallback(() => {
+    setFoundingCodeOpen((open) => !open);
+    setFoundingCodeError('');
+  }, []);
+
+  const handleFoundingCodeChange = useCallback((text) => {
+    setFoundingCode(text);
+    setFoundingCodeError('');
+  }, []);
+
+  /** Founding Mother code → skip Stripe, unlock lifetime Pro, celebrate, enter the app. */
+  const handleRedeemFoundingCode = useCallback(async () => {
+    if (foundingCodeBusy) return;
+    setFoundingCodeError('');
+    setFoundingCodeBusy(true);
+    try {
+      const result = await redeemVipPromoCode(foundingCode, {
+        email: String(contactInfo || '').trim() || null,
+      });
+      if (!result.ok) {
+        setFoundingCodeError(result.error || "That code isn't quite right. Try again mama!");
+        return;
+      }
+      setFoundingCode('');
+      setFoundingWelcomeOpen(true);
+    } finally {
+      setFoundingCodeBusy(false);
+    }
+  }, [contactInfo, foundingCode, foundingCodeBusy]);
+
+  const handleEnterAfterFoundingCode = useCallback(() => {
+    setFoundingWelcomeOpen(false);
+    enterLiveApp({ welcome: 'founding_mother' });
+  }, []);
+
   const openPrivacy = useCallback(() => {
     Linking.openURL('mailto:founder.calmmamavillage@gmail.com?subject=Privacy%20Policy').catch(
       () => {},
@@ -1012,15 +1111,30 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     isSubmitting,
     onSubmit: handleWaitlistSubmit,
     onOpenGift: () => setIsGiftModalVisible(true),
+    foundingCodeOpen,
+    onToggleFoundingCode: handleToggleFoundingCode,
+    foundingCode,
+    onFoundingCodeChange: handleFoundingCodeChange,
+    foundingCodeError,
+    foundingCodeBusy,
+    onRedeemFoundingCode: handleRedeemFoundingCode,
   };
 
   const giftModal = (
-    <GiftMamaModal
-      visible={isGiftModalVisible}
-      isSubmitting={isSubmitting}
-      onClose={() => setIsGiftModalVisible(false)}
-      onSubmit={handleWaitlistSubmit}
-    />
+    <>
+      <GiftMamaModal
+        visible={isGiftModalVisible}
+        isSubmitting={isSubmitting}
+        onClose={() => setIsGiftModalVisible(false)}
+        onSubmit={handleWaitlistSubmit}
+      />
+      <PremiumUpgradeWelcomeModal
+        visible={foundingWelcomeOpen}
+        variant="founding_mother"
+        planLabel="Founding Mother · Lifetime Access"
+        onClose={handleEnterAfterFoundingCode}
+      />
+    </>
   );
 
   // —— Mobile browser: edge-to-edge marketing + waitlist ——
@@ -1684,6 +1798,68 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  foundingCodeBlock: {
+    marginTop: 14,
+    alignItems: 'center',
+    width: '100%',
+  },
+  foundingCodeLink: {
+    color: '#8A6A4A',
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+    paddingVertical: 6,
+  },
+  foundingCodePanel: {
+    width: '100%',
+    marginTop: 8,
+  },
+  foundingCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  foundingCodeInput: {
+    flex: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    color: CHARCOAL,
+    borderWidth: 1,
+    borderColor: 'rgba(196, 165, 116, 0.45)',
+    backgroundColor: 'rgba(255, 252, 248, 0.85)',
+    ...Platform.select({
+      web: { outlineStyle: 'none' },
+      default: {},
+    }),
+  },
+  foundingCodeRedeemBtn: {
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    backgroundColor: '#C4A574',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  foundingCodeRedeemBtnDisabled: {
+    opacity: 0.55,
+  },
+  foundingCodeRedeemText: {
+    color: '#FFF9F2',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  foundingCodeError: {
+    marginTop: 8,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45A5A',
   },
   giftModalPortal: {
     ...Platform.select({
