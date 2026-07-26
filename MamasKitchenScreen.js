@@ -30,6 +30,7 @@ import { mealMatchesDietaryFilter, resolveMealDietaryTags } from './kitchenDieta
 import { VILLAGE_SNAPPY_SPRING, VILLAGE_USE_NATIVE_DRIVER } from './villageScreenTransitions';
 import { Image } from 'expo-image';
 import { LIST_PERF } from './tabShellConfig';
+import { useVillageRewards } from './VillageRewardsContext';
 import {
   warmPregnantKitchenImages,
   warmPregnantKitchenTabImages,
@@ -1564,6 +1565,8 @@ function MealDetailSheet({
   badgeAnim,
   contentW,
   isPregnantKitchen = false,
+  onMarkCooked,
+  cookedBusy = false,
 }) {
   const [checked, setChecked] = useState(() => new Set());
   const dragY = useRef(new Animated.Value(0)).current;
@@ -1727,6 +1730,19 @@ function MealDetailSheet({
           </View>
 
           <TouchableOpacity
+            style={[styles.markCookedBtn, cookedBusy && styles.markCookedBtnDisabled]}
+            onPress={onMarkCooked}
+            activeOpacity={0.9}
+            disabled={cookedBusy || !onMarkCooked}
+            accessibilityRole="button"
+            accessibilityLabel="Mark recipe as cooked"
+          >
+            <Text style={styles.markCookedBtnText}>
+              {cookedBusy ? 'Saving…' : 'I cooked this · Log nourishment'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.backToKitchenBtn}
             onPress={onClose}
             activeOpacity={0.9}
@@ -1786,6 +1802,35 @@ function MamasKitchenScreen({
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [tabTrackW, setTabTrackW] = useState(0);
+  const [cookedBusy, setCookedBusy] = useState(false);
+  const { addPoints, notify } = useVillageRewards();
+
+  const handleMarkCooked = useCallback(async () => {
+    if (cookedBusy) return;
+    setCookedBusy(true);
+    try {
+      const result = await addPoints(10, 'kitchenCooked');
+      if (result?.awarded) {
+        // Points toast already shown via rewards context.
+      } else if (result?.reason === 'already_today') {
+        notify({
+          category: 'kitchen',
+          title: "Mama's Kitchen",
+          message: 'Already logged nourishment today — beautiful consistency.',
+        });
+      } else {
+        notify({
+          category: 'kitchen',
+          title: "Mama's Kitchen",
+          message: selectedRecipe?.title
+            ? `${selectedRecipe.title} noted — keep nourishing yourself.`
+            : 'Nourishment noted — keep taking care of yourself.',
+        });
+      }
+    } finally {
+      setCookedBusy(false);
+    }
+  }, [addPoints, cookedBusy, notify, selectedRecipe?.title]);
 
   const prepBadgeAnim = useRef(new Animated.Value(0)).current;
   const tabHighlightX = useRef(new Animated.Value(0)).current;
@@ -2030,6 +2075,8 @@ function MamasKitchenScreen({
         badgeAnim={prepBadgeAnim}
         contentW={contentW}
         isPregnantKitchen={isPregnantKitchen}
+        onMarkCooked={handleMarkCooked}
+        cookedBusy={cookedBusy}
       />
     </View>
   );
@@ -2330,6 +2377,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(92, 122, 104, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(92, 122, 104, 0.22)',
+  },
+  markCookedBtn: {
+    padding: 16,
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginTop: 16,
+    alignItems: 'center',
+    backgroundColor: 'rgba(196, 148, 96, 0.92)',
+  },
+  markCookedBtnDisabled: {
+    opacity: 0.55,
+  },
+  markCookedBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFF9F2',
+    letterSpacing: 0.2,
   },
   backToKitchenBtnText: {
     fontSize: 15,

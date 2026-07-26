@@ -42,6 +42,7 @@ export const REWARD_POINT_VALUES = {
   registryCompleted: 250,
   dailyPuzzle: 15,
   encourage: 25,
+  kitchenCooked: 10,
   subscriptionUpgrade: 250,
   vipPromo: 500,
   adminTestGrant: 500,
@@ -49,11 +50,12 @@ export const REWARD_POINT_VALUES = {
 
 export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
 export const WEEKLY_JOURNAL_BONUS_TOAST =
-  'Weekly Sanctuary Bonus Unlocked! +50 pts 🌸';
-export const DAILY_CHECKLIST_TOAST = 'Daily Care List Complete! +5 pts 🌸';
-export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium Upgrade Bonus! +250 pts 🌸👑';
-export const VIP_PROMO_TOAST = 'VIP Welcome Bonus! +500 pts 🌸👑';
-export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated 🧪';
+  'Weekly Sanctuary streak — bonus unlocked! +50 pts';
+export const DAILY_CHECKLIST_TOAST = 'Daily checklist complete — soft win! +5 pts';
+export const KITCHEN_COOKED_TOAST = "Mama's Kitchen — nourishment logged! +10 pts";
+export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium welcome bonus unlocked! +250 pts';
+export const VIP_PROMO_TOAST = 'VIP welcome bonus unlocked! +500 pts';
+export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated';
 
 export function createDefaultVillageRewards() {
   return {
@@ -67,6 +69,7 @@ export function createDefaultVillageRewards() {
       dailyJournalDate: null,
       dailyPuzzleDate: null,
       dailyChecklistDate: null,
+      kitchenCookedDate: null,
       dailyEncouragementsCount: 0,
       dailyEncourageDate: null,
       weeklyJournalWeekKey: null,
@@ -123,6 +126,7 @@ export function normalizeVillageRewards(raw) {
       dailyJournalDate: actions.dailyJournalDate || null,
       dailyPuzzleDate: actions.dailyPuzzleDate || null,
       dailyChecklistDate: actions.dailyChecklistDate || null,
+      kitchenCookedDate: actions.kitchenCookedDate || null,
       dailyEncouragementsCount: Math.max(0, Number(actions.dailyEncouragementsCount) || 0),
       dailyEncourageDate: actions.dailyEncourageDate || null,
       weeklyJournalWeekKey: actions.weeklyJournalWeekKey || null,
@@ -222,7 +226,7 @@ function finishAward(current, actions, awardAmount, extras = {}) {
     reason: 'ok',
     rewards: next,
     newlyUnlocked,
-    toastMessage: extras.toastMessage || `+${awardAmount} pts! 🌸`,
+    toastMessage: extras.toastMessage || `+${awardAmount} pts earned`,
     bonusToastMessage: extras.bonusToastMessage || null,
     bonusAmount: extras.bonusAmount || 0,
   };
@@ -288,7 +292,7 @@ export function applyAddPoints(rewards, amount, actionKey) {
 
     return finishAward(current, actions, totalAward, {
       state: { dailyStreak: nextStreak },
-      toastMessage: `+${awardAmount} pts! 🌸`,
+      toastMessage: `Journal saved — +${awardAmount} pts`,
       bonusToastMessage,
       bonusAmount,
     });
@@ -361,6 +365,23 @@ export function applyAddPoints(rewards, amount, actionKey) {
     return finishAward(current, actions, awardAmount, {
       toastMessage: DAILY_CHECKLIST_TOAST,
     });
+  } else if (key === 'kitchenCooked') {
+    if (actions.kitchenCookedDate === today) {
+      return {
+        awarded: false,
+        amount: 0,
+        reason: 'already_today',
+        rewards: current,
+        newlyUnlocked: [],
+        toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
+      };
+    }
+    actions.kitchenCookedDate = today;
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: KITCHEN_COOKED_TOAST,
+    });
   } else if (key === 'pollFeedback') {
     if (actions.pollFeedback) {
       return {
@@ -426,7 +447,7 @@ export function applyAddPoints(rewards, amount, actionKey) {
   } else if (key === 'adminTestGrant') {
     // Uncapped sandbox grant — never used for public analytics funnels.
     return finishAward(current, actions, awardAmount, {
-      toastMessage: `Admin test +${awardAmount} pts 🧪`,
+      toastMessage: `Admin test +${awardAmount} pts`,
     });
   } else if (key === 'encourage') {
     if (actions.dailyEncourageDate !== today) {

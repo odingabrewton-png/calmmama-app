@@ -1287,7 +1287,7 @@ function PostpartumDailyTracker({
   winsSectionTitle = '📝 Mama-First Daily Wins',
   winsSectionHint = 'Micro-intentions that honor you, not just output',
 }) {
-  const { addPoints } = useVillageRewards();
+  const { addPoints, notify } = useVillageRewards();
   const [showFireworks, setShowFireworks] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
@@ -1338,19 +1338,28 @@ function PostpartumDailyTracker({
   const handleWinToggle = useCallback(
     (taskId) => {
       const task = mamaWinsTasks.find((item) => item.id === taskId);
+      const markingDone = Boolean(task) && !task.done;
       const completesLastWin =
-        task &&
-        !task.done &&
-        mamaWinsTasks.every((item) => item.id === taskId || item.done);
+        markingDone && mamaWinsTasks.every((item) => item.id === taskId || item.done);
 
       onToggleMamaWin(taskId);
 
       if (completesLastWin) {
         startWinsCelebration();
         addPoints(5, 'dailyChecklist');
+      } else if (markingDone) {
+        const remaining = mamaWinsTasks.filter((item) => item.id !== taskId && !item.done).length;
+        notify({
+          category: 'checklist',
+          title: 'Daily Checklist',
+          message:
+            remaining > 0
+              ? `Win checked — ${remaining} left on today's soft list.`
+              : 'Beautiful check — keep going.',
+        });
       }
     },
-    [mamaWinsTasks, onToggleMamaWin, startWinsCelebration, addPoints]
+    [mamaWinsTasks, onToggleMamaWin, startWinsCelebration, addPoints, notify]
   );
 
   useEffect(() => () => {
@@ -1764,12 +1773,17 @@ function renderMainTabContent({
         onOpenBirthPrompt={onOpenBirthPrompt}
         onLogMeals={onOpenKitchenTab}
         isActive={isActive}
-        onAddWeight={(entry) =>
+        onAddWeight={(entry) => {
           setWeightEntries((prev) => {
             const rest = prev.filter((e) => e.week !== entry.week);
             return [...rest, entry].sort((a, b) => a.week - b.week);
-          })
-        }
+          });
+          notify({
+            category: 'bloom',
+            title: 'Weekly Bloom',
+            message: `Week ${entry.week} weight saved — your bloom is tracked.`,
+          });
+        }}
       />
     );
   }
@@ -2539,7 +2553,7 @@ export default function App() {
 }
 
 function CalmMamaApp() {
-  const { resetRewards, addPoints, grantTestPoints, rewards } = useVillageRewards();
+  const { resetRewards, addPoints, grantTestPoints, rewards, notify } = useVillageRewards();
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [bootHydrated, setBootHydrated] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState('intake');
@@ -4386,14 +4400,26 @@ function CalmMamaApp() {
   const handleToggleNestingTask = (taskId) => {
     setNestingTasks((prev) => {
       const task = prev.find((item) => item.id === taskId);
+      const markingDone = Boolean(task) && !task.done;
       const completesAll =
-        Boolean(task) &&
-        !task.done &&
+        markingDone &&
         prev.length > 0 &&
         prev.every((item) => item.id === taskId || item.done);
 
       if (completesAll) {
         Promise.resolve().then(() => addPoints(5, 'dailyChecklist'));
+      } else if (markingDone) {
+        const remaining = prev.filter((item) => item.id !== taskId && !item.done).length;
+        Promise.resolve().then(() =>
+          notify({
+            category: 'checklist',
+            title: 'Daily Checklist',
+            message:
+              remaining > 0
+                ? `Checked off — ${remaining} soft win${remaining === 1 ? '' : 's'} left today.`
+                : 'Nice check — keep going, mama.',
+          }),
+        );
       }
 
       return prev.map((item) =>
@@ -4424,6 +4450,20 @@ function CalmMamaApp() {
       },
       ...prev,
     ]);
+    const kind = String(entry?.type || entry?.category || 'care').toLowerCase();
+    const label =
+      kind.includes('feed') || kind.includes('breast') || kind.includes('bottle')
+        ? 'Feeding logged'
+        : kind.includes('diaper')
+          ? 'Diaper change logged'
+          : kind.includes('sleep') || kind.includes('nap')
+            ? 'Sleep logged'
+            : 'Nursery moment logged';
+    notify({
+      category: 'nursery',
+      title: 'Cloud Nursery',
+      message: `${label} — you're tending the village.`,
+    });
   };
 
   const handleAddGoldenHourKeepsake = (item) => {
