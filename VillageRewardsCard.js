@@ -230,7 +230,7 @@ export default function VillageRewardsCard() {
           : `Soul Sanctuary this week: ${weeklyJournal.count}/${weeklyJournal.threshold} entries`}
       </Text>
       <Text style={[styles.matrixSummary, SANS]}>
-        Checklist +5/day · Puzzles +15/day · Journal +10 (+50 at 5/week) · Encourage +25
+        Checklist +5/day · Kitchen +15/day · Puzzles +15/day · Journal +10 (+50 at 5/week) · Encourage +25
         (max 5/day) · Poll +100 · Registry +250
       </Text>
 

@@ -79,7 +79,7 @@ export const REWARD_POINT_VALUES = {
   registryCompleted: 250,
   dailyPuzzle: 15,
   encourage: 25,
-  kitchenCooked: 10,
+  kitchenCooked: 15,
   subscriptionUpgrade: 250,
   vipPromo: 500,
   adminTestGrant: 500,
@@ -89,7 +89,7 @@ export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
 export const WEEKLY_JOURNAL_BONUS_TOAST =
   'Weekly Sanctuary streak — bonus unlocked! +50 pts';
 export const DAILY_CHECKLIST_TOAST = 'Daily checklist complete — soft win! +5 pts';
-export const KITCHEN_COOKED_TOAST = "Mama's Kitchen — nourishment logged! +10 pts";
+export const KITCHEN_COOKED_TOAST = "Mama's Kitchen — nourishment logged! +15 pts";
 export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium welcome bonus unlocked! +250 pts';
 export const VIP_PROMO_TOAST = 'VIP welcome bonus unlocked! +500 pts';
 export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated';

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { VILLAGE_USE_NATIVE_DRIVER } from './villageScreenTransitions';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -77,8 +78,21 @@ const CATEGORY_THEME = {
   },
 };
 
+function portalToBody(node) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || !document.body) {
+    return node;
+  }
+  try {
+    const { createPortal } = require('react-dom');
+    return createPortal(node, document.body);
+  } catch (_) {
+    return node;
+  }
+}
+
 /**
  * Soft category toast for Village moments (rewards, kitchen, checklist, etc.).
+ * Web: portals to document.body so phone-frame overflow/transform cannot bury it.
  */
 export default function VillageNotificationToast({ toast }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -96,19 +110,19 @@ export default function VillageNotificationToast({ toast }) {
       Animated.timing(opacity, {
         toValue: 1,
         duration: 240,
-        useNativeDriver: true,
+        useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
       }),
       Animated.spring(translateY, {
         toValue: 0,
         friction: 8,
         tension: 90,
-        useNativeDriver: true,
+        useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
       }),
       Animated.spring(scale, {
         toValue: 1,
         friction: 7,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
       }),
     ]).start();
 
@@ -117,12 +131,12 @@ export default function VillageNotificationToast({ toast }) {
         Animated.timing(opacity, {
           toValue: 0,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
         }),
         Animated.timing(translateY, {
           toValue: -8,
           duration: 280,
-          useNativeDriver: true,
+          useNativeDriver: VILLAGE_USE_NATIVE_DRIVER,
         }),
       ]).start();
     }, toast.durationMs || 2600);
@@ -165,8 +179,12 @@ export default function VillageNotificationToast({ toast }) {
     </Animated.View>
   );
 
-  return (
-    <View pointerEvents={actionable ? 'box-none' : 'none'} style={styles.host}>
+  const host = (
+    <View
+      pointerEvents={actionable ? 'box-none' : 'none'}
+      style={styles.host}
+      accessibilityLiveRegion="polite"
+    >
       {actionable ? (
         <Pressable
           onPress={toast.onPress}
@@ -181,17 +199,31 @@ export default function VillageNotificationToast({ toast }) {
       )}
     </View>
   );
+
+  return portalToBody(host);
 }
 
 const styles = StyleSheet.create({
   host: {
-    ...StyleSheet.absoluteFillObject,
+    ...Platform.select({
+      web: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 200000,
+      },
+      default: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 200000,
+        elevation: 200000,
+      },
+    }),
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingTop: Platform.select({ ios: 58, default: 44 }),
     paddingHorizontal: 16,
-    zIndex: 9999,
-    elevation: 9999,
   },
   pressWrap: {
     width: '100%',

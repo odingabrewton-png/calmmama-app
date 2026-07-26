@@ -1,38 +1,208 @@
-/**
- * EXPO GO STUB — personalized push disabled until Apple Developer / dev build setup.
- *
- * RESTORE: npm install expo-notifications, re-add the plugin in app.json, and
- * replace this file with the full scheduler (expo-notifications imports,
- * setNotificationHandler, scheduleNotificationAsync, listeners).
- */
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import {
+  FEEDING_SCHEDULE_SLOTS,
+  LEGACY_NOTIFICATION_IDS,
+  NOTIFICATION_COPY,
+  NOTIFICATION_IDS,
+  NOTIFICATION_ROUTES,
+  NOTIFICATION_WEEKDAYS,
+  getFeedingNotificationCopy,
+} from './notificationConfig';
 
-import { NOTIFICATION_ROUTES } from './notificationConfig';
+const ANDROID_CHANNEL_ID = 'calmmama-village-reminders';
+
+let handlerConfigured = false;
+let legacySchedulesPurged = false;
 
 export function configureVillageNotificationHandler() {
-  // RESTORE: import * as Notifications from 'expo-notifications';
-  // RESTORE: Notifications.setNotificationHandler({ ... });
+  if (handlerConfigured) return;
+  handlerConfigured = true;
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
 }
 
 export async function resetLegacyNotificationSchedules() {
-  // RESTORE: Notifications.cancelAllScheduledNotificationsAsync();
+  if (Platform.OS === 'web') return;
+
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (_) {
+    /* ignore — best-effort OS cache wipe */
+  }
+
+  await Promise.all(
+    LEGACY_NOTIFICATION_IDS.map((id) =>
+      Notifications.cancelScheduledNotificationAsync(id).catch(() => {})
+    )
+  );
 }
 
 export async function bootstrapVillageNotifications() {
-  // RESTORE: configure handler + purge legacy OS schedules on cold start.
+  if (Platform.OS === 'web') return;
+
+  configureVillageNotificationHandler();
+
+  if (legacySchedulesPurged) return;
+  legacySchedulesPurged = true;
+  await resetLegacyNotificationSchedules();
 }
 
 export async function ensureNotificationPermissions() {
-  // RESTORE: Notifications.getPermissionsAsync / requestPermissionsAsync
-  return { granted: false, status: 'expo-go-stub' };
+  if (Platform.OS === 'web') {
+    return { granted: false, status: 'web-unsupported' };
+  }
+
+  configureVillageNotificationHandler();
+
+  const existing = await Notifications.getPermissionsAsync();
+  if (existing.granted) {
+    return existing;
+  }
+
+  return Notifications.requestPermissionsAsync({
+    ios: {
+      allowAlert: true,
+      allowBadge: false,
+      allowSound: true,
+    },
+  });
+}
+
+async function ensureAndroidChannel() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: 'Village Reminders',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 180, 80, 180],
+    lightColor: '#E8E5F7',
+  });
+}
+
+function buildContent({ title, body, route, categoryIdentifier }) {
+  return {
+    title,
+    body,
+    data: { route },
+    sound: true,
+    ...(Platform.OS === 'android'
+      ? { channelId: ANDROID_CHANNEL_ID }
+      : {}),
+    ...(categoryIdentifier ? { categoryIdentifier } : {}),
+  };
+}
+
+async function scheduleDaily({ identifier, hour, minute, copy }) {
+  await Notifications.scheduleNotificationAsync({
+    identifier,
+    content: buildContent(copy),
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+    },
+  });
+}
+
+async function scheduleWeekly({ identifier, weekday, hour, minute, copy }) {
+  await Notifications.scheduleNotificationAsync({
+    identifier,
+    content: buildContent(copy),
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday,
+      hour,
+      minute,
+    },
+  });
 }
 
 export async function cancelAllVillageNotifications() {
-  // RESTORE: resetLegacyNotificationSchedules();
+  await resetLegacyNotificationSchedules();
 }
 
-export async function syncVillageNotificationSchedule(_userJourney = 'pregnant') {
-  // RESTORE: schedule morning kitchen, evening lounge, bloom / nursery + feeding loop.
-  return { scheduled: 0, skipped: 'expo-go-stub' };
+export async function syncVillageNotificationSchedule(userJourney = 'pregnant') {
+  if (Platform.OS === 'web') return { scheduled: 0, skipped: 'web' };
+
+  const permission = await ensureNotificationPermissions();
+  if (!permission.granted) {
+    return { scheduled: 0, skipped: 'permission-denied' };
+  }
+
+  await ensureAndroidChannel();
+  await resetLegacyNotificationSchedules();
+
+  const shared = [
+    scheduleDaily({
+      identifier: NOTIFICATION_IDS.MORNING_KITCHEN,
+      hour: 7,
+      minute: 30,
+      copy: NOTIFICATION_COPY.morningKitchen,
+    }),
+    scheduleDaily({
+      identifier: NOTIFICATION_IDS.EVENING_LOUNGE,
+      hour: 20,
+      minute: 30,
+      copy: NOTIFICATION_COPY.eveningLounge,
+    }),
+  ];
+
+  if (userJourney === 'pregnant' || userJourney === 'hybrid') {
+    await Promise.all([
+      ...shared,
+      scheduleWeekly({
+        identifier: NOTIFICATION_IDS.WEEKLY_BLOOM,
+        weekday: NOTIFICATION_WEEKDAYS.WEEKLY_BLOOM,
+        hour: 10,
+        minute: 0,
+        copy: NOTIFICATION_COPY.weeklyBloom,
+      }),
+    ]);
+    if (userJourney === 'pregnant') {
+      return { scheduled: 3, journey: 'pregnant' };
+    }
+  }
+
+  if (userJourney === 'postpartum' || userJourney === 'hybrid') {
+    const feedingJobs = FEEDING_SCHEDULE_SLOTS.map((slot) =>
+      scheduleDaily({
+        identifier: slot.id,
+        hour: slot.hour,
+        minute: slot.minute,
+        copy: getFeedingNotificationCopy(slot.hour),
+      })
+    );
+
+    await Promise.all([
+      ...(userJourney === 'hybrid' ? [] : shared),
+      scheduleWeekly({
+        identifier: NOTIFICATION_IDS.NURSERY_SUPPORT,
+        weekday: NOTIFICATION_WEEKDAYS.NURSERY_SUPPORT,
+        hour: 10,
+        minute: 0,
+        copy: NOTIFICATION_COPY.nurserySupport,
+      }),
+      ...feedingJobs,
+    ]);
+
+    return {
+      scheduled:
+        userJourney === 'hybrid'
+          ? 3 + 1 + FEEDING_SCHEDULE_SLOTS.length
+          : 2 + 1 + FEEDING_SCHEDULE_SLOTS.length,
+      journey: userJourney,
+    };
+  }
+
+  await Promise.all(shared);
+  return { scheduled: 2, journey: userJourney || 'default' };
 }
 
 export function getRouteFromNotification(notification) {
@@ -47,12 +217,28 @@ export function isKnownNotificationRoute(route) {
   return Object.values(NOTIFICATION_ROUTES).includes(route);
 }
 
-export function subscribeToNotificationResponses(_onRoute) {
-  // RESTORE: Notifications.addNotificationResponseReceivedListener(...)
-  return () => {};
+export function subscribeToNotificationResponses(onRoute) {
+  if (Platform.OS === 'web') {
+    return () => {};
+  }
+
+  configureVillageNotificationHandler();
+
+  const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const route = getRouteFromNotification(response.notification);
+    if (route) {
+      onRoute(route);
+    }
+  });
+
+  return () => subscription.remove();
 }
 
 export async function consumeInitialNotificationRoute() {
-  // RESTORE: Notifications.getLastNotificationResponseAsync()
-  return null;
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
+  const response = await Notifications.getLastNotificationResponseAsync();
+  return getRouteFromNotification(response?.notification);
 }

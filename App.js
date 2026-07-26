@@ -59,7 +59,6 @@ import PremiumUpgradeWelcomeModal from './PremiumUpgradeWelcomeModal';
 import { normalizeTimeCapsuleEntries, normalizeTimeCapsuleEntry } from './timeCapsuleStorage';
 import { NOTIFICATION_ROUTES } from './notificationConfig';
 import { claimWeeklyBloomReminder } from './weeklyBloomReminder';
-/* RESTORE (Apple Developer): re-enable village notification scheduler imports
 import {
   cancelAllVillageNotifications,
   bootstrapVillageNotifications,
@@ -68,8 +67,6 @@ import {
   subscribeToNotificationResponses,
   syncVillageNotificationSchedule,
 } from './villageNotificationScheduler';
-*/
-import { isKnownNotificationRoute } from './villageNotificationScheduler';
 import { getHomeJourneyPhase, showsLittleBitesKitchen } from './homeJourneyUtils';
 import {
   ACTIVE_MODES,
@@ -4092,7 +4089,7 @@ function CalmMamaApp() {
             onboardingStepBlend.setValue(0);
             initialNotificationHandledRef.current = false;
             setIsOnboarded(false);
-            // RESTORE: cancelAllVillageNotifications().catch(() => {});
+            cancelAllVillageNotifications().catch(() => {});
           },
         },
       ]
@@ -4105,36 +4102,14 @@ function CalmMamaApp() {
     setInVillagePortal(true);
   };
 
-  const handlePickProfilePhoto = () => {
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (event) => {
-        const file = event.target?.files?.[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
-          Alert.alert('Photo only', 'Please choose an image file for your profile picture.');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            setProfilePhotoUri(reader.result);
-          }
-        };
-        reader.onerror = () => {
-          Alert.alert('Upload failed', 'We could not read that photo. Please try another image.');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
-      return;
+  const handlePickProfilePhoto = async () => {
+    try {
+      const { pickProfilePhotoUri } = await import('./pickProfilePhoto');
+      const uri = await pickProfilePhotoUri();
+      if (uri) setProfilePhotoUri(uri);
+    } catch (_) {
+      Alert.alert('Upload failed', 'We could not update your profile photo. Please try again.');
     }
-    Alert.alert(
-      'Profile photo',
-      'Photo upload is available in the web preview. Choose a photo from your device gallery.'
-    );
   };
 
   const handleCloseVillagePortal = () => {
@@ -4550,7 +4525,6 @@ function CalmMamaApp() {
     };
   }, [runTabTransition, handleOpenMidnightLounge, handleCloseMidnightLounge]);
 
-  /* RESTORE (Apple Developer / dev client): bootstrap + notification tap listener
   useEffect(() => {
     let cancelled = false;
     let unsubscribe = () => {};
@@ -4567,9 +4541,7 @@ function CalmMamaApp() {
       unsubscribe();
     };
   }, [handleNotificationRoute]);
-  */
 
-  /* RESTORE: cold-start route from last notification tap
   useEffect(() => {
     if (!isOnboarded || initialNotificationHandledRef.current) return;
     initialNotificationHandledRef.current = true;
@@ -4581,18 +4553,21 @@ function CalmMamaApp() {
       })
       .catch(() => {});
   }, [isOnboarded, handleNotificationRoute]);
-  */
 
-  /* RESTORE: sync village reminder schedule (kitchen, lounge, bloom / feeding)
   useEffect(() => {
     if (!isOnboarded) return;
-    syncVillageNotificationSchedule(userJourney).catch((err) => {
+    const journeyForNotifications =
+      activeMode === ACTIVE_MODES.HYBRID
+        ? 'hybrid'
+        : effectiveJourney === 'postpartum'
+          ? 'postpartum'
+          : 'pregnant';
+    syncVillageNotificationSchedule(journeyForNotifications).catch((err) => {
       if (__DEV__ && typeof console !== 'undefined') {
         console.warn('[CalmMama Village] Notification schedule sync failed:', err);
       }
     });
-  }, [isOnboarded, userJourney]);
-  */
+  }, [isOnboarded, activeMode, effectiveJourney]);
 
   // Soft weekly Bloom reminder — once per calendar week for pregnant / hybrid mamas.
   useEffect(() => {

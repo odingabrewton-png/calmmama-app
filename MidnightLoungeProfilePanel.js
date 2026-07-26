@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
-  Image,
   TextInput,
   ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { MIDNIGHT } from './midnightLoungeTheme';
 import MamaBirthdayField from './MamaBirthdayField.js';
 import VillageRewardsCard from './VillageRewardsCard.js';
@@ -154,15 +154,30 @@ function MidnightLoungeProfilePanel({
       <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
       <Text style={[styles.sectionTitle, SANS]}>Me</Text>
 
-      <TouchableOpacity style={styles.avatarDashed} onPress={onPickProfilePhoto} activeOpacity={0.88}>
-        {profilePhotoUri ? (
-          <Image source={{ uri: profilePhotoUri }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarPlus}>+</Text>
-            <Text style={[styles.avatarHint, SANS]}>Add Photo</Text>
-          </View>
-        )}
+      <TouchableOpacity
+        style={styles.avatarDashed}
+        onPress={onPickProfilePhoto}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel="Upload profile photo"
+      >
+        <View style={styles.avatarInner}>
+          {profilePhotoUri ? (
+            <Image
+              source={{ uri: profilePhotoUri }}
+              style={styles.avatarImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={180}
+              accessibilityLabel="Your profile photo"
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarPlus}>+</Text>
+              <Text style={[styles.avatarHint, SANS]}>Add Photo</Text>
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
 
       <Text style={[styles.fieldLabel, SANS]}>Display Name</Text>
@@ -310,35 +325,44 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   avatarDashed: {
-    width: 108,
-    height: 108,
-    borderRadius: 54,
+    width: 152,
+    height: 152,
+    borderRadius: 76,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: MIDNIGHT.lavender,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
+    padding: 4,
+    backgroundColor: 'transparent',
+  },
+  avatarInner: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: MIDNIGHT.lavenderTint,
   },
   avatarImage: {
-    width: 108,
-    height: 108,
-    borderRadius: 54,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
   },
   avatarPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarPlus: {
-    fontSize: 30,
+    fontSize: 40,
     color: MIDNIGHT.lavender,
     fontWeight: '300',
   },
   avatarHint: {
-    fontSize: 16,
+    fontSize: 15,
     color: MIDNIGHT.textMuted,
     marginTop: 4,
   },

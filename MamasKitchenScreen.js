@@ -32,6 +32,17 @@ import { Image } from 'expo-image';
 import { LIST_PERF } from './tabShellConfig';
 import { useVillageRewards } from './VillageRewardsContext';
 import {
+  KitchenCookLogModal,
+  KitchenFavoriteBanner,
+  KitchenMealHistoryModal,
+} from './KitchenNourishmentLog';
+import {
+  appendMealLogEntry,
+  getVillageFavoriteMeal,
+  loadKitchenMealLog,
+  saveKitchenMealLog,
+} from './kitchenMealLogEngine';
+import {
   warmPregnantKitchenImages,
   warmPregnantKitchenTabImages,
   PREGNANT_KITCHEN_TAB_IMAGES,
@@ -1450,6 +1461,7 @@ const HybridKitchenHeader = memo(function HybridKitchenHeader({
   tabSlotW,
   onTabTrackLayout,
   showLittleBites = false,
+  onOpenHistory,
 }) {
   const filterCount = activeFilter ? 1 : 0;
   const tabs = showLittleBites
@@ -1499,6 +1511,16 @@ const HybridKitchenHeader = memo(function HybridKitchenHeader({
           {filterCount ? <View style={styles.filtersDot} /> : null}
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.historyEntryBtn}
+        onPress={onOpenHistory}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel="View my nourishment history"
+      >
+        <Text style={styles.historyEntryBtnText}>View My Nourishment History</Text>
+      </TouchableOpacity>
 
       {filtersOpen ? (
         <FlatList
@@ -1803,34 +1825,91 @@ function MamasKitchenScreen({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [tabTrackW, setTabTrackW] = useState(0);
   const [cookedBusy, setCookedBusy] = useState(false);
+  const [mealLog, setMealLog] = useState(() => ({ entries: [] }));
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [logRecipeDraft, setLogRecipeDraft] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { addPoints, notify } = useVillageRewards();
+  const mealLogRef = useRef(mealLog);
 
-  const handleMarkCooked = useCallback(async () => {
+  useEffect(() => {
+    mealLogRef.current = mealLog;
+  }, [mealLog]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const loaded = await loadKitchenMealLog();
+      if (mounted) setMealLog(loaded);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const villageFavorite = useMemo(
+    () => getVillageFavoriteMeal(mealLog.entries || []),
+    [mealLog.entries],
+  );
+
+  const openCookLogModal = useCallback((recipe = null) => {
+    setLogRecipeDraft(recipe);
+    setLogModalOpen(true);
+  }, []);
+
+  const handleMarkCooked = useCallback(() => {
     if (cookedBusy) return;
-    setCookedBusy(true);
-    try {
-      const result = await addPoints(10, 'kitchenCooked');
-      if (result?.awarded) {
-        // Points toast already shown via rewards context.
-      } else if (result?.reason === 'already_today') {
-        notify({
-          category: 'kitchen',
-          title: "Mama's Kitchen",
-          message: 'Already logged nourishment today — beautiful consistency.',
+    openCookLogModal(selectedRecipe);
+  }, [cookedBusy, openCookLogModal, selectedRecipe]);
+
+  const handleConfirmCookLog = useCallback(
+    async (payload) => {
+      if (cookedBusy) return;
+      setCookedBusy(true);
+      try {
+        const appended = appendMealLogEntry(mealLogRef.current, {
+          mealName: payload.mealName,
+          mealId: payload.mealId,
+          category: payload.category,
+          notes: payload.notes,
         });
-      } else {
-        notify({
-          category: 'kitchen',
-          title: "Mama's Kitchen",
-          message: selectedRecipe?.title
-            ? `${selectedRecipe.title} noted — keep nourishing yourself.`
-            : 'Nourishment noted — keep taking care of yourself.',
-        });
+        if (!appended.ok) {
+          notify({
+            category: 'kitchen',
+            title: "Mama's Kitchen",
+            message: 'Add a meal name to save this nourishment.',
+          });
+          return;
+        }
+
+        const saved = await saveKitchenMealLog(appended.log);
+        mealLogRef.current = saved;
+        setMealLog(saved);
+        setLogModalOpen(false);
+        setLogRecipeDraft(null);
+
+        const result = await addPoints(15, 'kitchenCooked');
+        if (result?.awarded) {
+          // Points toast already shown via rewards context.
+        } else if (result?.reason === 'already_today') {
+          notify({
+            category: 'kitchen',
+            title: "Mama's Kitchen",
+            message: `${payload.mealName} saved to your history — first cook of the day already earned +15 pts.`,
+          });
+        } else {
+          notify({
+            category: 'kitchen',
+            title: "Mama's Kitchen",
+            message: `${payload.mealName} logged — keep nourishing yourself.`,
+          });
+        }
+      } finally {
+        setCookedBusy(false);
       }
-    } finally {
-      setCookedBusy(false);
-    }
-  }, [addPoints, cookedBusy, notify, selectedRecipe?.title]);
+    },
+    [addPoints, cookedBusy, notify],
+  );
 
   const prepBadgeAnim = useRef(new Animated.Value(0)).current;
   const tabHighlightX = useRef(new Animated.Value(0)).current;
@@ -2008,18 +2087,25 @@ function MamasKitchenScreen({
 
   const kitchenListHeader = useMemo(
     () => (
-      <HybridKitchenHeader
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        filtersOpen={filtersOpen}
-        onToggleFilters={() => setFiltersOpen((v) => !v)}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        tabHighlightX={tabHighlightX}
-        tabSlotW={tabSlotW}
-        onTabTrackLayout={(e) => setTabTrackW(e.nativeEvent.layout.width)}
-        showLittleBites={showLittleBitesTab}
-      />
+      <View>
+        <HybridKitchenHeader
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          filtersOpen={filtersOpen}
+          onToggleFilters={() => setFiltersOpen((v) => !v)}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          tabHighlightX={tabHighlightX}
+          tabSlotW={tabSlotW}
+          onTabTrackLayout={(e) => setTabTrackW(e.nativeEvent.layout.width)}
+          showLittleBites={showLittleBitesTab}
+          onOpenHistory={() => setHistoryOpen(true)}
+        />
+        <KitchenFavoriteBanner
+          favorite={villageFavorite}
+          onPressHistory={() => setHistoryOpen(true)}
+        />
+      </View>
     ),
     [
       activeFilter,
@@ -2029,6 +2115,7 @@ function MamasKitchenScreen({
       showLittleBitesTab,
       tabHighlightX,
       tabSlotW,
+      villageFavorite,
     ]
   );
 
@@ -2078,6 +2165,28 @@ function MamasKitchenScreen({
         onMarkCooked={handleMarkCooked}
         cookedBusy={cookedBusy}
       />
+
+      <KitchenCookLogModal
+        visible={logModalOpen}
+        recipe={logRecipeDraft}
+        busy={cookedBusy}
+        onClose={() => {
+          if (cookedBusy) return;
+          setLogModalOpen(false);
+          setLogRecipeDraft(null);
+        }}
+        onConfirm={handleConfirmCookLog}
+      />
+
+      <KitchenMealHistoryModal
+        visible={historyOpen}
+        entries={mealLog.entries || []}
+        onClose={() => setHistoryOpen(false)}
+        onLogCustom={() => {
+          setHistoryOpen(false);
+          openCookLogModal(null);
+        }}
+      />
     </View>
   );
 }
@@ -2126,6 +2235,22 @@ const styles = StyleSheet.create({
       web: { position: 'sticky', top: 0 },
       default: {},
     }),
+  },
+  historyEntryBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 249, 244, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(92, 122, 104, 0.28)',
+  },
+  historyEntryBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(61, 79, 66, 0.88)',
+    letterSpacing: 0.2,
   },
   glassCapsule: {
     flexDirection: 'row',

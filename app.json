@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.odingaa.calmmamaapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "EXDevMenuShowFloatingActionButton": false
+        "EXDevMenuShowFloatingActionButton": false,
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -47,6 +48,14 @@
         "expo-dev-client",
         {
           "toolsButton": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#E5FCE8",
+          "defaultChannel": "calmmama-village-reminders"
         }
       ],
       "expo-video",
