@@ -21,9 +21,9 @@ import {
 } from './babyOracleChatEngine';
 
 const INK = '#1F1A19';
-const GLASS_FILL = 'rgba(255, 255, 255, 0.58)';
-const GLASS_SURFACE = 'rgba(255, 255, 255, 0.76)';
-const GLASS_BORDER = 'rgba(255, 255, 255, 0.52)';
+const GLASS_FILL = 'rgba(255, 255, 255, 0.28)';
+const GLASS_SURFACE = 'rgba(255, 255, 255, 0.38)';
+const GLASS_BORDER = 'rgba(255, 255, 255, 0.42)';
 
 const OPENING_COPY =
   'You made it to the quiet hours, Mama. Tap a quick tip below or type your question — I will meet you with gentle, step-by-step guidance.';
@@ -326,8 +326,8 @@ const styles = StyleSheet.create({
     gap: 10,
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
       },
       default: {},
     }),

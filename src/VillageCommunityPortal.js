@@ -627,7 +627,7 @@ function VillageBasketPanel({
         <VillageHeroImage
           source={VILLAGE_HERO_ASSETS.villageLivingroom}
           style={styles.basketWatermarkImage}
-          imageOpacity={pregnantCosmic ? 0.42 : 0.35}
+          imageOpacity={pregnantCosmic ? 0.55 : 0.48}
           contentFit={pregnantCosmic ? 'contain' : 'cover'}
         />
       </View>
@@ -1136,43 +1136,43 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 252, 248, 0.78)',
   },
   basketShareCard: {
-    backgroundColor: 'rgba(235, 240, 230, 0.55)',
+    backgroundColor: 'rgba(235, 240, 230, 0.28)',
     borderRadius: 28,
     padding: 20,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.38)',
     marginBottom: 16,
     overflow: 'hidden',
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(15px)',
-        WebkitBackdropFilter: 'blur(15px)',
-        boxShadow: '0 8px 24px rgba(74, 64, 56, 0.14)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        boxShadow: '0 8px 24px rgba(74, 64, 56, 0.12)',
       },
       default: {
         shadowColor: '#4A4038',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.14,
+        shadowOpacity: 0.12,
         shadowRadius: 16,
-        elevation: 5,
+        elevation: 4,
       },
     }),
   },
   basketShareCardPregnantCosmic: {
-    backgroundColor: 'rgba(255, 252, 248, 0.22)',
-    borderColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: 'rgba(255, 252, 248, 0.14)',
+    borderColor: 'rgba(255, 255, 255, 0.26)',
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
-        boxShadow: '0 12px 32px rgba(10, 8, 24, 0.35)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 12px 32px rgba(10, 8, 24, 0.3)',
       },
       default: {
         shadowColor: '#0A0818',
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.28,
+        shadowOpacity: 0.24,
         shadowRadius: 18,
-        elevation: 6,
+        elevation: 5,
       },
     }),
   },
@@ -1736,10 +1736,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   basketPanelInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    backgroundColor: 'rgba(255, 255, 255, 0.34)',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderColor: 'rgba(255, 255, 255, 0.45)',
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
@@ -1866,43 +1866,43 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   basketCard: {
-    backgroundColor: 'rgba(255, 252, 248, 0.78)',
+    backgroundColor: 'rgba(255, 252, 248, 0.32)',
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.42)',
+    borderColor: 'rgba(255, 255, 255, 0.38)',
     overflow: 'hidden',
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
       },
       default: {
         shadowColor: '#4A4038',
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 10,
-        elevation: 3,
+        elevation: 2,
       },
     }),
   },
   basketCardPregnantCosmic: {
-    backgroundColor: 'rgba(255, 252, 248, 0.24)',
-    borderColor: 'rgba(255, 255, 255, 0.26)',
+    backgroundColor: 'rgba(255, 252, 248, 0.14)',
+    borderColor: 'rgba(255, 255, 255, 0.24)',
     ...Platform.select({
       web: {
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: '0 10px 28px rgba(8, 6, 20, 0.32)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 10px 28px rgba(8, 6, 20, 0.28)',
       },
       default: {
         shadowColor: '#0A0818',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.24,
+        shadowOpacity: 0.2,
         shadowRadius: 14,
-        elevation: 5,
+        elevation: 4,
       },
     }),
   },

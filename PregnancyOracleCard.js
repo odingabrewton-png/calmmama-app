@@ -32,7 +32,7 @@ const SANS = Platform.select({
 });
 
 const ORACLE_GLASS = {
-  backgroundColor: 'rgba(30, 27, 48, 0.6)',
+  backgroundColor: 'rgba(30, 27, 48, 0.32)',
   borderRadius: 24,
   borderWidth: 1,
   borderColor: 'rgba(196, 184, 232, 0.28)',
