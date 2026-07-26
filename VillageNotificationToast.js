@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -134,30 +134,51 @@ export default function VillageNotificationToast({ toast }) {
 
   const theme = CATEGORY_THEME[toast.category] || CATEGORY_THEME.rewards;
   const emoji = toast.emoji || theme.emoji;
+  const actionable = typeof toast.onPress === 'function';
+
+  const card = (
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          opacity,
+          backgroundColor: theme.bg,
+          borderColor: theme.border,
+          transform: [{ translateY }, { scale }],
+        },
+      ]}
+    >
+      <Text style={styles.emoji}>{emoji}</Text>
+      <View style={styles.copy}>
+        {toast.title ? (
+          <Text style={[styles.title, SANS, { color: theme.title }]}>{toast.title}</Text>
+        ) : null}
+        <Text style={[styles.message, SANS, { color: toast.title ? theme.body : theme.title }]}>
+          {toast.message}
+        </Text>
+        {actionable ? (
+          <Text style={[styles.actionHint, SANS, { color: theme.title }]}>
+            Tap to open Weekly Bloom →
+          </Text>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
 
   return (
-    <View pointerEvents="none" style={styles.host}>
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            opacity,
-            backgroundColor: theme.bg,
-            borderColor: theme.border,
-            transform: [{ translateY }, { scale }],
-          },
-        ]}
-      >
-        <Text style={styles.emoji}>{emoji}</Text>
-        <View style={styles.copy}>
-          {toast.title ? (
-            <Text style={[styles.title, SANS, { color: theme.title }]}>{toast.title}</Text>
-          ) : null}
-          <Text style={[styles.message, SANS, { color: toast.title ? theme.body : theme.title }]}>
-            {toast.message}
-          </Text>
-        </View>
-      </Animated.View>
+    <View pointerEvents={actionable ? 'box-none' : 'none'} style={styles.host}>
+      {actionable ? (
+        <Pressable
+          onPress={toast.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={toast.title || 'Open notification'}
+          style={styles.pressWrap}
+        >
+          {card}
+        </Pressable>
+      ) : (
+        card
+      )}
     </View>
   );
 }
@@ -172,6 +193,10 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
   },
+  pressWrap: {
+    width: '100%',
+    maxWidth: 420,
+  },
   card: {
     maxWidth: 420,
     width: '100%',
@@ -183,7 +208,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
     ...Platform.select({
-      web: { boxShadow: '0 12px 32px rgba(61, 68, 58, 0.14)' },
+      web: { boxShadow: '0 12px 32px rgba(61, 68, 58, 0.14)', cursor: 'pointer' },
       default: {
         shadowColor: '#3D443A',
         shadowOffset: { width: 0, height: 8 },
@@ -212,5 +237,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.15,
     lineHeight: 20,
+  },
+  actionHint: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

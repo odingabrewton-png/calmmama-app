@@ -58,6 +58,7 @@ import { VillageRewardsProvider, useVillageRewards } from './VillageRewardsConte
 import PremiumUpgradeWelcomeModal from './PremiumUpgradeWelcomeModal';
 import { normalizeTimeCapsuleEntries, normalizeTimeCapsuleEntry } from './timeCapsuleStorage';
 import { NOTIFICATION_ROUTES } from './notificationConfig';
+import { claimWeeklyBloomReminder } from './weeklyBloomReminder';
 /* RESTORE (Apple Developer): re-enable village notification scheduler imports
 import {
   cancelAllVillageNotifications,
@@ -76,6 +77,7 @@ import {
   createChildEntry,
   deriveActiveMode,
   getEffectiveUserJourney,
+  hasPregnancyTrack,
   HOME_TRACKS,
   normalizeChildren,
   normalizeCurrentPregnancy,
@@ -4393,6 +4395,58 @@ function CalmMamaApp() {
     });
   }, [isOnboarded, userJourney]);
   */
+
+  // Soft weekly Bloom reminder — once per calendar week for pregnant / hybrid mamas.
+  useEffect(() => {
+    if (!bootHydrated || !isOnboarded) return undefined;
+
+    const pregnantTrack =
+      effectiveJourney === 'pregnant' ||
+      (activeMode === ACTIVE_MODES.HYBRID &&
+        hasPregnancyTrack({ currentPregnancy, weeksPregnant, dueDate }));
+
+    if (!pregnantTrack) return undefined;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      claimWeeklyBloomReminder({ weeksPregnant })
+        .then((reminder) => {
+          if (cancelled || !reminder) return;
+          notify({
+            category: 'bloom',
+            title: reminder.title,
+            message: reminder.message,
+            emoji: reminder.emoji,
+            durationMs: 5600,
+            onPress: () => {
+              setInVillagePortal(false);
+              if (activeMode === ACTIVE_MODES.HYBRID) {
+                setHomeTrack(HOME_TRACKS.PREGNANT);
+              }
+              runTabTransition('tracker');
+            },
+          });
+        })
+        .catch(() => {
+          /* non-blocking */
+        });
+    }, 1400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    bootHydrated,
+    isOnboarded,
+    effectiveJourney,
+    activeMode,
+    currentPregnancy,
+    weeksPregnant,
+    dueDate,
+    notify,
+    runTabTransition,
+  ]);
 
   const handleOpenKitchenTab = () => {
     runTabTransition('kitchen');

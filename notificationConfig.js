@@ -58,7 +58,7 @@ export const NOTIFICATION_COPY = {
   },
   weeklyBloom: {
     title: 'Weekly Bloom',
-    body: "You're doing amazing, Mama. Tap to see how your body and baby are blooming this week.",
+    body: "Week check-in, Mama. See baby's growth, read this week's facts, and update your weight in Bloom.",
     route: NOTIFICATION_ROUTES.BLOOM,
   },
   nurserySupport: {

@@ -121,6 +121,7 @@ export function VillageRewardsProvider({ children }) {
       category,
       emoji: payload.emoji,
       durationMs,
+      onPress: typeof payload.onPress === 'function' ? payload.onPress : null,
     });
 
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
