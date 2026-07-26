@@ -13,11 +13,13 @@ import React, {
 } from 'react';
 import {
   applyAddPoints,
+  applyRedeemTier,
   clearVillageRewards,
   createDefaultVillageRewards,
   loadVillageRewards,
   REWARD_POINT_VALUES,
   saveVillageRewards,
+  updateRewardsProfileFields,
 } from './villageRewardsEngine';
 import VillageNotificationToast, {
   NOTIFICATION_CATEGORIES,
@@ -27,6 +29,8 @@ const VillageRewardsContext = createContext({
   rewards: createDefaultVillageRewards(),
   hydrated: false,
   addPoints: async () => ({ awarded: false }),
+  redeemTier: async () => ({ ok: false }),
+  updateProfileFields: async () => createDefaultVillageRewards(),
   grantTestPoints: async () => ({ awarded: false }),
   resetRewards: async () => {},
   notify: () => {},
@@ -166,6 +170,32 @@ export function VillageRewardsProvider({ children }) {
     [showToast],
   );
 
+  const redeemTier = useCallback(async (tierId) => {
+    const result = applyRedeemTier(rewardsRef.current, tierId);
+    if (!result.ok) return result;
+
+    rewardsRef.current = result.rewards;
+    setRewards(result.rewards);
+    try {
+      await saveVillageRewards(result.rewards);
+    } catch (_) {
+      /* non-blocking persist */
+    }
+    return result;
+  }, []);
+
+  const updateProfileFields = useCallback(async (fields) => {
+    const next = updateRewardsProfileFields(rewardsRef.current, fields);
+    rewardsRef.current = next;
+    setRewards(next);
+    try {
+      await saveVillageRewards(next);
+    } catch (_) {
+      /* ignore */
+    }
+    return next;
+  }, []);
+
   const grantTestPoints = useCallback(
     async (amount) => {
       const result = applyAddPoints(
@@ -200,11 +230,22 @@ export function VillageRewardsProvider({ children }) {
       rewards,
       hydrated,
       addPoints,
+      redeemTier,
+      updateProfileFields,
       grantTestPoints,
       resetRewards,
       notify,
     }),
-    [rewards, hydrated, addPoints, grantTestPoints, resetRewards, notify],
+    [
+      rewards,
+      hydrated,
+      addPoints,
+      redeemTier,
+      updateProfileFields,
+      grantTestPoints,
+      resetRewards,
+      notify,
+    ],
   );
 
   return (

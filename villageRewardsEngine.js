@@ -1,35 +1,72 @@
 /**
- * Village Rewards & Badges — points, daily caps, streaks, and unlock tiers.
+ * Village Rewards & Badges — Crown Points, redeemable tiers, and perk flags.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const VILLAGE_REWARDS_STORAGE_KEY = 'villageRewards';
 
+/** Crown Points redeem tiers (spend balance to claim). */
 export const REWARD_TIERS = [
   {
-    id: 'village_sister',
+    id: 'exclusive_badge',
     points: 500,
-    title: 'Village Sister 🌸',
-    perk: '10% OFF Merch',
-    code: 'VILLAGE10',
-    emoji: '🌸',
-  },
-  {
-    id: 'sanctuary_queen',
-    points: 1000,
-    title: 'Sanctuary Queen 👑',
-    perk: '20% OFF Merch',
-    code: 'SANCTUARY20',
+    title: 'Exclusive Top-Tier Badge',
+    type: 'badge',
+    perk: 'Wear your crown in the village',
+    description: 'A gleaming top-tier badge for your Village profile.',
     emoji: '👑',
   },
   {
-    id: 'founding_legend',
+    id: 'store_10',
+    points: 1000,
+    title: '10% Off Store Discount',
+    type: 'discount',
+    value: 10,
+    perk: '10% OFF Boutique',
+    code: 'CROWN10',
+    description: 'Save 10% in The Village Boutique.',
+    emoji: '🛍️',
+  },
+  {
+    id: 'oracle_beta',
+    points: 2000,
+    title: 'The Village Oracle (Beta Tester Pass)',
+    type: 'early_access',
+    perk: 'Test new features early',
+    description: 'Test new features 2 weeks early',
+    emoji: '🔮',
+  },
+  {
+    id: 'store_20',
     points: 3000,
-    title: 'Founding Legend 🏆',
-    perk: '30% OFF + Free Shipping',
-    code: 'LEGEND30',
-    emoji: '🏆',
+    title: '20% Off Store Discount',
+    type: 'discount',
+    value: 20,
+    perk: '20% OFF Boutique',
+    code: 'CROWN20',
+    description: 'Save 20% in The Village Boutique.',
+    emoji: '✨',
+  },
+  {
+    id: 'fairy_godmother',
+    points: 4000,
+    title: 'Feature Fairy Godmother Perks',
+    type: 'fairy_godmother',
+    perk: 'Secret themes + premium prompts',
+    description:
+      'Permanent unlock of all premium prompts/secret themes + custom profile title',
+    emoji: '🧚',
+  },
+  {
+    id: 'founding_matriarch',
+    points: 5000,
+    title: 'Founding Matriarch Bundle',
+    type: 'matriarch',
+    perk: 'Badge + co-create + dual 50% coupons',
+    description: 'Custom profile badge + Co-create a feature + Two 50% off coupons',
+    emoji: '🏛️',
+    coupons: ['MATRIARCH50A', 'MATRIARCH50B'],
   },
 ];
 
@@ -57,9 +94,20 @@ export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium welcome bonus unlocked! +250 
 export const VIP_PROMO_TOAST = 'VIP welcome bonus unlocked! +500 pts';
 export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated';
 
+const LEGACY_TIER_ID_MAP = Object.freeze({
+  village_sister: 'exclusive_badge',
+  sanctuary_queen: 'store_10',
+  founding_legend: 'store_20',
+});
+
+function mapLegacyTierId(id) {
+  return LEGACY_TIER_ID_MAP[id] || id;
+}
+
 export function createDefaultVillageRewards() {
   return {
     points: 0,
+    lifetimePoints: 0,
     dailyStreak: 0,
     completedActions: {
       pollFeedback: false,
@@ -76,7 +124,16 @@ export function createDefaultVillageRewards() {
       weeklyJournalCount: 0,
       weeklyJournalBonusClaimed: false,
     },
+    redeemedTiers: [],
+    /** @deprecated Prefer redeemedTiers — kept for older UI checks. */
     unlockedBadges: [],
+    hasFairyGodmotherPerk: false,
+    hasOracleBetaPass: false,
+    hasMatriarchPerk: false,
+    hasExclusiveBadge: false,
+    customProfileTitle: '',
+    selectedSecretThemeId: null,
+    discountCoupons: [],
   };
 }
 
@@ -103,6 +160,31 @@ function previousCalendarDayKey(date = new Date()) {
   return calendarDayKey(prev);
 }
 
+function validTierIdSet() {
+  return new Set(REWARD_TIERS.map((tier) => tier.id));
+}
+
+function normalizeRedeemedTiers(raw) {
+  const valid = validTierIdSet();
+  const fromRedeemed = Array.isArray(raw?.redeemedTiers) ? raw.redeemedTiers : [];
+  const fromLegacy = Array.isArray(raw?.unlockedBadges) ? raw.unlockedBadges : [];
+  const merged = [...fromRedeemed, ...fromLegacy]
+    .map(mapLegacyTierId)
+    .filter((id) => valid.has(id));
+  return Array.from(new Set(merged));
+}
+
+function derivePerkFlags(redeemedTiers, raw = {}) {
+  const set = new Set(redeemedTiers);
+  return {
+    hasExclusiveBadge: Boolean(raw.hasExclusiveBadge) || set.has('exclusive_badge'),
+    hasOracleBetaPass: Boolean(raw.hasOracleBetaPass) || set.has('oracle_beta'),
+    hasFairyGodmotherPerk:
+      Boolean(raw.hasFairyGodmotherPerk) || set.has('fairy_godmother'),
+    hasMatriarchPerk: Boolean(raw.hasMatriarchPerk) || set.has('founding_matriarch'),
+  };
+}
+
 export function normalizeVillageRewards(raw) {
   const base = createDefaultVillageRewards();
   if (!raw || typeof raw !== 'object') return base;
@@ -111,12 +193,21 @@ export function normalizeVillageRewards(raw) {
     ? raw.completedActions
     : {};
 
-  const unlocked = Array.isArray(raw.unlockedBadges)
-    ? raw.unlockedBadges.filter((id) => REWARD_TIERS.some((tier) => tier.id === id))
+  const redeemedTiers = normalizeRedeemedTiers(raw);
+  const perks = derivePerkFlags(redeemedTiers, raw);
+  const points = Math.max(0, Number(raw.points) || 0);
+  const lifetimePoints = Math.max(
+    points,
+    Number(raw.lifetimePoints) || 0,
+  );
+
+  const coupons = Array.isArray(raw.discountCoupons)
+    ? raw.discountCoupons.map((c) => String(c || '').trim()).filter(Boolean)
     : [];
 
   return {
-    points: Math.max(0, Number(raw.points) || 0),
+    points,
+    lifetimePoints,
     dailyStreak: Math.max(0, Number(raw.dailyStreak) || 0),
     completedActions: {
       pollFeedback: Boolean(actions.pollFeedback),
@@ -133,7 +224,12 @@ export function normalizeVillageRewards(raw) {
       weeklyJournalCount: Math.max(0, Number(actions.weeklyJournalCount) || 0),
       weeklyJournalBonusClaimed: Boolean(actions.weeklyJournalBonusClaimed),
     },
-    unlockedBadges: unlocked,
+    redeemedTiers,
+    unlockedBadges: redeemedTiers,
+    ...perks,
+    customProfileTitle: String(raw.customProfileTitle || '').trim().slice(0, 48),
+    selectedSecretThemeId: raw.selectedSecretThemeId || null,
+    discountCoupons: coupons,
   };
 }
 
@@ -148,38 +244,56 @@ export async function loadVillageRewards() {
 }
 
 export async function saveVillageRewards(rewards) {
-  const normalized = normalizeVillageRewards(rewards);
-  await AsyncStorage.setItem(VILLAGE_REWARDS_STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  try {
+    await AsyncStorage.setItem(
+      VILLAGE_REWARDS_STORAGE_KEY,
+      JSON.stringify(normalizeVillageRewards(rewards)),
+    );
+  } catch (_) {
+    /* non-blocking */
+  }
 }
 
 export async function clearVillageRewards() {
-  await AsyncStorage.removeItem(VILLAGE_REWARDS_STORAGE_KEY);
+  try {
+    await AsyncStorage.removeItem(VILLAGE_REWARDS_STORAGE_KEY);
+  } catch (_) {
+    /* ignore */
+  }
 }
 
-/**
- * Progress toward 500 → 1000 → 3000 badge tiers.
- * Bar fills from the previous unlocked threshold to the next.
- */
-export function getNextTierProgress(points) {
-  const total = Math.max(0, Number(points) || 0);
+export function getNextTierProgress(pointsOrRewards) {
+  const total =
+    typeof pointsOrRewards === 'object' && pointsOrRewards
+      ? Math.max(0, Number(pointsOrRewards.points) || 0)
+      : Math.max(0, Number(pointsOrRewards) || 0);
+  const redeemed = new Set(
+    typeof pointsOrRewards === 'object' && pointsOrRewards
+      ? normalizeRedeemedTiers(pointsOrRewards)
+      : [],
+  );
   const thresholds = REWARD_TIERS.map((tier) => tier.points);
-  const next = REWARD_TIERS.find((tier) => total < tier.points) || null;
-  const prevThreshold =
-    [...thresholds].reverse().find((mark) => mark <= total) || 0;
+  const next =
+    REWARD_TIERS.find((tier) => !redeemed.has(tier.id) && total < tier.points) ||
+    REWARD_TIERS.find((tier) => !redeemed.has(tier.id)) ||
+    null;
 
   if (!next) {
     const last = REWARD_TIERS[REWARD_TIERS.length - 1];
     return {
       nextTier: null,
-      currentThreshold: last.points,
-      nextThreshold: last.points,
+      currentThreshold: last?.points || 0,
+      nextThreshold: last?.points || 0,
       progress: 1,
       pointsToNext: 0,
       absoluteProgress: 1,
     };
   }
 
+  const prev =
+    [...REWARD_TIERS].reverse().find((tier) => redeemed.has(tier.id) || total >= tier.points) ||
+    null;
+  const prevThreshold = prev ? prev.points : 0;
   const span = Math.max(1, next.points - prevThreshold);
   const progress = Math.min(1, Math.max(0, (total - prevThreshold) / span));
   const absoluteProgress = Math.min(1, total / thresholds[thresholds.length - 1]);
@@ -194,29 +308,14 @@ export function getNextTierProgress(points) {
   };
 }
 
-function syncUnlockedBadges(points, unlockedBadges = []) {
-  const unlocked = new Set(unlockedBadges);
-  const newlyUnlocked = [];
-  for (const tier of REWARD_TIERS) {
-    if (points >= tier.points && !unlocked.has(tier.id)) {
-      unlocked.add(tier.id);
-      newlyUnlocked.push(tier.id);
-    }
-  }
-  return {
-    unlockedBadges: REWARD_TIERS.map((t) => t.id).filter((id) => unlocked.has(id)),
-    newlyUnlocked,
-  };
-}
-
 function finishAward(current, actions, awardAmount, extras = {}) {
   const points = current.points + awardAmount;
-  const { unlockedBadges, newlyUnlocked } = syncUnlockedBadges(points, current.unlockedBadges);
+  const lifetimePoints = Math.max(current.lifetimePoints || 0, 0) + awardAmount;
   const next = {
     ...current,
     points,
+    lifetimePoints,
     completedActions: actions,
-    unlockedBadges,
     ...extras.state,
   };
 
@@ -225,7 +324,7 @@ function finishAward(current, actions, awardAmount, extras = {}) {
     amount: awardAmount,
     reason: 'ok',
     rewards: next,
-    newlyUnlocked,
+    newlyUnlocked: [],
     toastMessage: extras.toastMessage || `+${awardAmount} pts earned`,
     bonusToastMessage: extras.bonusToastMessage || null,
     bonusAmount: extras.bonusAmount || 0,
@@ -233,10 +332,80 @@ function finishAward(current, actions, awardAmount, extras = {}) {
 }
 
 /**
+ * Spend Crown Points to redeem a tier perk.
+ * @returns {{ ok: boolean, reason?: string, rewards: object, tier?: object, celebration?: object }}
+ */
+export function applyRedeemTier(rewards, tierId) {
+  const current = normalizeVillageRewards(rewards);
+  const tier = REWARD_TIERS.find((item) => item.id === tierId);
+  if (!tier) {
+    return { ok: false, reason: 'unknown_tier', rewards: current };
+  }
+  if (current.redeemedTiers.includes(tier.id)) {
+    return { ok: false, reason: 'already_redeemed', rewards: current, tier };
+  }
+  if (current.points < tier.points) {
+    return {
+      ok: false,
+      reason: 'insufficient_points',
+      rewards: current,
+      tier,
+      pointsNeeded: tier.points - current.points,
+    };
+  }
+
+  const redeemedTiers = [...current.redeemedTiers, tier.id];
+  const next = {
+    ...current,
+    points: current.points - tier.points,
+    redeemedTiers,
+    unlockedBadges: redeemedTiers,
+  };
+
+  if (tier.type === 'badge') next.hasExclusiveBadge = true;
+  if (tier.type === 'early_access') next.hasOracleBetaPass = true;
+  if (tier.type === 'fairy_godmother') {
+    next.hasFairyGodmotherPerk = true;
+    if (!next.customProfileTitle) {
+      next.customProfileTitle = 'Feature Fairy Godmother';
+    }
+  }
+  if (tier.type === 'matriarch') {
+    next.hasMatriarchPerk = true;
+    const coupons = Array.isArray(tier.coupons) ? tier.coupons : [];
+    next.discountCoupons = Array.from(new Set([...(next.discountCoupons || []), ...coupons]));
+    if (!next.customProfileTitle) {
+      next.customProfileTitle = 'Founding Matriarch';
+    }
+  }
+
+  return {
+    ok: true,
+    reason: 'redeemed',
+    rewards: normalizeVillageRewards(next),
+    tier,
+    celebration: {
+      title: `${tier.emoji} ${tier.title}`,
+      body: tier.description || tier.perk,
+      variant: tier.type === 'fairy_godmother' || tier.type === 'matriarch' ? 'vip' : 'premium',
+    },
+  };
+}
+
+export function updateRewardsProfileFields(rewards, fields = {}) {
+  const current = normalizeVillageRewards(rewards);
+  const next = { ...current };
+  if (fields.customProfileTitle != null) {
+    next.customProfileTitle = String(fields.customProfileTitle || '').trim().slice(0, 48);
+  }
+  if (fields.selectedSecretThemeId !== undefined) {
+    next.selectedSecretThemeId = fields.selectedSecretThemeId || null;
+  }
+  return normalizeVillageRewards(next);
+}
+
+/**
  * Pure award attempt. Returns whether points were granted + updated rewards.
- * @param {object} rewards
- * @param {number} amount
- * @param {string} actionKey
  */
 export function applyAddPoints(rewards, amount, actionKey) {
   const current = normalizeVillageRewards(rewards);
@@ -260,7 +429,6 @@ export function applyAddPoints(rewards, amount, actionKey) {
   }
 
   if (key === 'dailyJournal') {
-    // Reset weekly counter when the week rolls over.
     if (actions.weeklyJournalWeekKey !== weekKey) {
       actions.weeklyJournalWeekKey = weekKey;
       actions.weeklyJournalCount = 0;
@@ -277,8 +445,8 @@ export function applyAddPoints(rewards, amount, actionKey) {
     actions.weeklyJournalCount += 1;
 
     let totalAward = awardAmount;
-    let bonusToastMessage = null;
     let bonusAmount = 0;
+    let bonusToastMessage = null;
 
     if (
       actions.weeklyJournalCount >= WEEKLY_JOURNAL_BONUS_THRESHOLD &&
@@ -445,7 +613,6 @@ export function applyAddPoints(rewards, amount, actionKey) {
       toastMessage: VIP_PROMO_TOAST,
     });
   } else if (key === 'adminTestGrant') {
-    // Uncapped sandbox grant — never used for public analytics funnels.
     return finishAward(current, actions, awardAmount, {
       toastMessage: `Admin test +${awardAmount} pts`,
     });
@@ -487,10 +654,6 @@ export function applyAddPoints(rewards, amount, actionKey) {
 export function applyAdminSetPoints(rewards, points) {
   const current = normalizeVillageRewards(rewards);
   const nextPoints = Math.max(0, Number(points) || 0);
-  const { unlockedBadges, newlyUnlocked } = syncUnlockedBadges(
-    nextPoints,
-    current.unlockedBadges,
-  );
   return {
     awarded: true,
     amount: nextPoints - current.points,
@@ -498,9 +661,9 @@ export function applyAdminSetPoints(rewards, points) {
     rewards: {
       ...current,
       points: nextPoints,
-      unlockedBadges,
+      lifetimePoints: Math.max(current.lifetimePoints || 0, nextPoints),
     },
-    newlyUnlocked,
+    newlyUnlocked: [],
     toastMessage: ADMIN_TEST_POINTS_TOAST,
     bonusToastMessage: null,
     bonusAmount: 0,
@@ -509,7 +672,7 @@ export function applyAdminSetPoints(rewards, points) {
 }
 
 export function getBadgeMeta(badgeId) {
-  return REWARD_TIERS.find((tier) => tier.id === badgeId) || null;
+  return REWARD_TIERS.find((tier) => tier.id === mapLegacyTierId(badgeId)) || null;
 }
 
 /** Current-week journal progress for Me-tab copy (resets each Monday). */
@@ -528,4 +691,13 @@ export function getWeeklyJournalProgress(rewards, date = new Date()) {
     threshold: WEEKLY_JOURNAL_BONUS_THRESHOLD,
     bonusClaimed: actions.weeklyJournalBonusClaimed,
   };
+}
+
+/** Soft premium access: Pro/sub OR Fairy Godmother redeem. */
+export function hasSanctuaryPremiumAccess({
+  isPro,
+  isSubscribed,
+  hasFairyGodmotherPerk,
+} = {}) {
+  return Boolean(isPro || isSubscribed || hasFairyGodmotherPerk);
 }

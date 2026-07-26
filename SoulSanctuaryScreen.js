@@ -33,8 +33,10 @@ import { useVillageRewards } from './VillageRewardsContext';
 import {
   normalizeJournalStage,
   pickInAppPromptBatch,
+  pickPremiumTeaserPrompt,
   shuffleInAppPromptBatch,
 } from './sanctuaryJournalPrompts';
+import { hasSanctuaryPremiumAccess } from './villageRewardsEngine';
 
 const JOURNAL_SPRING = VILLAGE_SNAPPY_REANIMATED;
 const JOURNAL_SPRING_GENTLE = { damping: 20, stiffness: 68 };
@@ -192,7 +194,13 @@ export default function SoulSanctuaryScreen({
   /** Prefill from email deep link / newsletter CTA */
   initialJournalPrompt = '',
 }) {
-  const hasPro = Boolean(isPro || isSubscribed);
+  const { addPoints, rewards } = useVillageRewards();
+  const hasPremiumPrompts = hasSanctuaryPremiumAccess({
+    isPro,
+    isSubscribed,
+    hasFairyGodmotherPerk: rewards?.hasFairyGodmotherPerk,
+  });
+  const hasPro = hasPremiumPrompts;
   const stage = normalizeJournalStage(journeyStage);
   const [phase, setPhase] = useState('clouds');
   const [selectedMood, setSelectedMood] = useState(null);
@@ -202,8 +210,9 @@ export default function SoulSanctuaryScreen({
   const [expandedEntryId, setExpandedEntryId] = useState(null);
   const [openingPrompt, setOpeningPrompt] = useState('');
   const [inspirationPrompts, setInspirationPrompts] = useState(() =>
-    pickInAppPromptBatch(stage, { count: 4, seed: 1 }),
+    pickInAppPromptBatch(stage, { count: 4, seed: 1, includePremium: false }),
   );
+  const [premiumTeaser, setPremiumTeaser] = useState(() => pickPremiumTeaserPrompt(stage, 1));
   const [selectedPromptId, setSelectedPromptId] = useState(null);
   const pendingEmailPromptRef = useRef(String(initialJournalPrompt || '').trim());
 
@@ -217,12 +226,18 @@ export default function SoulSanctuaryScreen({
   const screenReveal = gentleEnter ? gentleReveal : standardReveal;
   const scrollRef = useRef(null);
   const releaseRef = useRef(null);
-  const { addPoints } = useVillageRewards();
 
   useEffect(() => {
-    setInspirationPrompts(pickInAppPromptBatch(stage, { count: 4, seed: Date.now() % 1000 }));
+    setInspirationPrompts(
+      pickInAppPromptBatch(stage, {
+        count: 4,
+        seed: Date.now() % 1000,
+        includePremium: hasPremiumPrompts,
+      }),
+    );
+    setPremiumTeaser(pickPremiumTeaserPrompt(stage, Date.now() % 1000));
     setSelectedPromptId(null);
-  }, [stage]);
+  }, [stage, hasPremiumPrompts]);
 
   useEffect(() => {
     pendingEmailPromptRef.current = String(initialJournalPrompt || '').trim();
@@ -287,12 +302,21 @@ export default function SoulSanctuaryScreen({
 
   const handleSelectInspiration = (prompt) => {
     if (!prompt?.text || releasing) return;
+    if (prompt.premium && !hasPremiumPrompts) {
+      onRequestUpgrade?.();
+      return;
+    }
     setSelectedPromptId(prompt.id);
     setJournalText(prompt.text);
   };
 
   const handleShuffleInspiration = () => {
-    setInspirationPrompts((prev) => shuffleInAppPromptBatch(stage, prev, { count: 4 }));
+    setInspirationPrompts((prev) =>
+      shuffleInAppPromptBatch(stage, prev, { count: 4, includePremium: hasPremiumPrompts }),
+    );
+    if (!hasPremiumPrompts) {
+      setPremiumTeaser(pickPremiumTeaserPrompt(stage, Date.now() % 1000));
+    }
     setSelectedPromptId(null);
   };
 
@@ -454,7 +478,11 @@ export default function SoulSanctuaryScreen({
                       return (
                         <TouchableOpacity
                           key={prompt.id}
-                          style={[styles.inspirationChip, selected && styles.inspirationChipActive]}
+                          style={[
+                            styles.inspirationChip,
+                            selected && styles.inspirationChipActive,
+                            prompt.premium && styles.inspirationChipPremium,
+                          ]}
                           onPress={() => handleSelectInspiration(prompt)}
                           activeOpacity={0.88}
                           disabled={releasing}
@@ -465,11 +493,24 @@ export default function SoulSanctuaryScreen({
                               selected && styles.inspirationChipTextActive,
                             ]}
                           >
+                            {prompt.premium ? '✨ ' : ''}
                             {prompt.text}
                           </Text>
                         </TouchableOpacity>
                       );
                     })}
+                    {!hasPremiumPrompts && premiumTeaser ? (
+                      <TouchableOpacity
+                        style={[styles.inspirationChip, styles.inspirationChipLocked]}
+                        onPress={() => onRequestUpgrade?.()}
+                        activeOpacity={0.88}
+                        disabled={releasing}
+                      >
+                        <Text style={styles.inspirationChipLockedText}>
+                          🔒 Premium · {premiumTeaser.text}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </View>
 
@@ -814,6 +855,22 @@ const styles = StyleSheet.create({
   inspirationChipTextActive: {
     color: '#FFF9FC',
     fontWeight: '600',
+  },
+  inspirationChipPremium: {
+    borderColor: 'rgba(212, 184, 150, 0.55)',
+    backgroundColor: 'rgba(212, 184, 150, 0.12)',
+  },
+  inspirationChipLocked: {
+    borderColor: 'rgba(196, 168, 216, 0.35)',
+    backgroundColor: 'rgba(40, 32, 55, 0.45)',
+    opacity: 0.9,
+  },
+  inspirationChipLockedText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(220, 210, 235, 0.72)',
+    fontStyle: 'italic',
+    ...SANCTUARY_ZEN,
   },
   diaryInput: {
     minHeight: 140,

@@ -110,10 +110,11 @@ export default function PremiumUpgradeWelcomeModal({
   title,
   body,
   bonusLabel,
+  confetti = false,
 }) {
   const isVip = variant === 'vip';
   const isFoundingMother = variant === 'founding_mother';
-  const showConfetti = isVip || isFoundingMother;
+  const showConfetti = confetti || isVip || isFoundingMother;
 
   const header =
     title ||

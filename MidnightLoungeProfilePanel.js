@@ -13,7 +13,9 @@ import { MIDNIGHT } from './midnightLoungeTheme';
 import MamaBirthdayField from './MamaBirthdayField.js';
 import VillageRewardsCard from './VillageRewardsCard.js';
 import AdminPortalPanel from './AdminPortalPanel.js';
+import SecretThemeSwitcher from './SecretThemeSwitcher.js';
 import { isAdmin } from './adminAccess.js';
+import { useVillageRewards } from './VillageRewardsContext';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -66,6 +68,22 @@ const STAGE_OPTIONS = [
   { id: 'hybrid', label: 'Both', hint: 'Toggle on Home' },
 ];
 
+function CustomTitleBadge({ title }) {
+  const text = String(title || '').trim();
+  if (!text) return null;
+  return (
+    <View style={styles.titleBadge}>
+      <Text style={[styles.titleBadgeSparkle, styles.titleBadgeSparkleLeft]} pointerEvents="none">
+        ✦
+      </Text>
+      <Text style={[styles.titleBadgeText, PLAYFUL]}>{text}</Text>
+      <Text style={[styles.titleBadgeSparkle, styles.titleBadgeSparkleRight]} pointerEvents="none">
+        ✦
+      </Text>
+    </View>
+  );
+}
+
 function MidnightLoungeProfilePanel({
   mamaName,
   onMamaNameChange,
@@ -90,10 +108,14 @@ function MidnightLoungeProfilePanel({
   onResetTestPoints,
   currentPoints = 0,
 }) {
+  const { rewards, updateProfileFields } = useVillageRewards();
   const [nameDraft, setNameDraft] = useState(mamaName || '');
   const [bioDraft, setBioDraft] = useState(shortBio || '');
+  const [titleDraft, setTitleDraft] = useState(rewards.customProfileTitle || '');
   const [savedFlash, setSavedFlash] = useState(false);
   const showAdminPortal = isAdmin(adminUser);
+  const canEditTitle = Boolean(rewards.hasFairyGodmotherPerk || rewards.hasMatriarchPerk);
+  const secretThemesUnlocked = Boolean(rewards.hasFairyGodmotherPerk);
 
   useEffect(() => {
     setNameDraft(mamaName || '');
@@ -103,9 +125,16 @@ function MidnightLoungeProfilePanel({
     setBioDraft(shortBio || '');
   }, [shortBio]);
 
+  useEffect(() => {
+    setTitleDraft(rewards.customProfileTitle || '');
+  }, [rewards.customProfileTitle]);
+
   const handleSave = () => {
     onMamaNameChange?.(nameDraft.trim() || 'Mama');
     onShortBioChange?.(bioDraft.trim());
+    if (canEditTitle) {
+      updateProfileFields({ customProfileTitle: titleDraft.trim().slice(0, 48) });
+    }
     onSave?.();
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2200);
@@ -144,6 +173,21 @@ function MidnightLoungeProfilePanel({
         placeholder="How should the village greet you?"
         placeholderTextColor={MIDNIGHT.textMuted}
       />
+      <CustomTitleBadge title={rewards.customProfileTitle || titleDraft} />
+
+      {canEditTitle ? (
+        <>
+          <Text style={[styles.fieldLabel, SANS]}>Custom Profile Title</Text>
+          <TextInput
+            style={[styles.fieldInput, SANS]}
+            value={titleDraft}
+            onChangeText={setTitleDraft}
+            placeholder="e.g. Feature Fairy Godmother"
+            placeholderTextColor={MIDNIGHT.textMuted}
+            maxLength={48}
+          />
+        </>
+      ) : null}
 
       <Text style={[styles.fieldLabel, SANS]}>Short Bio / Mantra</Text>
       <TextInput
@@ -211,6 +255,8 @@ function MidnightLoungeProfilePanel({
       </TouchableOpacity>
 
       <VillageRewardsCard />
+
+      <SecretThemeSwitcher unlocked={secretThemesUnlocked} />
 
       {showAdminPortal ? (
         <AdminPortalPanel
@@ -313,6 +359,53 @@ const styles = StyleSheet.create({
     fontSize: 19,
     color: MIDNIGHT.textPrimary,
     marginBottom: 14,
+  },
+  titleBadge: {
+    alignSelf: 'center',
+    marginTop: -6,
+    marginBottom: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 150, 0.65)',
+    backgroundColor: 'rgba(196, 184, 232, 0.22)',
+    overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        backgroundImage:
+          'linear-gradient(110deg, rgba(232,223,245,0.35) 0%, rgba(212,184,150,0.45) 45%, rgba(232,223,245,0.35) 100%)',
+        backgroundSize: '220% 100%',
+        animation: 'calmmamaTitleShimmer 2.8s ease-in-out infinite',
+        boxShadow: '0 0 22px rgba(212, 184, 150, 0.35)',
+      },
+      default: {
+        shadowColor: '#D4B896',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.45,
+        shadowRadius: 10,
+        elevation: 4,
+      },
+    }),
+  },
+  titleBadgeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F5E6C8',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  titleBadgeSparkle: {
+    position: 'absolute',
+    top: 4,
+    fontSize: 10,
+    color: 'rgba(245, 230, 200, 0.85)',
+  },
+  titleBadgeSparkleLeft: {
+    left: 8,
+  },
+  titleBadgeSparkleRight: {
+    right: 8,
   },
   fieldInputMultiline: {
     minHeight: 96,

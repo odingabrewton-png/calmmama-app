@@ -121,7 +121,7 @@ function buildRewardsFooterHtml({ points = 0, appUrl = APP_URL } = {}) {
   const pointsLabel = Number(points || 0).toLocaleString();
   const nextLine = progress.nextTier
     ? `${progress.pointsToNext} pts to ${progress.nextTitle} · ${progress.nextPerk}`
-    : `You have unlocked every merch reward tier — ${progress.nextPerk}`;
+    : `You have unlocked every Crown Points reward tier — ${progress.nextPerk}`;
   const rewardsUrl = String(buildAppDeepLink({ rewards: '1' }) || appUrl).replace(/"/g, '&quot;');
 
   return `
@@ -146,7 +146,7 @@ function buildRewardsFooterHtml({ points = 0, appUrl = APP_URL } = {}) {
                       </tr>
                     </table>
                     <p style="color: #B9A7D0; font-size: 11px; margin: 8px 0 16px 0; text-align: center;">
-                      ${filled}% of the way to your next merch discount tier
+                      ${filled}% of the way to your next Crown Points reward
                     </p>
                     <p style="margin: 0; text-align: center;">
                       <a href="${rewardsUrl}" target="_blank" style="background-color: #F8F4FC; color: #4A3B5C; text-decoration: none; padding: 12px 22px; border-radius: 99px; font-weight: 700; font-size: 14px; display: inline-block;">

@@ -54,6 +54,79 @@ const IN_APP_PROMPTS = Object.freeze({
 });
 
 /**
+ * Premium / Fairy Godmother prompts — unlocked with Pro or Fairy Godmother perk.
+ * Never duplicated into free IN_APP_PROMPTS.
+ */
+const PREMIUM_IN_APP_PROMPTS = Object.freeze({
+  pregnant: [
+    {
+      id: 'p-pr-1',
+      premium: true,
+      text: 'What ancestral softness am I ready to inherit — and what patterns can I gently refuse?',
+    },
+    {
+      id: 'p-pr-2',
+      premium: true,
+      text: 'If my baby could feel my nervous system today, what would I want them to borrow from me?',
+    },
+    {
+      id: 'p-pr-3',
+      premium: true,
+      text: 'Write the secret wish I keep polishing in quiet moments — without editing for anyone else.',
+    },
+    {
+      id: 'p-pr-4',
+      premium: true,
+      text: 'Where is fear asking for control, and where might trust ask for companionship instead?',
+    },
+  ],
+  postpartum: [
+    {
+      id: 'pp-pr-1',
+      premium: true,
+      text: 'What part of me needs re-mothering before I can keep pouring out?',
+    },
+    {
+      id: 'pp-pr-2',
+      premium: true,
+      text: 'Name a midnight truth I only admit when the house is finally quiet…',
+    },
+    {
+      id: 'pp-pr-3',
+      premium: true,
+      text: 'If healing had a private ritual just for me this week, what would it look like?',
+    },
+    {
+      id: 'pp-pr-4',
+      premium: true,
+      text: 'What story about “good motherhood” am I ready to rewrite in my own handwriting?',
+    },
+  ],
+  hybrid: [
+    {
+      id: 'h-pr-1',
+      premium: true,
+      text: 'How do I honor the child who is already here while making room for the one arriving?',
+    },
+    {
+      id: 'h-pr-2',
+      premium: true,
+      text: 'What do I need permission to drop so both seasons can breathe?',
+    },
+    {
+      id: 'h-pr-3',
+      premium: true,
+      text: 'Write a love note to the version of me holding two timelines with one heart…',
+    },
+    {
+      id: 'h-pr-4',
+      premium: true,
+      text: 'Where does my body ask for luxury-level gentleness that the day keeps denying?',
+    },
+  ],
+});
+
+/**
  * Email-only Reflection Prompt of the Week — must never duplicate in-app copy.
  * Longer, letter-like reflections tailored by stage.
  */
@@ -242,11 +315,18 @@ function poolForStage(map, stage) {
   return map[key] || map.pregnant;
 }
 
+function buildInAppPool(stage, { includePremium = false } = {}) {
+  const free = poolForStage(IN_APP_PROMPTS, stage);
+  if (!includePremium) return [...free];
+  const premium = poolForStage(PREMIUM_IN_APP_PROMPTS, stage);
+  return [...free, ...premium];
+}
+
 /** Deterministic batch of 3–4 in-app prompts for a stage. */
-function pickInAppPromptBatch(stage, { count = 4, seed = 0 } = {}) {
-  const pool = [...poolForStage(IN_APP_PROMPTS, stage)];
+function pickInAppPromptBatch(stage, { count = 4, seed = 0, includePremium = false } = {}) {
+  const pool = buildInAppPool(stage, { includePremium });
   const n = Math.min(Math.max(3, count), 4, pool.length);
-  const start = hashString(`${normalizeJournalStage(stage)}:${seed}`) % pool.length;
+  const start = hashString(`${normalizeJournalStage(stage)}:${seed}:${includePremium ? 1 : 0}`) % pool.length;
   const batch = [];
   for (let i = 0; i < n; i += 1) {
     batch.push(pool[(start + i) % pool.length]);
@@ -255,8 +335,12 @@ function pickInAppPromptBatch(stage, { count = 4, seed = 0 } = {}) {
 }
 
 /** Fresh batch that prefers prompts not in the current visible set. */
-function shuffleInAppPromptBatch(stage, currentBatch = [], { count = 4 } = {}) {
-  const pool = poolForStage(IN_APP_PROMPTS, stage);
+function shuffleInAppPromptBatch(
+  stage,
+  currentBatch = [],
+  { count = 4, includePremium = false } = {},
+) {
+  const pool = buildInAppPool(stage, { includePremium });
   const currentIds = new Set((currentBatch || []).map((p) => p.id));
   const preferred = pool.filter((p) => !currentIds.has(p.id));
   const source = preferred.length >= 3 ? preferred : pool;
@@ -269,6 +353,14 @@ function shuffleInAppPromptBatch(stage, currentBatch = [], { count = 4 } = {}) {
     batch.push(source[(start + i * 3) % source.length]);
   }
   return batch;
+}
+
+/** One locked teaser premium prompt for free members (paywall / Fairy upsell). */
+function pickPremiumTeaserPrompt(stage, seed = 0) {
+  const pool = poolForStage(PREMIUM_IN_APP_PROMPTS, stage);
+  if (!pool.length) return null;
+  const index = hashString(`${normalizeJournalStage(stage)}:teaser:${seed}`) % pool.length;
+  return pool[index];
 }
 
 /** Exclusive weekly email reflection for a stage (never from in-app pool). */
@@ -332,6 +424,9 @@ function assertEmailPromptsAreExclusive() {
   const inAppTexts = new Set();
   JOURNAL_STAGES.forEach((stage) => {
     (IN_APP_PROMPTS[stage] || []).forEach((p) => inAppTexts.add(String(p.text).trim().toLowerCase()));
+    (PREMIUM_IN_APP_PROMPTS[stage] || []).forEach((p) =>
+      inAppTexts.add(String(p.text).trim().toLowerCase()),
+    );
   });
   const collisions = [];
   JOURNAL_STAGES.forEach((stage) => {
@@ -346,10 +441,12 @@ function assertEmailPromptsAreExclusive() {
 module.exports = {
   JOURNAL_STAGES,
   IN_APP_PROMPTS,
+  PREMIUM_IN_APP_PROMPTS,
   EMAIL_EXCLUSIVE_PROMPTS,
   normalizeJournalStage,
   pickInAppPromptBatch,
   shuffleInAppPromptBatch,
+  pickPremiumTeaserPrompt,
   pickEmailWeeklyPrompt,
   inferNewsletterStage,
   buildJournalDeepLink,
