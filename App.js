@@ -31,7 +31,6 @@ import {
 import WeeklyBloomScreen from './WeeklyBloomScreen'; // layout locked — pregnantBloomLayoutConfig.js
 import AppBrandHeader from './AppBrandHeader';
 import VillageOmbreBackdrop from './VillageOmbreBackdrop';
-import PWAInstallPrompt from './PWAInstallPrompt';
 import { CALM_MAMA_PASTEL } from './calmMamaPastelPalette';
 import CloudNurseryScreen from './CloudNurseryScreen';
 import LittleHorizonsScreen from './LittleHorizonsScreen';
@@ -5147,7 +5146,7 @@ function CalmMamaApp() {
         </Animated.View>
 
         {/* Web-only install overlay — transparent over living ombre */}
-        <PWAInstallPrompt />
+        {/* Install sheet disabled inside the live app to avoid unsolicited pop-ups. */}
 
         <PremiumUpgradeWelcomeModal
           visible={premiumWelcomeOpen}

@@ -1216,7 +1216,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
         </ScrollView>
 
         {/* iOS Share opt-in slide-up — absolute, separate from scroll CTA */}
-        <PWAInstallPrompt onBindPrimary={bindInstallPrimary} autoOpenIosSheet />
+        <PWAInstallPrompt onBindPrimary={bindInstallPrimary} autoOpenIosSheet={false} />
         {giftModal}
       </View>
     );

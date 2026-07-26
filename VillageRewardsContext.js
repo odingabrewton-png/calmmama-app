@@ -19,7 +19,6 @@ import {
   REWARD_POINT_VALUES,
   saveVillageRewards,
 } from './villageRewardsEngine';
-import VillageRewardsToast from './VillageRewardsToast';
 
 const VillageRewardsContext = createContext({
   rewards: createDefaultVillageRewards(),
@@ -32,7 +31,6 @@ const VillageRewardsContext = createContext({
 export function VillageRewardsProvider({ children }) {
   const [rewards, setRewards] = useState(createDefaultVillageRewards);
   const [hydrated, setHydrated] = useState(false);
-  const [toast, setToast] = useState(null);
   const rewardsRef = useRef(rewards);
   const toastTimerRef = useRef(null);
 
@@ -54,11 +52,8 @@ export function VillageRewardsProvider({ children }) {
     };
   }, []);
 
-  const showToast = useCallback((message, durationMs = 2400) => {
-    if (!message) return;
-    setToast({ id: Date.now(), message });
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), durationMs);
+  const showToast = useCallback((_message, _durationMs = 2400) => {
+    // Soft point toasts disabled — awards still persist without popup noise.
   }, []);
 
   const addPoints = useCallback(async (amount, actionKey) => {
@@ -131,7 +126,6 @@ export function VillageRewardsProvider({ children }) {
   return (
     <VillageRewardsContext.Provider value={value}>
       {children}
-      <VillageRewardsToast toast={toast} />
     </VillageRewardsContext.Provider>
   );
 }
