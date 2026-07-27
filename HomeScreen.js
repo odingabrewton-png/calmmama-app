@@ -32,6 +32,7 @@ import BotanicalGardenFrame from './BotanicalGardenFrame';
 import RegistryVillageAskPanel from './RegistryVillageAskPanel';
 import { injectNurseryWebFonts, mamaCardScriptTitle } from './nurseryRetroFonts';
 import { useVillageRewards } from './VillageRewardsContext';
+import { useVillageUiInk } from './villageUiInk';
 import {
   PREGNANT_HOME_LAYOUT,
   PREGNANT_HOME_LAYOUT_LOCKED,
@@ -52,7 +53,6 @@ const FALLBACK_PAGE_WIDTH =
   Platform.OS === 'web' ? 295 : Dimensions.get('window').width - PARENT_H_PAD * 2;
 const LINK_PROGRESS_BUMP = 0.15;
 
-const INK = '#000000';
 const CELL_BLOCK = 'rgba(255, 255, 255, 0.2)';
 const BOTANICAL_GREEN = '#5C7A68';
 const BOTANICAL_PEACH = '#E9A889';
@@ -81,6 +81,7 @@ function isWordSolved(puzzle, entries, word) {
 const CROSSWORD_MAX_HINTS = 3;
 
 const CrosswordClueLine = memo(function CrosswordClueLine({ word, solved, hinted }) {
+  const styles = useHomeStyles();
   const arrow = word.direction === 'across' ? '→' : '↓';
   return (
     <View style={styles.clueRow}>
@@ -95,6 +96,7 @@ const CrosswordClueLine = memo(function CrosswordClueLine({ word, solved, hinted
 });
 
 const DailyMiniCrossword = memo(function DailyMiniCrossword() {
+  const styles = useHomeStyles();
   const { addPoints } = useVillageRewards();
   const [levelIndex, setLevelIndex] = useState(0);
   const dailyCrossword = useMemo(() => getCrosswordLevel(levelIndex), [levelIndex]);
@@ -341,6 +343,7 @@ const DailyMiniCrossword = memo(function DailyMiniCrossword() {
 });
 
 const SanctuaryCanvas = memo(function SanctuaryCanvas({ children }) {
+  const styles = useHomeStyles();
   return (
     <View style={styles.fullscreenContainer}>
       {/*
@@ -376,6 +379,7 @@ function ModalFallback() {
 
 const RegistryLinkButton = memo(
   function RegistryLinkButton({ link, onPress }) {
+    const styles = useHomeStyles();
     return (
       <TouchableOpacity
         style={styles.registryLinkBtn}
@@ -434,6 +438,7 @@ const FrostedGlassCard = memo(function FrostedGlassCard({ children, style }) {
 
 const BabyRegistryTrackerFrame = memo(
   function BabyRegistryTrackerFrame({ title, progress, onRegistryLinkPress }) {
+    const styles = useHomeStyles();
     return (
       <BotanicalGardenFrame
         topColor={BOTANICAL_GREEN}
@@ -458,6 +463,7 @@ const BabyRegistryTrackerFrame = memo(
 
 const RegistryTrackingBox = memo(
   function RegistryTrackingBox({ title, progress, onRegistryLinkPress }) {
+    const styles = useHomeStyles();
     const percent = Math.round(progress * 100);
 
     return (
@@ -502,6 +508,7 @@ const LoungePage = memo(
     onRegistryLinkPress,
     onWordSearchDragChange,
   }) {
+    const styles = useHomeStyles();
     const handleLinkPress = useCallback(
       (url) => onRegistryLinkPress(url, pageIndex),
       [onRegistryLinkPress, pageIndex],
@@ -565,6 +572,7 @@ function HomeScreen({ headerSlot = null }) {
     console.warn('[HomeScreen] PREGNANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
   }
   const { addPoints } = useVillageRewards();
+  const styles = useHomeStyles();
   const carouselRef = useRef(null);
   const [pagerWidth, setPagerWidth] = useState(() => Math.max(1, Math.round(FALLBACK_PAGE_WIDTH)));
   const pageWidth = pagerWidth;
@@ -710,6 +718,7 @@ function HomeScreen({ headerSlot = null }) {
 export default memo(HomeScreen);
 
 export function PregnantHomeFallback() {
+  const styles = useHomeStyles();
   return (
     <View style={styles.fullscreenContainer}>
       <SafeAreaView style={styles.safeArea} edges={['left', 'right']} />
@@ -717,7 +726,8 @@ export function PregnantHomeFallback() {
   );
 }
 
-const styles = StyleSheet.create({
+function createHomeStyles(ink) {
+  return StyleSheet.create({
   fullscreenContainer: {
     flex: 1,
     // Transparent so shell cream + ombre show through; cream is the shell fallback.
@@ -758,7 +768,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.1,
     textTransform: 'uppercase',
-    color: INK,
+    color: ink,
     opacity: 0.85,
     marginBottom: 10,
   },
@@ -774,7 +784,7 @@ const styles = StyleSheet.create({
   registryLinkLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: INK,
+    color: ink,
     letterSpacing: 0.2,
     textAlign: 'center',
   },
@@ -798,7 +808,7 @@ const styles = StyleSheet.create({
   registryPercentText: {
     fontSize: 12,
     fontWeight: '800',
-    color: INK,
+    color: ink,
     letterSpacing: 0.3,
   },
   registrySyncLabel: {
@@ -806,7 +816,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.7,
     textTransform: 'uppercase',
-    color: INK,
+    color: ink,
     opacity: 0.85,
     marginBottom: 16,
     textAlign: 'center',
@@ -827,11 +837,11 @@ const styles = StyleSheet.create({
   paginationDot: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgba(0, 0, 0, 0.35)',
+    color: ink === '#FFFFFF' ? 'rgba(255,255,255,0.45)' : 'rgba(0, 0, 0, 0.35)',
     lineHeight: 18,
   },
   paginationDotActive: {
-    color: '#000000',
+    color: ink,
     fontWeight: '800',
   },
   loungePage: {
@@ -876,7 +886,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1.3,
     textTransform: 'uppercase',
-    color: INK,
+    color: ink,
     opacity: 0.85,
     marginBottom: 10,
   },
@@ -903,7 +913,7 @@ const styles = StyleSheet.create({
   crosswordLevelChipText: {
     fontSize: 14,
     fontWeight: '800',
-    color: INK,
+    color: ink,
     opacity: 0.7,
   },
   crosswordLevelChipTextActive: {
@@ -914,7 +924,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
-    color: INK,
+    color: ink,
     opacity: 0.55,
     textAlign: 'center',
     marginBottom: 8,
@@ -922,7 +932,7 @@ const styles = StyleSheet.create({
   crosswordTheme: {
     fontSize: 16,
     fontWeight: '700',
-    color: INK,
+    color: ink,
     letterSpacing: 0.2,
     marginBottom: 6,
     textAlign: 'center',
@@ -930,7 +940,7 @@ const styles = StyleSheet.create({
   crosswordSubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: INK,
+    color: ink,
     lineHeight: 20,
     marginBottom: 16,
   },
@@ -954,7 +964,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.55)',
     fontSize: 16,
     fontWeight: '700',
-    color: INK,
+    color: ink,
     padding: 0,
   },
   crosswordCellCorrect: {
@@ -964,7 +974,7 @@ const styles = StyleSheet.create({
   crosswordProgress: {
     fontSize: 12,
     fontWeight: '700',
-    color: INK,
+    color: ink,
     textAlign: 'center',
     marginBottom: 10,
     letterSpacing: 0.4,
@@ -998,7 +1008,7 @@ const styles = StyleSheet.create({
   crosswordSuccessText: {
     fontSize: 14,
     fontWeight: '700',
-    color: INK,
+    color: ink,
     textAlign: 'center',
   },
   cluesSection: {
@@ -1009,7 +1019,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    color: INK,
+    color: ink,
     marginBottom: 2,
   },
   cluesHeadingDown: {
@@ -1023,7 +1033,7 @@ const styles = StyleSheet.create({
   clueArrow: {
     fontSize: 13,
     fontWeight: '700',
-    color: INK,
+    color: ink,
     width: 16,
     lineHeight: 20,
   },
@@ -1031,10 +1041,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: INK,
+    color: ink,
     lineHeight: 20,
   },
   clueSolved: {
     opacity: 0.55,
   },
 });
+}
+
+function useHomeStyles() {
+  const { ink } = useVillageUiInk();
+  return useMemo(() => createHomeStyles(ink), [ink]);
+}

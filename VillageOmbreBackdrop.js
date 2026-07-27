@@ -1,6 +1,6 @@
 /**
  * VillageOmbreBackdrop — sage / lavender / peach ombre by default.
- * Fairy Godmother perk explicitly applies one of 5 custom ombre overlays.
+ * Fairy Godmother perk explicitly applies a custom animated ombre overlay.
  *
  * Web: CSS gradient + body `#calmmama-body-ombre` sync (full-bleed DOM).
  * Native: Reanimated wash layers + translucent overlay blend.
@@ -18,12 +18,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { CALM_MAMA_PASTEL, CALM_MAMA_PASTEL_CYCLE_MS } from './calmMamaPastelPalette';
 import { safeStartOmbrePhase } from './reanimatedSafe';
-import { getActiveFairyTheme } from './secretFairyThemes';
+import { fairyThemeUsesWhiteText, getActiveFairyTheme } from './secretFairyThemes';
 import { useVillageRewards } from './VillageRewardsContext';
 
 const WEB_OMBRE_STYLE_ID = 'calmmama-ombre-backdrop-css';
 const WEB_TITLE_SHIMMER_ID = 'calmmama-title-shimmer-css';
 const WEB_FAIRY_BODY_STYLE_ID = 'calmmama-fairy-body-ombre-css';
+const WEB_FAIRY_TEXT_STYLE_ID = 'calmmama-fairy-text-contrast-css';
+const FAIRY_CYCLE_MS = Math.round(CALM_MAMA_PASTEL_CYCLE_MS * 0.85);
 
 function ensureTitleShimmerCss() {
   if (typeof document === 'undefined') return;
@@ -53,6 +55,40 @@ function paletteFromTheme(theme) {
   return { a: theme.colors.a, b: theme.colors.b, c: theme.colors.c };
 }
 
+/** Soften village ink to white when Fairy Godmother wash needs light copy (web). */
+function syncWebFairyTextContrast(theme) {
+  if (typeof document === 'undefined') return;
+  let style = document.getElementById(WEB_FAIRY_TEXT_STYLE_ID);
+  if (!style) {
+    style = document.createElement('style');
+    style.id = WEB_FAIRY_TEXT_STYLE_ID;
+    document.head.appendChild(style);
+  }
+
+  const root = document.documentElement;
+  if (!fairyThemeUsesWhiteText(theme)) {
+    style.textContent = '';
+    root.removeAttribute('data-fairy-ui-text');
+    return;
+  }
+
+  root.setAttribute('data-fairy-ui-text', 'white');
+  style.textContent = `
+    html[data-fairy-ui-text="white"] {
+      --village-ink: #FFFFFF;
+      --village-ink-soft: rgba(255, 255, 255, 0.82);
+    }
+    /* Force readable white copy over deeper Fairy Godmother washes (RN Web text classes) */
+    html[data-fairy-ui-text="white"] #root [class*="css-text"],
+    html[data-fairy-ui-text="white"] #root [class^="r-"][class*="color"] {
+      color: #FFFFFF !important;
+    }
+    html[data-fairy-ui-text="white"] #root [class*="css-text"] {
+      text-shadow: 0 1px 2px rgba(20, 16, 28, 0.4);
+    }
+  `;
+}
+
 /** Sync Fairy Godmother wash onto the fixed body ombre DOM node (web). */
 function syncWebBodyFairyOmbre(theme) {
   if (typeof document === 'undefined') return;
@@ -65,6 +101,7 @@ function syncWebBodyFairyOmbre(theme) {
   }
 
   const layer = document.getElementById('calmmama-body-ombre');
+  syncWebFairyTextContrast(theme);
   if (!theme) {
     style.textContent = '';
     if (layer) {
@@ -87,9 +124,9 @@ function syncWebBodyFairyOmbre(theme) {
     .calmmama-ombre-backdrop[data-theme="${theme.id}"] {
       background:
         linear-gradient(165deg, ${from} 0%, ${via} 48%, ${to} 100%),
-        linear-gradient(155deg, ${a} 0%, ${b} 38%, ${c} 72%, ${a} 100%) !important;
-      background-size: 280% 280%, 300% 300% !important;
-      animation: calmmamaOmbreShift ${CALM_MAMA_PASTEL_CYCLE_MS}ms ease-in-out infinite !important;
+        linear-gradient(145deg, ${a} 0%, ${b} 32%, ${c} 64%, ${a} 100%) !important;
+      background-size: 320% 320%, 360% 360% !important;
+      animation: calmmamaOmbreShift ${FAIRY_CYCLE_MS}ms ease-in-out infinite !important;
     }
   `;
 
@@ -109,12 +146,13 @@ function ensureWebOmbreCss(palette, themeKey, theme) {
   }
 
   const overlay = theme?.overlay;
+  const cycleMs = overlay ? FAIRY_CYCLE_MS : CALM_MAMA_PASTEL_CYCLE_MS;
   const layered = overlay
     ? `
       background:
         linear-gradient(165deg, ${overlay.from} 0%, ${overlay.via} 48%, ${overlay.to} 100%),
-        linear-gradient(155deg, ${palette.a} 0%, ${palette.b} 35%, ${palette.c} 70%, ${palette.a} 100%);
-      background-size: 280% 280%, 300% 300%;
+        linear-gradient(145deg, ${palette.a} 0%, ${palette.b} 32%, ${palette.c} 64%, ${palette.a} 100%);
+      background-size: 320% 320%, 360% 360%;
     `
     : `
       background: linear-gradient(
@@ -136,7 +174,7 @@ function ensureWebOmbreCss(palette, themeKey, theme) {
       pointer-events: none;
       overflow: hidden;
       ${layered}
-      animation: calmmamaOmbreShift ${CALM_MAMA_PASTEL_CYCLE_MS}ms ease-in-out infinite;
+      animation: calmmamaOmbreShift ${cycleMs}ms ease-in-out infinite;
     }
     @keyframes calmmamaOmbreShift {
       0% { background-position: 0% 40%, 0% 40%; }
@@ -180,7 +218,7 @@ function NativeOmbreBackdrop({ style, palette, theme }) {
         phase,
         withRepeat(
           withTiming(1, {
-            duration: CALM_MAMA_PASTEL_CYCLE_MS,
+            duration: theme?.overlay ? FAIRY_CYCLE_MS : CALM_MAMA_PASTEL_CYCLE_MS,
             easing: Easing.linear,
           }),
           -1,
@@ -202,7 +240,7 @@ function NativeOmbreBackdrop({ style, palette, theme }) {
       cancelAnimation(phase);
       sub.remove();
     };
-  }, [phase]);
+  }, [phase, theme]);
 
   const sageWash = useAnimatedStyle(() => ({
     opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [1, 0.15, 0.1, 0.2, 1]),

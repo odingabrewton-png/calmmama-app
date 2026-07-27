@@ -130,14 +130,16 @@ function MidnightLoungeProfilePanel({
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={background.colors}
-        locations={background.locations}
-        start={{ x: 0.15, y: 0 }}
-        end={{ x: 0.85, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
+      {!background.passThrough ? (
+        <LinearGradient
+          colors={background.colors}
+          locations={background.locations}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+      ) : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -145,8 +147,24 @@ function MidnightLoungeProfilePanel({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.contentColumn}>
-          <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
-          <Text style={[styles.sectionTitle, SANS]}>Me</Text>
+          <Text
+            style={[
+              styles.sectionEyebrow,
+              background.light || background.passThrough ? styles.sectionEyebrowOnLight : null,
+              SANS,
+            ]}
+          >
+            YOUR LOUNGE IDENTITY
+          </Text>
+          <Text
+            style={[
+              styles.sectionTitle,
+              background.light || background.passThrough ? styles.sectionTitleOnLight : null,
+              SANS,
+            ]}
+          >
+            Me
+          </Text>
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryAvatarWrap}>
@@ -279,12 +297,18 @@ const styles = StyleSheet.create({
     color: MIDNIGHT.lavenderMuted,
     textAlign: 'center',
   },
+  sectionEyebrowOnLight: {
+    color: 'rgba(42, 37, 64, 0.62)',
+  },
   sectionTitle: {
     fontSize: 34,
     fontWeight: '700',
     color: MIDNIGHT.textPrimary,
     textAlign: 'center',
     marginBottom: 18,
+  },
+  sectionTitleOnLight: {
+    color: '#2A2540',
   },
   summaryCard: {
     alignItems: 'center',

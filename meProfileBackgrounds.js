@@ -1,50 +1,69 @@
 /**
  * Me-tab lounge backgrounds — free to all mamas (separate from Fairy Godmother village ombres).
+ * Default is Calm Mama village pass-through so the living pastel ombre shows through.
  */
 
-export const DEFAULT_ME_BACKGROUND_ID = 'midnight_studio';
+import { CALM_MAMA_PASTEL } from './calmMamaPastelPalette';
+
+export const DEFAULT_ME_BACKGROUND_ID = 'calm_mama';
 
 export const ME_PROFILE_BACKGROUNDS = Object.freeze([
   {
-    id: 'midnight_studio',
-    label: 'Midnight Studio',
-    emoji: '🌙',
-    colors: ['#1A1626', '#14121C', '#0E0C14'],
+    id: 'calm_mama',
+    label: 'Calm Mama',
+    emoji: '🪷',
+    /** No Me overlay — village sage / lavender / peach ombre shows through. */
+    passThrough: true,
+    light: true,
+    colors: [CALM_MAMA_PASTEL.sage, CALM_MAMA_PASTEL.lavender, CALM_MAMA_PASTEL.peach],
     locations: [0, 0.5, 1],
   },
   {
-    id: 'sage_evening',
-    label: 'Sage Evening',
+    id: 'soft_lilac_mist',
+    label: 'Lilac Mist',
+    emoji: '💜',
+    light: true,
+    colors: ['#E8E0F5', '#D8D0EE', '#F2ECFA'],
+    locations: [0, 0.5, 1],
+  },
+  {
+    id: 'sage_morning',
+    label: 'Sage Morning',
     emoji: '🌿',
-    colors: ['#1A2A24', '#14201C', '#0E1614'],
+    light: true,
+    colors: ['#D8E8DC', '#C8DCCE', '#E8F2EA'],
     locations: [0, 0.52, 1],
   },
   {
-    id: 'cocoa_hearth',
-    label: 'Cocoa Hearth',
-    emoji: '☕',
-    colors: ['#2A221C', '#1E1814', '#14100E'],
+    id: 'peach_bloom',
+    label: 'Peach Bloom',
+    emoji: '🍑',
+    light: true,
+    colors: ['#F5E0D4', '#EED4C4', '#FAEBE4'],
     locations: [0, 0.48, 1],
   },
   {
-    id: 'blush_dusk',
-    label: 'Blush Dusk',
-    emoji: '🌸',
-    colors: ['#2A1E24', '#1E161C', '#140F14'],
-    locations: [0, 0.5, 1],
-  },
-  {
-    id: 'slate_mist',
-    label: 'Slate Mist',
-    emoji: '🌫️',
-    colors: ['#1C2228', '#151A1F', '#0F1216'],
+    id: 'sky_powder',
+    label: 'Sky Powder',
+    emoji: '☁️',
+    light: true,
+    colors: ['#D8E4F4', '#C8D8EC', '#E8F0FA'],
     locations: [0, 0.55, 1],
   },
   {
-    id: 'golden_ember',
-    label: 'Golden Ember',
+    id: 'buttercream',
+    label: 'Buttercream',
     emoji: '✨',
-    colors: ['#2A2418', '#1E1A12', '#14110C'],
+    light: true,
+    colors: ['#F5ECD8', '#EBE0C8', '#FAF4E8'],
+    locations: [0, 0.5, 1],
+  },
+  {
+    id: 'rosewater',
+    label: 'Rosewater',
+    emoji: '🌸',
+    light: true,
+    colors: ['#F5DCE6', '#EED0DC', '#FAEAF0'],
     locations: [0, 0.5, 1],
   },
 ]);
@@ -53,8 +72,19 @@ export const ME_PROFILE_BACKGROUNDS = Object.freeze([
 export const ME_PROFILE_CONTENT_MAX_WIDTH = 440;
 export const ME_PROFILE_H_PAD = 18;
 
+/** Map retired dark Me washes → light replacements. */
+const LEGACY_ME_BACKGROUND_MAP = Object.freeze({
+  midnight_studio: 'calm_mama',
+  sage_evening: 'sage_morning',
+  cocoa_hearth: 'buttercream',
+  blush_dusk: 'rosewater',
+  slate_mist: 'sky_powder',
+  golden_ember: 'buttercream',
+});
+
 export function getMeBackgroundById(themeId) {
-  const id = String(themeId || '').trim();
+  const raw = String(themeId || '').trim();
+  const id = LEGACY_ME_BACKGROUND_MAP[raw] || raw;
   return (
     ME_PROFILE_BACKGROUNDS.find((theme) => theme.id === id) ||
     ME_PROFILE_BACKGROUNDS.find((theme) => theme.id === DEFAULT_ME_BACKGROUND_ID) ||
@@ -63,8 +93,13 @@ export function getMeBackgroundById(themeId) {
 }
 
 export function resolveMeBackgroundId(themeId) {
-  const id = String(themeId || '').trim();
+  const raw = String(themeId || '').trim();
+  const id = LEGACY_ME_BACKGROUND_MAP[raw] || raw;
   return ME_PROFILE_BACKGROUNDS.some((theme) => theme.id === id)
     ? id
     : DEFAULT_ME_BACKGROUND_ID;
+}
+
+export function meBackgroundUsesLightText(theme) {
+  return !theme?.light && !theme?.passThrough;
 }

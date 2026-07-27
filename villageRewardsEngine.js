@@ -94,7 +94,7 @@ export const REWARD_TIERS = [
     shopGroup: 'redeemable',
     perk: 'Secret ombre themes + premium prompts',
     description:
-      'Permanent unlock of all premium prompts, 5 custom ombre blends, and a custom profile title',
+      'Permanent unlock of all premium prompts, animated Fairy Godmother ombre blends, and a custom profile title',
     emoji: '🧚',
   },
   {

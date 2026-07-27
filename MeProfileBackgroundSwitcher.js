@@ -29,7 +29,8 @@ export default function MeProfileBackgroundSwitcher() {
     <View style={styles.wrap}>
       <Text style={[styles.eyebrow, SANS]}>ME PAGE BACKGROUNDS</Text>
       <Text style={[styles.hint, SANS]}>
-        Soft lounge washes just for your Me space — pick one that feels like home tonight.
+        Soft lounge washes just for your Me space — Calm Mama keeps the village ombre; the others are
+        lighter pastel rooms.
       </Text>
       <View style={styles.row}>
         {ME_PROFILE_BACKGROUNDS.map((theme) => {
