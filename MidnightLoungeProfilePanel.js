@@ -1,20 +1,21 @@
-import React, { useEffect, useState } from 'react';
+/**
+ * Me tab hub — compact identity summary, Crown Points rewards, Village Boutique.
+ * Full profile editing lives on MidnightLoungeProfileEditPanel (deep page).
+ */
+
+import React from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Platform,
-  TextInput,
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { MIDNIGHT } from './midnightLoungeTheme';
-import MamaBirthdayField from './MamaBirthdayField.js';
 import VillageRewardsCard from './VillageRewardsCard.js';
 import AdminPortalPanel from './AdminPortalPanel.js';
-import SecretThemeSwitcher from './SecretThemeSwitcher.js';
-import HybridLittleOnesSection from './HybridLittleOnesSection.js';
 import { isAdmin } from './adminAccess.js';
 import { useVillageRewards } from './VillageRewardsContext';
 
@@ -33,6 +34,12 @@ const PLAYFUL = Platform.select({
 const ESPRESSO = '#4A4038';
 const ESPRESSO_MUTED = '#6B5E54';
 const TERRACOTTA = '#8B4A35';
+
+const STAGE_LABELS = {
+  pregnant: 'Pregnant',
+  postpartum: 'Parenting',
+  hybrid: 'Both · Pregnancy + Parenting',
+};
 
 function VillageBoutiqueBanner({ onPress }) {
   return (
@@ -63,12 +70,6 @@ function VillageBoutiqueBanner({ onPress }) {
   );
 }
 
-const STAGE_OPTIONS = [
-  { id: 'pregnant', label: 'Pregnant', hint: 'Pregnancy Home' },
-  { id: 'postpartum', label: 'Parenting', hint: 'Little one Home' },
-  { id: 'hybrid', label: 'Both', hint: 'Toggle on Home' },
-];
-
 function CustomTitleBadge({ title }) {
   const text = String(title || '').trim();
   if (!text) return null;
@@ -87,18 +88,12 @@ function CustomTitleBadge({ title }) {
 
 function MidnightLoungeProfilePanel({
   mamaName,
-  onMamaNameChange,
   shortBio,
-  onShortBioChange,
-  mamaBirthday,
-  onBirthdayChange,
   profilePhotoUri,
-  onPickProfilePhoto,
   onOpenBoutique,
+  onOpenProfileEdit,
   onDeleteAccount,
-  onSave,
   activeMode = 'pregnant',
-  onSelectJourneyMode,
   adminUser = null,
   accountEmail = '',
   onAccountEmailChange,
@@ -108,44 +103,12 @@ function MidnightLoungeProfilePanel({
   onGrantTestPoints,
   onResetTestPoints,
   currentPoints = 0,
-  littleOnes = [],
-  onChildrenChange,
 }) {
-  const { rewards, updateProfileFields } = useVillageRewards();
-  const [nameDraft, setNameDraft] = useState(mamaName || '');
-  const [bioDraft, setBioDraft] = useState(shortBio || '');
-  const [titleDraft, setTitleDraft] = useState(rewards.customProfileTitle || '');
-  const [savedFlash, setSavedFlash] = useState(false);
+  const { rewards } = useVillageRewards();
   const showAdminPortal = isAdmin(adminUser);
-  const canEditTitle = Boolean(rewards.hasFairyGodmotherPerk || rewards.hasMatriarchPerk);
-  const secretThemesUnlocked = Boolean(rewards.hasFairyGodmotherPerk);
-
-  useEffect(() => {
-    setNameDraft(mamaName || '');
-  }, [mamaName]);
-
-  useEffect(() => {
-    setBioDraft(shortBio || '');
-  }, [shortBio]);
-
-  useEffect(() => {
-    setTitleDraft(rewards.customProfileTitle || '');
-  }, [rewards.customProfileTitle]);
-
-  const handleSave = () => {
-    onMamaNameChange?.(nameDraft.trim() || 'Mama');
-    onShortBioChange?.(bioDraft.trim());
-    if (canEditTitle) {
-      updateProfileFields({ customProfileTitle: titleDraft.trim().slice(0, 48) });
-    }
-    onSave?.();
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 2200);
-  };
-
-  const openBoutique = () => {
-    onOpenBoutique?.();
-  };
+  const displayName = String(mamaName || '').trim() || 'Mama';
+  const bioLine = String(shortBio || '').trim();
+  const stageLabel = STAGE_LABELS[activeMode] || STAGE_LABELS.pregnant;
 
   return (
     <ScrollView
@@ -157,127 +120,48 @@ function MidnightLoungeProfilePanel({
       <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
       <Text style={[styles.sectionTitle, SANS]}>Me</Text>
 
-      <TouchableOpacity
-        style={styles.avatarDashed}
-        onPress={onPickProfilePhoto}
-        activeOpacity={0.88}
-        accessibilityRole="button"
-        accessibilityLabel="Upload profile photo"
-      >
-        <View style={styles.avatarInner}>
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryAvatarWrap}>
           {profilePhotoUri ? (
             <Image
               source={{ uri: profilePhotoUri }}
-              style={styles.avatarImage}
+              style={styles.summaryAvatar}
               contentFit="cover"
               cachePolicy="memory-disk"
               transition={180}
               accessibilityLabel="Your profile photo"
             />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarPlus}>+</Text>
-              <Text style={[styles.avatarHint, SANS]}>Add Photo</Text>
+            <View style={[styles.summaryAvatar, styles.summaryAvatarEmpty]}>
+              <Text style={styles.summaryAvatarInitial}>
+                {displayName.charAt(0).toUpperCase()}
+              </Text>
             </View>
           )}
         </View>
-      </TouchableOpacity>
-
-      <Text style={[styles.fieldLabel, SANS]}>Display Name</Text>
-      <TextInput
-        style={[styles.fieldInput, SANS]}
-        value={nameDraft}
-        onChangeText={setNameDraft}
-        placeholder="How should the village greet you?"
-        placeholderTextColor={MIDNIGHT.textMuted}
-      />
-      <CustomTitleBadge title={rewards.customProfileTitle || titleDraft} />
-
-      {canEditTitle ? (
-        <>
-          <Text style={[styles.fieldLabel, SANS]}>Custom Profile Title</Text>
-          <TextInput
-            style={[styles.fieldInput, SANS]}
-            value={titleDraft}
-            onChangeText={setTitleDraft}
-            placeholder="e.g. Feature Fairy Godmother"
-            placeholderTextColor={MIDNIGHT.textMuted}
-            maxLength={48}
-          />
-        </>
-      ) : null}
-
-      <Text style={[styles.fieldLabel, SANS]}>Short Bio / Mantra</Text>
-      <TextInput
-        style={[styles.fieldInput, styles.fieldInputMultiline, SANS]}
-        value={bioDraft}
-        onChangeText={setBioDraft}
-        placeholder="A line you carry into the quiet hours…"
-        placeholderTextColor={MIDNIGHT.textMuted}
-        multiline
-        textAlignVertical="top"
-      />
-
-      <MamaBirthdayField
-        birthday={mamaBirthday}
-        onBirthdayChange={onBirthdayChange}
-        variant="midnight"
-      />
-
-      <Text style={[styles.fieldLabel, SANS]}>Account email</Text>
-      <TextInput
-        style={[styles.fieldInput, SANS]}
-        value={accountEmail || ''}
-        onChangeText={onAccountEmailChange}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        placeholder="Used for membership & village mail"
-        placeholderTextColor={MIDNIGHT.textMuted}
-      />
-
-      <Text style={[styles.fieldLabel, SANS]}>Your village stage</Text>
-      <Text style={[styles.stageHint, SANS]}>
-        Pregnant and parenting a little one? Choose Both — then use the Home pills to switch tracks.
-      </Text>
-      <View style={styles.stageRow}>
-        {STAGE_OPTIONS.map((option) => {
-          const selected = activeMode === option.id;
-          return (
-            <TouchableOpacity
-              key={option.id}
-              style={[styles.stagePill, selected && styles.stagePillActive]}
-              onPress={() => onSelectJourneyMode?.(option.id)}
-              activeOpacity={0.88}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-            >
-              <Text style={[styles.stagePillLabel, SANS, selected && styles.stagePillLabelActive]}>
-                {option.label}
-              </Text>
-              <Text style={[styles.stagePillHint, SANS, selected && styles.stagePillHintActive]}>
-                {option.hint}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      {activeMode === 'hybrid' ? (
-        <>
-          <HybridLittleOnesSection littleOnes={littleOnes} onChildrenChange={onChildrenChange} />
-          <Text style={[styles.hybridReadyNote, SANS]}>
-            Hybrid on — open Home for Pregnancy / Toddler pills.
+        <Text style={[styles.summaryName, PLAYFUL]}>{displayName}</Text>
+        <CustomTitleBadge title={rewards.customProfileTitle} />
+        {bioLine ? (
+          <Text style={[styles.summaryBio, SANS]} numberOfLines={3}>
+            {bioLine}
           </Text>
-        </>
-      ) : null}
+        ) : (
+          <Text style={[styles.summaryBioMuted, SANS]}>Add a short bio on your profile page.</Text>
+        )}
+        <Text style={[styles.summaryStage, SANS]}>{stageLabel}</Text>
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.88}>
-        <Text style={[styles.saveBtnText, SANS]}>{savedFlash ? 'Saved ✓' : 'Save Changes'}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.editProfileBtn}
+          onPress={onOpenProfileEdit}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel="Customize profile"
+        >
+          <Text style={[styles.editProfileBtnText, SANS]}>Customize Profile</Text>
+        </TouchableOpacity>
+      </View>
 
       <VillageRewardsCard />
-
-      <SecretThemeSwitcher unlocked={secretThemesUnlocked} />
 
       {showAdminPortal ? (
         <AdminPortalPanel
@@ -292,7 +176,7 @@ function MidnightLoungeProfilePanel({
         />
       ) : null}
 
-      <VillageBoutiqueBanner onPress={openBoutique} />
+      <VillageBoutiqueBanner onPress={onOpenBoutique} />
 
       <TouchableOpacity
         style={styles.deleteAccountBtn}
@@ -330,70 +214,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 18,
   },
-  avatarDashed: {
-    width: 152,
-    height: 152,
-    borderRadius: 76,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: MIDNIGHT.lavender,
-    alignSelf: 'center',
+  summaryCard: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 22,
-    padding: 4,
-    backgroundColor: 'transparent',
-  },
-  avatarInner: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: MIDNIGHT.lavenderTint,
-  },
-  avatarImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-  },
-  avatarPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlus: {
-    fontSize: 40,
-    color: MIDNIGHT.lavender,
-    fontWeight: '300',
-  },
-  avatarHint: {
-    fontSize: 15,
-    color: MIDNIGHT.textMuted,
-    marginTop: 4,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: MIDNIGHT.textMuted,
-    marginBottom: 8,
-    letterSpacing: 0.4,
-  },
-  fieldInput: {
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 22,
     backgroundColor: MIDNIGHT.bgCard,
-    borderRadius: 14,
     borderWidth: 1,
     borderColor: MIDNIGHT.border,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 19,
+    marginBottom: 8,
+  },
+  summaryAvatarWrap: {
+    marginBottom: 12,
+  },
+  summaryAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  summaryAvatarEmpty: {
+    backgroundColor: MIDNIGHT.lavenderTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: MIDNIGHT.lavender,
+  },
+  summaryAvatarInitial: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: MIDNIGHT.lavender,
+  },
+  summaryName: {
+    fontSize: 26,
+    fontWeight: '700',
     color: MIDNIGHT.textPrimary,
-    marginBottom: 14,
+    textAlign: 'center',
   },
   titleBadge: {
     alignSelf: 'center',
-    marginTop: -6,
-    marginBottom: 16,
+    marginTop: 10,
+    marginBottom: 4,
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 999,
@@ -437,74 +297,39 @@ const styles = StyleSheet.create({
   titleBadgeSparkleRight: {
     right: 8,
   },
-  fieldInputMultiline: {
-    minHeight: 96,
-    paddingTop: 14,
+  summaryBio: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    color: MIDNIGHT.textSecondary,
+    textAlign: 'center',
   },
-  stageHint: {
+  summaryBioMuted: {
+    marginTop: 10,
     fontSize: 14,
     lineHeight: 20,
     color: MIDNIGHT.textMuted,
-    marginBottom: 10,
-    marginTop: -2,
-  },
-  stageRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-  stagePill: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 96,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: MIDNIGHT.border,
-    backgroundColor: MIDNIGHT.bgCard,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  stagePillActive: {
-    borderColor: MIDNIGHT.lavender,
-    backgroundColor: MIDNIGHT.lavenderTint,
-  },
-  stagePillLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: MIDNIGHT.textPrimary,
-    marginBottom: 3,
-  },
-  stagePillLabelActive: {
-    color: '#2A2540',
-  },
-  stagePillHint: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: MIDNIGHT.textMuted,
     textAlign: 'center',
+    fontStyle: 'italic',
   },
-  stagePillHintActive: {
-    color: '#5A4E72',
-  },
-  hybridReadyNote: {
+  summaryStage: {
+    marginTop: 10,
     fontSize: 13,
     fontWeight: '700',
-    color: MIDNIGHT.lavender,
-    marginBottom: 14,
-    textAlign: 'center',
+    color: MIDNIGHT.lavenderMuted,
+    letterSpacing: 0.3,
   },
-  saveBtn: {
+  editProfileBtn: {
+    marginTop: 16,
     backgroundColor: MIDNIGHT.lavender,
     borderRadius: 999,
-    paddingVertical: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 22,
     alignItems: 'center',
-    marginBottom: 28,
-    marginTop: 4,
+    minWidth: 200,
   },
-  saveBtnText: {
-    fontSize: 18,
+  editProfileBtnText: {
+    fontSize: 16,
     fontWeight: '800',
     color: '#2A2540',
   },
@@ -515,6 +340,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(235, 215, 210, 0.6)',
     paddingHorizontal: 20,
     paddingVertical: 22,
+    marginTop: 18,
     marginBottom: 20,
     overflow: 'hidden',
     position: 'relative',

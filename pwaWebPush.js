@@ -3,7 +3,7 @@
  */
 
 const SW_PATH = '/sw.js';
-const SW_CACHE_BUST = 'v3';
+const SW_CACHE_BUST = 'v4';
 const SUBSCRIPTION_STORAGE_KEY = 'calmmama.webPush.subscription';
 const PERMISSION_STORAGE_KEY = 'calmmama.webPush.permission';
 

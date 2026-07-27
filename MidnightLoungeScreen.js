@@ -21,6 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LotusFlowerButton from './LotusFlowerButton';
 import MidnightLoungeProfilePanel from './MidnightLoungeProfilePanel.js';
+import MidnightLoungeProfileEditPanel from './MidnightLoungeProfileEditPanel.js';
 import VillageBoutiqueScreen from './VillageBoutiqueScreen';
 import { useVillageRewards } from './VillageRewardsContext';
 import { MIDNIGHT, MIDNIGHT_LOUNGE_TABS } from './midnightLoungeTheme';
@@ -551,6 +552,9 @@ function MidnightLoungeScreen({
   const boutiqueRef = useRef(null);
   const boutiqueOpacity = useRef(new Animated.Value(0)).current;
   const boutiqueAnimatingRef = useRef(false);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const profileEditOpacity = useRef(new Animated.Value(0)).current;
+  const profileEditAnimatingRef = useRef(false);
   const [posts, setPosts] = useState(MIDNIGHT_LOUNGE_POSTS);
   const [profiles, setProfiles] = useState(MIDNIGHT_MAMA_PROFILES);
   const [selectedProfileId, setSelectedProfileId] = useState(null);
@@ -639,6 +643,36 @@ function MidnightLoungeScreen({
     }
     closeBoutique();
   }, [boutiqueCanGoBack, closeBoutique]);
+
+  const openProfileEdit = useCallback(() => {
+    if (profileEditAnimatingRef.current) return;
+    setProfileEditOpen(true);
+    profileEditAnimatingRef.current = true;
+    profileEditOpacity.setValue(0);
+    Animated.timing(profileEditOpacity, {
+      toValue: 1,
+      duration: 380,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start(() => {
+      profileEditAnimatingRef.current = false;
+    });
+  }, [profileEditOpacity]);
+
+  const closeProfileEdit = useCallback(() => {
+    if (profileEditAnimatingRef.current) return;
+    profileEditAnimatingRef.current = true;
+    Animated.timing(profileEditOpacity, {
+      toValue: 0,
+      duration: 320,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start(({ finished }) => {
+      profileEditAnimatingRef.current = false;
+      if (!finished) return;
+      setProfileEditOpen(false);
+    });
+  }, [profileEditOpacity]);
 
   const sheetY = useRef(new Animated.Value(420)).current;
 
@@ -771,7 +805,9 @@ function MidnightLoungeScreen({
 
   const isPregnantJourney = userJourney === 'pregnant';
   const isPostpartumJourney = userJourney === 'postpartum';
-  const isImmersiveSubView = Boolean(chatProfileId || boutiqueOpen || activeSubView);
+  const isImmersiveSubView = Boolean(
+    chatProfileId || boutiqueOpen || profileEditOpen || activeSubView,
+  );
 
   const enterLoungeSubView = useCallback(
     (subViewId) => {
@@ -1084,17 +1120,12 @@ function MidnightLoungeScreen({
         return (
           <MidnightLoungeProfilePanel
             mamaName={mamaName}
-            onMamaNameChange={onMamaNameChange}
             shortBio={shortBio}
-            onShortBioChange={onShortBioChange}
-            mamaBirthday={mamaBirthday}
-            onBirthdayChange={onBirthdayChange}
             profilePhotoUri={profilePhotoUri}
-            onPickProfilePhoto={onPickProfilePhoto}
             onOpenBoutique={openBoutique}
+            onOpenProfileEdit={openProfileEdit}
             onDeleteAccount={onDeleteAccount}
             activeMode={activeMode}
-            onSelectJourneyMode={onSelectJourneyMode}
             adminUser={adminUser}
             accountEmail={accountEmail}
             onAccountEmailChange={onAccountEmailChange}
@@ -1104,8 +1135,6 @@ function MidnightLoungeScreen({
             onGrantTestPoints={onGrantTestPoints}
             onResetTestPoints={onResetTestPoints}
             currentPoints={currentPoints}
-            littleOnes={littleOnes}
-            onChildrenChange={onChildrenChange}
           />
         );
       case 'feed':
@@ -1159,6 +1188,39 @@ function MidnightLoungeScreen({
                 <VillageBoutiqueScreen
                   ref={boutiqueRef}
                   onCanGoBackChange={handleBoutiqueCanGoBack}
+                />
+              </Animated.View>
+            ) : null}
+            {profileEditOpen ? (
+              <Animated.View
+                style={[styles.boutiqueSubView, { opacity: profileEditOpacity }]}
+                pointerEvents="auto"
+              >
+                <TouchableOpacity
+                  style={styles.boutiqueBackBtn}
+                  onPress={closeProfileEdit}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to Me"
+                >
+                  <Text style={[styles.boutiqueBackText, SANS]}>← Back to Me</Text>
+                </TouchableOpacity>
+                <MidnightLoungeProfileEditPanel
+                  mamaName={mamaName}
+                  onMamaNameChange={onMamaNameChange}
+                  shortBio={shortBio}
+                  onShortBioChange={onShortBioChange}
+                  mamaBirthday={mamaBirthday}
+                  onBirthdayChange={onBirthdayChange}
+                  profilePhotoUri={profilePhotoUri}
+                  onPickProfilePhoto={onPickProfilePhoto}
+                  onClose={closeProfileEdit}
+                  activeMode={activeMode}
+                  onSelectJourneyMode={onSelectJourneyMode}
+                  accountEmail={accountEmail}
+                  onAccountEmailChange={onAccountEmailChange}
+                  littleOnes={littleOnes}
+                  onChildrenChange={onChildrenChange}
                 />
               </Animated.View>
             ) : null}

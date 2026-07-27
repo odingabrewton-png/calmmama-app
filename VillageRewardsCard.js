@@ -184,6 +184,7 @@ function TierCard({ tier, redeemed, balance, redeeming, onRedeem, onViewCodes })
 export default function VillageRewardsCard() {
   const { rewards, redeemTier, notify } = useVillageRewards();
   const [shopTab, setShopTab] = useState('all');
+  const [shopExpanded, setShopExpanded] = useState(false);
   const [codeTier, setCodeTier] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
   const [celebration, setCelebration] = useState(null);
@@ -305,25 +306,45 @@ export default function VillageRewardsCard() {
         Journal +10 (+50 at 5/week) · Encourage +25 (max 5/day) · Poll +100 · Registry +250
       </Text>
 
-      <ShopPillTabs activeTab={shopTab} onChange={setShopTab} />
+      <TouchableOpacity
+        style={styles.collapseToggle}
+        onPress={() => setShopExpanded((open) => !open)}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: shopExpanded }}
+        accessibilityLabel={shopExpanded ? 'Hide reward tiers' : 'Show reward tiers'}
+      >
+        <Text style={[styles.collapseToggleText, SANS]}>
+          {shopExpanded ? 'Hide reward tiers ▴' : 'Show reward tiers ▾'}
+        </Text>
+        <Text style={[styles.collapseToggleHint, SANS]}>
+          {redeemedSet.size} unlocked · {REWARD_TIERS.length} total
+        </Text>
+      </TouchableOpacity>
 
-      <View style={styles.badgeGrid}>
-        {visibleTiers.length === 0 ? (
-          <Text style={[styles.emptyShop, SANS]}>{emptyCopy}</Text>
-        ) : (
-          visibleTiers.map((tier) => (
-            <TierCard
-              key={tier.id}
-              tier={tier}
-              redeemed={redeemedSet.has(tier.id)}
-              balance={balance}
-              redeeming={redeemingId === tier.id}
-              onRedeem={handleRedeem}
-              onViewCodes={setCodeTier}
-            />
-          ))
-        )}
-      </View>
+      {shopExpanded ? (
+        <>
+          <ShopPillTabs activeTab={shopTab} onChange={setShopTab} />
+
+          <View style={styles.badgeGrid}>
+            {visibleTiers.length === 0 ? (
+              <Text style={[styles.emptyShop, SANS]}>{emptyCopy}</Text>
+            ) : (
+              visibleTiers.map((tier) => (
+                <TierCard
+                  key={tier.id}
+                  tier={tier}
+                  redeemed={redeemedSet.has(tier.id)}
+                  balance={balance}
+                  redeeming={redeemingId === tier.id}
+                  onRedeem={handleRedeem}
+                  onViewCodes={setCodeTier}
+                />
+              ))
+            )}
+          </View>
+        </>
+      ) : null}
 
       <PremiumUpgradeWelcomeModal
         visible={Boolean(celebration)}
@@ -435,11 +456,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   matrixSummary: {
-    marginBottom: 14,
+    marginBottom: 12,
     fontSize: 11,
     lineHeight: 16,
     color: MIDNIGHT.textMuted,
     textAlign: 'center',
+  },
+  collapseToggle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 150, 0.32)',
+    backgroundColor: 'rgba(37, 34, 50, 0.45)',
+    marginBottom: 4,
+  },
+  collapseToggleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: MIDNIGHT.accentGold,
+    letterSpacing: 0.2,
+  },
+  collapseToggleHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: MIDNIGHT.textMuted,
   },
   pillScroll: {
     marginBottom: 14,
