@@ -1808,7 +1808,6 @@ function renderMainTabContent({
   isYearlyMember = false,
   onReleaseUpgradePrompt,
   onOpenSubscription,
-  activeMode = 'pregnant',
   homeTrack = 'pregnant',
   onHomeTrackChange,
   isActive = true,
@@ -2002,12 +2001,13 @@ function renderMainTabContent({
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[panelStyle, styles.postpartumNurseryShell]}>
+          <View style={styles.postpartumNurseryInner}>
             <NurserySwipeChecklist
               tasks={nurserySurvivalTasks}
               onToggleTask={onToggleNurserySurvivalTask}
             />
             <LittleHorizonsScreen
+              embedded
               babyAge={babyAge}
               history={littleHorizonsHistory}
               onSaveEntry={onSaveLittleHorizonsEntry}
@@ -2669,8 +2669,8 @@ function UpgradeOfferSheet({
           <Text style={styles.upgradeEyebrow}>FREE EXPLORER</Text>
           <Text style={styles.upgradeTitle}>Unlock a little more village care</Text>
           <Text style={styles.upgradeBody}>
-            AI Oracle, full registry perks, and founding badges are waiting when you are ready —
-            soft upgrade, no pressure.
+            Nursery checklist & baby logs stay free. Upgrade for birth plan tools, full kitchen,
+            sanctuary prompts, time capsule archives, and Little Horizons victories.
           </Text>
           <TouchableOpacity
             style={styles.upgradePrimaryBtn}
@@ -5232,6 +5232,9 @@ function CalmMamaApp() {
               visible={pregnancySanctuaryOpen && effectiveJourney === 'pregnant'}
               onClose={() => setPregnancySanctuaryOpen(false)}
               weeksPregnant={weeksPregnant}
+              isPro={isPro}
+              isSubscribed={isSubscribed}
+              onRequestUpgrade={handleReleaseUpgradePrompt}
             />
 
             <PostpartumNurseryWelcomeModal
@@ -5825,7 +5828,7 @@ const styles = StyleSheet.create({
       default: { ...StyleSheet.absoluteFillObject },
     }),
     backgroundColor: 'rgba(36, 48, 40, 0.52)',
-    zIndex: 1120,
+    zIndex: 11040,
     justifyContent: 'flex-end',
   },
   candleSanctumSheet: {
@@ -6207,10 +6210,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
-    zIndex: 999,
+    zIndex: 11030,
   },
   apothecaryDetailOverlay: {
-    zIndex: 1180,
+    zIndex: 11045,
   },
   apothecaryModal: {
     width: '100%',
@@ -6349,7 +6352,7 @@ const styles = StyleSheet.create({
       default: { ...StyleSheet.absoluteFillObject },
     }),
     backgroundColor: 'rgba(42, 56, 46, 0.38)',
-    zIndex: 1250,
+    zIndex: 11050,
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
@@ -6554,7 +6557,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    zIndex: 1300,
+    zIndex: 11060,
   },
   checkoutSummaryCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.72)',
@@ -6627,7 +6630,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-    zIndex: 1400,
+    zIndex: 11070,
   },
   birthPromptCard: {
     width: '100%',
@@ -7859,7 +7862,12 @@ const styles = StyleSheet.create({
   postpartumNurseryShell: {
     flex: 1,
     minHeight: 0,
-    paddingHorizontal: 20,
+    paddingTop: 0,
+    backgroundColor: 'transparent',
+  },
+  postpartumNurseryInner: {
+    flex: 1,
+    minHeight: 0,
     paddingTop: 0,
     backgroundColor: 'transparent',
   },
@@ -7942,7 +7950,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 22,
-    zIndex: 1250,
+    zIndex: 11055,
   },
   villageRemedyPopupCard: {
     width: '100%',

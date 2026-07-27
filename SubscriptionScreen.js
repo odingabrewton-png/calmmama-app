@@ -15,6 +15,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { openStripeCheckout, redeemVipPromoCode } from './membershipAccess';
+import {
+  VILLAGE_FREE_FEATURES,
+  VILLAGE_PREMIUM_FEATURES,
+} from './premiumFeatures';
 
 export const SUBSCRIPTION_PLANS = {
   monthly: 'monthly',
@@ -27,7 +31,7 @@ const PLAN_OPTIONS = [
     id: SUBSCRIPTION_PLANS.monthly,
     title: 'General Access',
     price: '$5.99 / month',
-    caption: 'Everyday Village tools — bloom, sanctuary, and soft community support.',
+    caption: 'Kitchen, Sanctuary, Time Capsule, Little Horizons & birth tools.',
     bestValue: false,
     cta: 'Upgrade ($5.99/mo)',
     stripeKey: 'monthly',
@@ -36,7 +40,7 @@ const PLAN_OPTIONS = [
     id: SUBSCRIPTION_PLANS.yearly,
     title: 'Founding Mother',
     price: '$25 / year',
-    caption: 'Founding 40 status, launch gifts, AI Oracle, and full registry perks.',
+    caption: 'Founding 40 status, launch gifts, full registry perks & yearly savings.',
     bestValue: true,
     cta: 'Upgrade to Founding Mother ($25/yr)',
     stripeKey: 'annual',
@@ -141,8 +145,8 @@ export default function SubscriptionScreen({
     }
 
     Alert.alert(
-      'CalmMama Circle',
-      `Checkout for ${plan?.title ?? 'premium'} will connect shortly.`,
+      'Checkout unavailable',
+      'Stripe checkout could not open right now. Please try again in a moment or use a Founding Mother code below.',
     );
   };
 
@@ -193,9 +197,30 @@ export default function SubscriptionScreen({
           <Text style={[styles.eyebrow, SERIF]}>CALMMAMA PREMIUM</Text>
           <Text style={[styles.title, SERIF]}>Upgrade your Village access</Text>
           <Text style={[styles.subtitle, SERIF]}>
-            Free Explorer is a beautiful start. Unlock AI Oracle, full registry perks, and founding
-            badges whenever you are ready.
+            Free Explorer is a beautiful start — nursery checklist, baby logs, and doula tips stay
+            free. Upgrade when you want birth tools, full kitchen, sanctuary prompts, and time capsule
+            archives.
           </Text>
+
+          <View style={styles.featureMatrix}>
+            <Text style={[styles.featureMatrixTitle, SANS]}>Included free</Text>
+            {VILLAGE_FREE_FEATURES.map((line) => (
+              <Text key={line} style={[styles.featureFreeLine, SANS]}>
+                · {line}
+              </Text>
+            ))}
+            <Text style={[styles.featureMatrixTitle, styles.featureMatrixTitlePremium, SANS]}>
+              Premium unlocks
+            </Text>
+            {VILLAGE_PREMIUM_FEATURES.map((line) => (
+              <Text key={line} style={[styles.featurePremiumLine, SANS]}>
+                ✦ {line}
+              </Text>
+            ))}
+            <Text style={[styles.featureMatrixFootnote, SANS]}>
+              Crown Points perks (themes, discounts) are earned separately — not subscription-only.
+            </Text>
+          </View>
 
           <View style={styles.planStack}>
             {PLAN_OPTIONS.map((plan) => (
@@ -335,7 +360,47 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#6E7E65',
-    marginBottom: 22,
+    marginBottom: 16,
+  },
+  featureMatrix: {
+    marginBottom: 20,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(186, 198, 188, 0.45)',
+  },
+  featureMatrixTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    color: '#6B8F78',
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  featureMatrixTitlePremium: {
+    marginTop: 12,
+    color: '#8A6A4A',
+  },
+  featureFreeLine: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#5A6A62',
+    marginBottom: 3,
+  },
+  featurePremiumLine: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#4A5A48',
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  featureMatrixFootnote: {
+    marginTop: 10,
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#8A968A',
+    fontStyle: 'italic',
   },
   planStack: {
     gap: 12,

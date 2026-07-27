@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import PremiumGateOverlay from './PremiumGateOverlay';
 
 const BIRTH_PLAN_KEY = '@calmmama/birth_plan_v1';
 
@@ -70,15 +71,31 @@ function getTrimester(weeksPregnant) {
   return 3;
 }
 
-function ModuleTab({ id, label, active, onPress }) {
+function ModuleTab({ id, label, active, onPress, locked = false }) {
   return (
     <TouchableOpacity
       style={[styles.tab, active && styles.tabActive]}
       onPress={() => onPress(id)}
       activeOpacity={0.88}
     >
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>
+        {locked ? '🔒 ' : ''}
+        {label}
+      </Text>
     </TouchableOpacity>
+  );
+}
+
+function PremiumModuleGate({ title, body, onUpgrade }) {
+  return (
+    <View style={styles.premiumGateWrap}>
+      <PremiumGateOverlay label="Premium Sanctuary tool" />
+      <Text style={styles.premiumGateTitle}>{title}</Text>
+      <Text style={styles.premiumGateBody}>{body}</Text>
+      <TouchableOpacity style={styles.primaryBtn} onPress={onUpgrade} activeOpacity={0.9}>
+        <Text style={styles.primaryBtnText}>Unlock with Village access</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -274,14 +291,33 @@ function ContractionTimerPanel() {
   );
 }
 
-function PregnancySanctuaryModal({ visible, onClose, weeksPregnant }) {
+function PregnancySanctuaryModal({
+  visible,
+  onClose,
+  weeksPregnant,
+  isPro = false,
+  isSubscribed = false,
+  onRequestUpgrade,
+}) {
   const [module, setModule] = useState('doula');
+  const hasPremium = Boolean(isPro || isSubscribed);
 
   useEffect(() => {
     if (visible) setModule('doula');
   }, [visible]);
 
   const close = useCallback(() => onClose?.(), [onClose]);
+
+  const selectModule = useCallback(
+    (next) => {
+      if ((next === 'plan' || next === 'timer') && !hasPremium) {
+        onRequestUpgrade?.();
+        return;
+      }
+      setModule(next);
+    },
+    [hasPremium, onRequestUpgrade],
+  );
 
   return (
     <Modal
@@ -305,9 +341,21 @@ function PregnancySanctuaryModal({ visible, onClose, weeksPregnant }) {
           </View>
 
           <View style={styles.tabs}>
-            <ModuleTab id="doula" label="Doula Tips" active={module === 'doula'} onPress={setModule} />
-            <ModuleTab id="plan" label="Birth Plan" active={module === 'plan'} onPress={setModule} />
-            <ModuleTab id="timer" label="Timer" active={module === 'timer'} onPress={setModule} />
+            <ModuleTab id="doula" label="Doula Tips" active={module === 'doula'} onPress={selectModule} />
+            <ModuleTab
+              id="plan"
+              label="Birth Plan"
+              active={module === 'plan'}
+              onPress={selectModule}
+              locked={!hasPremium}
+            />
+            <ModuleTab
+              id="timer"
+              label="Timer"
+              active={module === 'timer'}
+              onPress={selectModule}
+              locked={!hasPremium}
+            />
           </View>
 
           <ScrollView
@@ -317,8 +365,22 @@ function PregnancySanctuaryModal({ visible, onClose, weeksPregnant }) {
             keyboardShouldPersistTaps="handled"
           >
             {module === 'doula' ? <DoulaTipsPanel weeksPregnant={weeksPregnant} /> : null}
-            {module === 'plan' ? <BirthPlanPanel /> : null}
-            {module === 'timer' ? <ContractionTimerPanel /> : null}
+            {module === 'plan' && !hasPremium ? (
+              <PremiumModuleGate
+                title="Birth plan templates"
+                body="Draft atmosphere, support people, comfort tools, and golden-hour preferences — saved privately on your device."
+                onUpgrade={onRequestUpgrade}
+              />
+            ) : null}
+            {module === 'plan' && hasPremium ? <BirthPlanPanel /> : null}
+            {module === 'timer' && !hasPremium ? (
+              <PremiumModuleGate
+                title="Contraction timer"
+                body="Track duration and frequency during early labor — a calm companion when waves begin."
+                onUpgrade={onRequestUpgrade}
+              />
+            ) : null}
+            {module === 'timer' && hasPremium ? <ContractionTimerPanel /> : null}
           </ScrollView>
         </Pressable>
       </View>
@@ -553,5 +615,30 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 12,
     color: '#5A6E58',
+  },
+  premiumGateWrap: {
+    position: 'relative',
+    minHeight: 220,
+    borderRadius: 18,
+    overflow: 'hidden',
+    padding: 18,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(143,179,154,0.35)',
+  },
+  premiumGateTitle: {
+    marginTop: 48,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2A382E',
+    textAlign: 'center',
+  },
+  premiumGateBody: {
+    marginTop: 8,
+    marginBottom: 16,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#5A6E58',
+    textAlign: 'center',
   },
 });

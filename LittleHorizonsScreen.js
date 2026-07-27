@@ -65,6 +65,7 @@ function LittleHorizonsScreen({
   isYearlyMember = false,
   onRequestUpgrade,
   onOpenSubscription,
+  embedded = false,
 }) {
   const [activeTile, setActiveTile] = useState(null);
   const [notes, setNotes] = useState('');
@@ -133,8 +134,8 @@ function LittleHorizonsScreen({
     [history]
   );
 
-  return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.rootContent} showsVerticalScrollIndicator={false}>
+  const mainContent = (
+    <>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🌅 Little Horizons</Text>
         <Text style={styles.headerSub}>Toddler rhythms · {babyAge}</Text>
@@ -178,31 +179,47 @@ function LittleHorizonsScreen({
             <PremiumGateOverlay label="Unlock history" />
           </TouchableOpacity>
         ) : null}
-      {sortedHistory.length === 0 ? (
-        <Text style={[styles.historyEmpty, SERIF]}>
-          Tap a victory tile to journal — your toddler story builds here.
-        </Text>
-      ) : (
-        sortedHistory.map((entry) => (
-          <View
-            key={entry.id}
-            style={[styles.historyRow, !hasPro && styles.historyRowBlurred]}
-          >
-            <Text style={styles.historyEmoji}>{entry.tileEmoji}</Text>
-            <View style={styles.historyBody}>
-              <Text style={[styles.historyLabel, SERIF]}>
-                {entry.tileLabel} · {formatLogTime(entry.timestamp)}
-              </Text>
-              {entry.notes ? (
-                <Text style={[styles.historyNotes, SERIF]}>{entry.notes}</Text>
-              ) : (
-                <Text style={styles.historyNotesMuted}>Logged with love.</Text>
-              )}
+        {sortedHistory.length === 0 ? (
+          <Text style={[styles.historyEmpty, SERIF]}>
+            Tap a victory tile to journal — your toddler story builds here.
+          </Text>
+        ) : (
+          sortedHistory.map((entry) => (
+            <View
+              key={entry.id}
+              style={[styles.historyRow, !hasPro && styles.historyRowBlurred]}
+            >
+              <Text style={styles.historyEmoji}>{entry.tileEmoji}</Text>
+              <View style={styles.historyBody}>
+                <Text style={[styles.historyLabel, SERIF]}>
+                  {entry.tileLabel} · {formatLogTime(entry.timestamp)}
+                </Text>
+                {entry.notes ? (
+                  <Text style={[styles.historyNotes, SERIF]}>{entry.notes}</Text>
+                ) : (
+                  <Text style={styles.historyNotesMuted}>Logged with love.</Text>
+                )}
+              </View>
             </View>
-          </View>
-        ))
-      )}
+          ))
+        )}
       </View>
+    </>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <View style={styles.rootEmbedded}>{mainContent}</View>
+      ) : (
+        <ScrollView
+          style={styles.root}
+          contentContainerStyle={styles.rootContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {mainContent}
+        </ScrollView>
+      )}
 
       <Modal visible={upgradeSheetOpen} transparent animationType="fade" onRequestClose={() => setUpgradeSheetOpen(false)}>
         <View style={styles.upgradeBackdrop}>
@@ -214,8 +231,8 @@ function LittleHorizonsScreen({
           <View style={styles.upgradeSheet}>
             <Text style={[styles.upgradeTitle, SERIF]}>Unlock the Full Village Circle</Text>
             <Text style={[styles.upgradeBody, SERIF]}>
-              This milestone logger is exclusive to our Yearly Village members. Upgrade today to unlock
-              tracking and claim your 3-piece Founding Gift Box!
+              Little Victories journaling is for Village members — monthly or Founding Mother yearly.
+              Upgrade to log milestones and unlock full history.
             </Text>
             <TouchableOpacity
               style={styles.upgradePrimaryBtn}
@@ -225,7 +242,7 @@ function LittleHorizonsScreen({
               }}
               activeOpacity={0.88}
             >
-              <Text style={styles.upgradePrimaryBtnText}>View Yearly Village Pass</Text>
+              <Text style={styles.upgradePrimaryBtnText}>View Village plans</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.upgradeGhostBtn}
@@ -274,7 +291,7 @@ function LittleHorizonsScreen({
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </>
   );
 }
 
@@ -283,6 +300,7 @@ export default React.memo(LittleHorizonsScreen);
 const styles = StyleSheet.create({
   root: { flex: 1 },
   rootContent: { paddingBottom: 24 },
+  rootEmbedded: { paddingBottom: 8 },
   header: { paddingTop: 38, paddingBottom: 10, paddingHorizontal: 2 },
   headerTitle: {
     fontSize: 22,

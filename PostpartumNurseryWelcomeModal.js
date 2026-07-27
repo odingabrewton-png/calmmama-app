@@ -13,7 +13,7 @@ function PostpartumNurseryWelcomeModal({ visible, onExploreNursery, onDismiss })
       <View style={styles.backdrop}>
         <CelebrationConfetti active={visible} density="rich" seed={63} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
-        <View style={styles.card}>
+        <Pressable style={styles.card} onPress={(e) => e.stopPropagation?.()}>
           <Text style={styles.sparkle}>☁️ · ✦ · 🌸</Text>
           <Text style={styles.eyebrow}>YOU DID IT</Text>
           <Text style={styles.title}>Welcome to your Nursery</Text>
@@ -27,7 +27,7 @@ function PostpartumNurseryWelcomeModal({ visible, onExploreNursery, onDismiss })
           <TouchableOpacity style={styles.secondary} onPress={onDismiss} activeOpacity={0.88}>
             <Text style={styles.secondaryText}>I&apos;ll explore in a moment</Text>
           </TouchableOpacity>
-        </View>
+        </Pressable>
       </View>
     </Modal>
   );
