@@ -13,6 +13,7 @@ export const NOTIFICATION_IDS = {
   EVENING_LOUNGE: 'calmmama.notification.evening-lounge',
   WEEKLY_BLOOM: 'calmmama.notification.weekly-bloom',
   NURSERY_SUPPORT: 'calmmama.notification.nursery-support',
+  NURSERY_SURVIVAL_DAILY: 'calmmama.notification.nursery-survival-daily',
   FEEDING_0930: 'calmmama.notification.feeding-0930',
   FEEDING_1200: 'calmmama.notification.feeding-1200',
   FEEDING_1430: 'calmmama.notification.feeding-1430',
@@ -42,6 +43,7 @@ export const ACTIVE_VILLAGE_NOTIFICATION_IDS = [
   NOTIFICATION_IDS.EVENING_LOUNGE,
   NOTIFICATION_IDS.WEEKLY_BLOOM,
   NOTIFICATION_IDS.NURSERY_SUPPORT,
+  NOTIFICATION_IDS.NURSERY_SURVIVAL_DAILY,
   ...FEEDING_SCHEDULE_SLOTS.map((slot) => slot.id),
 ];
 
@@ -63,7 +65,12 @@ export const NOTIFICATION_COPY = {
   },
   nurserySupport: {
     title: 'Cloud Nursery',
-    body: "Ready to log? Tap to quickly track baby's cycles or peek at this week's calming nursery tips.",
+    body: "Swipe your Postpartum Survival checklist in the Nursery tab — hydration, healing, rest & more. Each check earns +5 Crown Points (up to 6/day).",
+    route: NOTIFICATION_ROUTES.NURSERY,
+  },
+  nurserySurvivalDaily: {
+    title: 'Postpartum Survival Checklist',
+    body: '☁️ Swipe the Nursery cards — log hydration, nourishment, breathwork & rest. Each gentle check earns +5 Crown Points.',
     route: NOTIFICATION_ROUTES.NURSERY,
   },
 };

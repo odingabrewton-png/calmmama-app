@@ -1,5 +1,5 @@
 /* Calm Mama Village — baseline PWA service worker (cache + web push). */
-const CACHE_NAME = 'calmmama-village-static-v1';
+const CACHE_NAME = 'calmmama-village-static-v2';
 const CORE_ASSETS = [
   '/',
   '/index.html',
@@ -47,6 +47,14 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html'))),
+    );
+    return;
+  }
+
+  // Network-first for JS bundles so deploys reach installed PWAs quickly.
+  if (url.pathname.endsWith('.js') || url.pathname.includes('/_expo/')) {
+    event.respondWith(
+      fetch(request).catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html'))),
     );
     return;
   }

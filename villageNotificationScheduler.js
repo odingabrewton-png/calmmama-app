@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { presentVillageWebNotification } from './pwaWebPush';
 import {
   FEEDING_SCHEDULE_SLOTS,
   LEGACY_NOTIFICATION_IDS,
@@ -93,6 +94,7 @@ const MOMENT_ROUTES = Object.freeze({
   nursery: NOTIFICATION_ROUTES.NURSERY,
   sanctuary: NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE,
   checklist: NOTIFICATION_ROUTES.HOME,
+  nursery_checklist: NOTIFICATION_ROUTES.NURSERY,
   rewards: NOTIFICATION_ROUTES.HOME,
   community: NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE,
   membership: NOTIFICATION_ROUTES.HOME,
@@ -110,13 +112,26 @@ export async function presentVillageMomentNotification({
   route,
   emoji,
 } = {}) {
-  if (Platform.OS === 'web') {
-    return { ok: false, reason: 'web' };
-  }
-
   const message = String(body || '').trim();
   if (!message) {
     return { ok: false, reason: 'empty' };
+  }
+
+  const resolvedCategory = String(category || 'rewards');
+  const resolvedTitle =
+    String(title || '').trim() ||
+    MOMENT_TITLES[resolvedCategory] ||
+    MOMENT_TITLES.rewards;
+  const resolvedRoute = route || MOMENT_ROUTES[resolvedCategory] || NOTIFICATION_ROUTES.HOME;
+  const prefix = emoji ? `${emoji} ` : '';
+
+  if (Platform.OS === 'web') {
+    return presentVillageWebNotification({
+      title: resolvedTitle,
+      body: `${prefix}${message}`,
+      route: resolvedRoute,
+      tag: `calmmama-moment-${resolvedCategory}`,
+    });
   }
 
   configureVillageNotificationHandler();
@@ -127,14 +142,6 @@ export async function presentVillageMomentNotification({
   }
 
   await ensureAndroidChannel();
-
-  const resolvedCategory = String(category || 'rewards');
-  const resolvedTitle =
-    String(title || '').trim() ||
-    MOMENT_TITLES[resolvedCategory] ||
-    MOMENT_TITLES.rewards;
-  const resolvedRoute = route || MOMENT_ROUTES[resolvedCategory] || NOTIFICATION_ROUTES.HOME;
-  const prefix = emoji ? `${emoji} ` : '';
 
   try {
     const id = await Notifications.scheduleNotificationAsync({
@@ -267,6 +274,12 @@ export async function syncVillageNotificationSchedule(userJourney = 'pregnant') 
 
     await Promise.all([
       ...(userJourney === 'hybrid' ? [] : shared),
+      scheduleDaily({
+        identifier: NOTIFICATION_IDS.NURSERY_SURVIVAL_DAILY,
+        hour: 11,
+        minute: 0,
+        copy: NOTIFICATION_COPY.nurserySurvivalDaily,
+      }),
       scheduleWeekly({
         identifier: NOTIFICATION_IDS.NURSERY_SUPPORT,
         weekday: NOTIFICATION_WEEKDAYS.NURSERY_SUPPORT,
@@ -280,8 +293,8 @@ export async function syncVillageNotificationSchedule(userJourney = 'pregnant') 
     return {
       scheduled:
         userJourney === 'hybrid'
-          ? 3 + 1 + FEEDING_SCHEDULE_SLOTS.length
-          : 2 + 1 + FEEDING_SCHEDULE_SLOTS.length,
+          ? 4 + 1 + FEEDING_SCHEDULE_SLOTS.length
+          : 3 + 1 + FEEDING_SCHEDULE_SLOTS.length,
       journey: userJourney,
     };
   }

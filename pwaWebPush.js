@@ -177,6 +177,62 @@ export async function enableVillageWebPush() {
   }
 }
 
+/**
+ * Show a local notification in the PWA / mobile browser when OS moment banners are unavailable.
+ */
+export async function presentVillageWebNotification({
+  title = 'Calm Mama Village',
+  body = '',
+  route = '/',
+  tag = 'calmmama-village-moment',
+} = {}) {
+  if (!canUseDom() || typeof Notification === 'undefined') {
+    return { ok: false, reason: 'unsupported' };
+  }
+  if (Notification.permission !== 'granted') {
+    return { ok: false, reason: 'denied' };
+  }
+
+  const message = String(body || '').trim();
+  if (!message) return { ok: false, reason: 'empty' };
+
+  const url =
+    route === 'nursery'
+      ? '/?village=nursery'
+      : route === 'kitchen'
+        ? '/?village=kitchen'
+        : route === 'tracker'
+          ? '/?village=tracker'
+          : route === 'midnight_lounge'
+            ? '/?village=lounge'
+            : route?.startsWith?.('/')
+              ? route
+              : '/';
+
+  try {
+    const registration = await navigator.serviceWorker?.ready;
+    if (registration?.showNotification) {
+      await registration.showNotification(title, {
+        body: message,
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        tag,
+        renotify: true,
+        data: { url },
+      });
+      return { ok: true, via: 'sw' };
+    }
+    // eslint-disable-next-line no-new
+    new Notification(title, { body: message, icon: '/logo192.png' });
+    return { ok: true, via: 'notification-api' };
+  } catch (err) {
+    if (typeof console !== 'undefined') {
+      console.warn('[CalmMama PWA] Web moment notification failed:', err);
+    }
+    return { ok: false, reason: 'show-failed' };
+  }
+}
+
 export function getStoredWebPushSubscription() {
   return readStoredSubscription();
 }

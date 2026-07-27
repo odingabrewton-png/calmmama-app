@@ -39,6 +39,7 @@ import PregnancySanctuaryModal from './PregnancySanctuaryModal';
 import PostpartumNurseryWelcomeModal from './PostpartumNurseryWelcomeModal';
 import HybridLittleOnesSection from './HybridLittleOnesSection';
 import { DEFAULT_NURSERY_SURVIVAL_TASKS } from './NurserySwipeChecklist';
+import NurserySwipeChecklist from './NurserySwipeChecklist';
 import SubscriptionScreen from './SubscriptionScreen';
 import VillageCommunityPortal from './src/VillageCommunityPortal';
 import MamasKitchenScreen from './MamasKitchenScreen';
@@ -158,6 +159,38 @@ function consumeSanctuaryJournalDeepLink() {
     return null;
   }
 }
+/** Consume PWA notification deep link (?village=nursery|kitchen|tracker|lounge). */
+function consumeVillageTabDeepLink() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location?.search || '');
+    const village = String(params.get('village') || '').trim().toLowerCase();
+    if (!village) return null;
+
+    const routeByVillage = {
+      nursery: NOTIFICATION_ROUTES.NURSERY,
+      kitchen: NOTIFICATION_ROUTES.KITCHEN,
+      tracker: NOTIFICATION_ROUTES.BLOOM,
+      lounge: NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE,
+      home: NOTIFICATION_ROUTES.HOME,
+    };
+    const route = routeByVillage[village];
+    if (!route) return null;
+
+    const next = new URL(window.location.href);
+    next.searchParams.delete('village');
+    const search = next.searchParams.toString();
+    window.history.replaceState(
+      {},
+      document.title,
+      `${next.pathname}${search ? `?${search}` : ''}`,
+    );
+    return route;
+  } catch (_) {
+    return null;
+  }
+}
+
 import { isBirthdayToday } from './mamaBirthdayUtils';
 import { MAMA_KITCHEN_RECIPES } from './mealsData';
 import { getPostpartumDailyWins, getPostpartumWinsDayKey } from './postpartumDailyWins';
@@ -1962,18 +1995,30 @@ function renderMainTabContent({
   if (tabId === 'nursery' && userJourney === 'postpartum') {
     if (homePhase === 'toddler') {
       return (
-        <View style={[panelStyle, styles.postpartumNurseryShell]}>
-          <LittleHorizonsScreen
-            babyAge={babyAge}
-            history={littleHorizonsHistory}
-            onSaveEntry={onSaveLittleHorizonsEntry}
-            isPro={isSubscribed}
-            isSubscribed={isSubscribed}
-            isYearlyMember={isYearlyMember}
-            onRequestUpgrade={onReleaseUpgradePrompt}
-            onOpenSubscription={onOpenSubscription}
-          />
-        </View>
+        <ScrollView
+          style={styles.postpartumNurseryScroll}
+          contentContainerStyle={styles.postpartumNurseryScrollContent}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[panelStyle, styles.postpartumNurseryShell]}>
+            <NurserySwipeChecklist
+              tasks={nurserySurvivalTasks}
+              onToggleTask={onToggleNurserySurvivalTask}
+            />
+            <LittleHorizonsScreen
+              babyAge={babyAge}
+              history={littleHorizonsHistory}
+              onSaveEntry={onSaveLittleHorizonsEntry}
+              isPro={isSubscribed}
+              isSubscribed={isSubscribed}
+              isYearlyMember={isYearlyMember}
+              onRequestUpgrade={onReleaseUpgradePrompt}
+              onOpenSubscription={onOpenSubscription}
+            />
+          </View>
+        </ScrollView>
       );
     }
 
@@ -4608,6 +4653,11 @@ function CalmMamaApp() {
   useEffect(() => {
     if (!isOnboarded || initialNotificationHandledRef.current) return;
     initialNotificationHandledRef.current = true;
+    const villageRoute = consumeVillageTabDeepLink();
+    if (villageRoute) {
+      handleNotificationRoute(villageRoute);
+      return;
+    }
     consumeInitialNotificationRoute()
       .then((route) => {
         if (route) {

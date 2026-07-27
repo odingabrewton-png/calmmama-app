@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useVillageRewards } from './VillageRewardsContext';
+import { NOTIFICATION_CATEGORIES } from './VillageNotificationToast';
 
 const H_PAD = 16;
 const FALLBACK_W = Platform.OS === 'web' ? 320 : Dimensions.get('window').width - H_PAD * 2;
@@ -86,15 +87,9 @@ function NurserySwipeChecklist({
       if (!markingDone) return;
 
       const result = await addPoints(5, 'nurseryChecklistItem');
-      if (result?.awarded) {
+      if (result?.reason === 'daily_cap') {
         notify({
-          category: 'nursery',
-          title: 'Cloud Nursery',
-          message: result.toastMessage || 'Survival check logged — +5 Crown Points 👑',
-        });
-      } else if (result?.reason === 'daily_cap') {
-        notify({
-          category: 'nursery',
+          category: NOTIFICATION_CATEGORIES.nursery,
           title: 'Cloud Nursery',
           message: 'Beautiful consistency — checklist points already bloomed today.',
         });
@@ -127,6 +122,7 @@ function NurserySwipeChecklist({
       </View>
 
       <View
+        style={styles.carouselShell}
         onLayout={(e) => {
           const w = Math.round(e.nativeEvent.layout.width);
           if (w > 0) setPageWidth((prev) => (Math.abs(prev - w) <= 1 ? prev : w));
@@ -166,6 +162,12 @@ export default memo(NurserySwipeChecklist);
 const styles = StyleSheet.create({
   wrap: {
     marginBottom: 14,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  carouselShell: {
+    width: '100%',
+    alignSelf: 'stretch',
   },
   eyebrow: {
     fontSize: 11,

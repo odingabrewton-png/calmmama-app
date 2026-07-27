@@ -40,8 +40,9 @@ const VillageRewardsContext = createContext({
 function categoryForActionKey(actionKey) {
   switch (actionKey) {
     case 'dailyChecklist':
-    case 'nurseryChecklistItem':
       return NOTIFICATION_CATEGORIES.checklist;
+    case 'nurseryChecklistItem':
+      return NOTIFICATION_CATEGORIES.nursery;
     case 'dailyJournal':
     case 'weeklyJournalBonus':
       return NOTIFICATION_CATEGORIES.sanctuary;
