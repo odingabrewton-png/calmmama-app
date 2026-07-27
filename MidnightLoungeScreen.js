@@ -524,6 +524,8 @@ function MidnightLoungeScreen({
   onGrantTestPoints,
   onResetTestPoints,
   currentPoints = 0,
+  littleOnes = [],
+  onChildrenChange,
   ventingHistory = [],
   onAppendVentingEntry,
   guidanceHistory = [],
@@ -1102,6 +1104,8 @@ function MidnightLoungeScreen({
             onGrantTestPoints={onGrantTestPoints}
             onResetTestPoints={onResetTestPoints}
             currentPoints={currentPoints}
+            littleOnes={littleOnes}
+            onChildrenChange={onChildrenChange}
           />
         );
       case 'feed':

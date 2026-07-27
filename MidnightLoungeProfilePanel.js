@@ -14,6 +14,7 @@ import MamaBirthdayField from './MamaBirthdayField.js';
 import VillageRewardsCard from './VillageRewardsCard.js';
 import AdminPortalPanel from './AdminPortalPanel.js';
 import SecretThemeSwitcher from './SecretThemeSwitcher.js';
+import HybridLittleOnesSection from './HybridLittleOnesSection.js';
 import { isAdmin } from './adminAccess.js';
 import { useVillageRewards } from './VillageRewardsContext';
 
@@ -107,6 +108,8 @@ function MidnightLoungeProfilePanel({
   onGrantTestPoints,
   onResetTestPoints,
   currentPoints = 0,
+  littleOnes = [],
+  onChildrenChange,
 }) {
   const { rewards, updateProfileFields } = useVillageRewards();
   const [nameDraft, setNameDraft] = useState(mamaName || '');
@@ -260,9 +263,12 @@ function MidnightLoungeProfilePanel({
         })}
       </View>
       {activeMode === 'hybrid' ? (
-        <Text style={[styles.hybridReadyNote, SANS]}>
-          Hybrid on — open Home for Pregnancy / Toddler pills.
-        </Text>
+        <>
+          <HybridLittleOnesSection littleOnes={littleOnes} onChildrenChange={onChildrenChange} />
+          <Text style={[styles.hybridReadyNote, SANS]}>
+            Hybrid on — open Home for Pregnancy / Toddler pills.
+          </Text>
+        </>
       ) : null}
 
       <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.88}>

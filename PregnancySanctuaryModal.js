@@ -284,10 +284,16 @@ function PregnancySanctuaryModal({ visible, onClose, weeksPregnant }) {
   const close = useCallback(() => onClose?.(), [onClose]);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      onRequestClose={close}
+    >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
-        <View style={styles.sheet}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation?.()}>
           <View style={styles.sheetHeader}>
             <View>
               <Text style={styles.sheetEyebrow}>PREGNANT MAMA</Text>
@@ -314,7 +320,7 @@ function PregnancySanctuaryModal({ visible, onClose, weeksPregnant }) {
             {module === 'plan' ? <BirthPlanPanel /> : null}
             {module === 'timer' ? <ContractionTimerPanel /> : null}
           </ScrollView>
-        </View>
+        </Pressable>
       </View>
     </Modal>
   );
@@ -337,6 +343,8 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 28 : 18,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.55)',
+    zIndex: 2,
+    width: '100%',
   },
   sheetHeader: {
     paddingHorizontal: 20,

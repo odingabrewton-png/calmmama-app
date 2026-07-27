@@ -13,13 +13,14 @@ export const HOME_TRACKS = Object.freeze({
   TODDLER: 'toddler',
 });
 
-export function createChildEntry({ ageLabel = 'Newborn', stage } = {}) {
+export function createChildEntry({ ageLabel = 'Newborn', stage, name = '' } = {}) {
   const label = String(ageLabel || 'Newborn').trim() || 'Newborn';
   const inferredStage =
     stage ||
-    (/year|12-24|toddler/i.test(label) ? 'toddler' : 'infant');
+    (/year|12-24|toddler|2-3|3-4|4-5/i.test(label) ? 'toddler' : 'infant');
   return {
     id: `child-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: String(name || '').trim().slice(0, 32),
     ageLabel: label,
     stage: inferredStage,
   };
@@ -67,11 +68,18 @@ export function resolveActiveMode(profile = {}) {
 export function normalizeChildren(raw, fallbackBabyAge) {
   if (Array.isArray(raw) && raw.length) {
     return raw
-      .map((child, index) => ({
-        id: child?.id || `child-${index}`,
-        ageLabel: String(child?.ageLabel || child?.age || fallbackBabyAge || 'Newborn').trim(),
-        stage: child?.stage === 'toddler' ? 'toddler' : 'infant',
-      }))
+      .map((child, index) => {
+        const ageLabel = String(child?.ageLabel || child?.age || fallbackBabyAge || 'Newborn').trim();
+        return {
+          id: child?.id || `child-${index}`,
+          name: String(child?.name || '').trim().slice(0, 32),
+          ageLabel,
+          stage:
+            child?.stage === 'toddler' || /year|12-24|toddler|2-3|3-4|4-5/i.test(ageLabel)
+              ? 'toddler'
+              : 'infant',
+        };
+      })
       .filter((child) => child.ageLabel);
   }
   if (String(fallbackBabyAge || '').trim()) {
@@ -135,8 +143,10 @@ export function buildSanctuaryJourneyContext({
   });
 
   if (mode === ACTIVE_MODES.HYBRID && pregnancy && kids.length) {
-    const childAges = kids.map((c) => c.ageLabel).join(', ');
-    return `She is BOTH pregnant (about ${pregnancy.weeksPregnant || '?'} weeks${pregnancy.dueDate ? `, due ${pregnancy.dueDate}` : ''}) AND parenting a young child (${childAges}). If the user is both pregnant and parenting a toddler, acknowledge the unique physical and emotional weight of growing a baby while caring for a young child in your responses.`;
+    const childLabels = kids
+      .map((c) => (c.name ? `${c.name} (${c.ageLabel})` : c.ageLabel))
+      .join(', ');
+    return `She is BOTH pregnant (about ${pregnancy.weeksPregnant || '?'} weeks${pregnancy.dueDate ? `, due ${pregnancy.dueDate}` : ''}) AND parenting young children (${childLabels}). If the user is both pregnant and parenting a toddler, acknowledge the unique physical and emotional weight of growing a baby while caring for a young child in your responses.`;
   }
   if (mode === ACTIVE_MODES.PREGNANT && pregnancy) {
     return `She is pregnant (about ${pregnancy.weeksPregnant || '?'} weeks${pregnancy.dueDate ? `, due ${pregnancy.dueDate}` : ''}).`;

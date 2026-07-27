@@ -37,6 +37,7 @@ import CloudNurseryScreen from './CloudNurseryScreen';
 import LittleHorizonsScreen from './LittleHorizonsScreen';
 import PregnancySanctuaryModal from './PregnancySanctuaryModal';
 import PostpartumNurseryWelcomeModal from './PostpartumNurseryWelcomeModal';
+import HybridLittleOnesSection from './HybridLittleOnesSection';
 import { DEFAULT_NURSERY_SURVIVAL_TASKS } from './NurserySwipeChecklist';
 import SubscriptionScreen from './SubscriptionScreen';
 import VillageCommunityPortal from './src/VillageCommunityPortal';
@@ -1000,6 +1001,9 @@ function renderPregnantDailyTracker({
   onLogKick,
   onSaveKickSession,
   onOpenPregnancySanctuary,
+  activeMode,
+  children,
+  onChildrenChange,
   therapeuticMeals,
   therapeuticHeadline,
   onOpenKitchen,
@@ -1027,6 +1031,16 @@ function renderPregnantDailyTracker({
         <Text style={styles.dailyTabTitle}>✨ Daily Village</Text>
         <Text style={styles.dailyTabSub}>Symptoms, kicks & Pregnancy Sanctuary — all in one gentle place</Text>
       </View>
+
+      {activeMode === ACTIVE_MODES.HYBRID ? (
+        <View style={styles.homeGlassCard}>
+          <HybridLittleOnesSection
+            littleOnes={children}
+            onChildrenChange={onChildrenChange}
+            variant="daily"
+          />
+        </View>
+      ) : null}
 
       <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.symptom}>
         <Text style={styles.homeCardTitle}>🤰 Quick Daily Symptom Tracker</Text>
@@ -1129,7 +1143,7 @@ function renderPregnantDailyTracker({
         </Text>
         <TouchableOpacity
           style={styles.pregnancySanctuaryBtn}
-          onPress={onOpenPregnancySanctuary}
+          onPress={() => onOpenPregnancySanctuary?.()}
           activeOpacity={0.88}
         >
           <Text style={styles.pregnancySanctuaryBtnEmoji}>🌿</Text>
@@ -1734,6 +1748,9 @@ function renderMainTabContent({
   onLogKick,
   onSaveKickSession,
   onOpenPregnancySanctuary,
+  activeMode = 'pregnant',
+  children = [],
+  onChildrenChange,
   selectedPostpartumVibes,
   onTogglePostpartumVibe,
   postpartumVibeHistory,
@@ -1848,6 +1865,9 @@ function renderMainTabContent({
       onLogKick,
       onSaveKickSession,
       onOpenPregnancySanctuary,
+      activeMode,
+      children,
+      onChildrenChange,
       therapeuticMeals,
       therapeuticHeadline: pregnantTherapeuticHeadline,
       onOpenKitchen: onOpenKitchenTab,
@@ -4678,6 +4698,14 @@ function CalmMamaApp() {
     setPregnancySanctuaryOpen(true);
   }, []);
 
+  const handleChildrenChange = useCallback((nextChildren) => {
+    setChildren(nextChildren);
+    const primary = Array.isArray(nextChildren) ? nextChildren[0] : null;
+    if (primary?.ageLabel) {
+      setBabyAge(primary.ageLabel);
+    }
+  }, []);
+
   const appendNurseryLog = (entry) => {
     const now = new Date();
     nurseryLogIdRef.current += 1;
@@ -4906,6 +4934,8 @@ function CalmMamaApp() {
       onLogKick: handleLogKick,
       onSaveKickSession: handleSaveKickSession,
       onOpenPregnancySanctuary: handleOpenPregnancySanctuary,
+      children,
+      onChildrenChange: handleChildrenChange,
       nurserySurvivalTasks,
       onToggleNurserySurvivalTask: handleToggleNurserySurvivalTask,
       selectedPostpartumVibes,
@@ -4964,6 +4994,8 @@ function CalmMamaApp() {
       nurserySurvivalTasks,
       handleToggleNurserySurvivalTask,
       handleOpenPregnancySanctuary,
+      handleChildrenChange,
+      children,
       selectedPostpartumVibes,
       postpartumVibeHistory,
       selectedToddlerVibes,
@@ -5147,7 +5179,7 @@ function CalmMamaApp() {
             />
 
             <PregnancySanctuaryModal
-              visible={pregnancySanctuaryOpen && userJourney === 'pregnant'}
+              visible={pregnancySanctuaryOpen && effectiveJourney === 'pregnant'}
               onClose={() => setPregnancySanctuaryOpen(false)}
               weeksPregnant={weeksPregnant}
             />
@@ -5309,6 +5341,8 @@ function CalmMamaApp() {
                     onGrantTestPoints={handleGrantTestPoints}
                     onResetTestPoints={handleResetTestPoints}
                     currentPoints={rewards?.points || 0}
+                    littleOnes={children}
+                    onChildrenChange={handleChildrenChange}
                     ventingHistory={ventingHistory}
                     onAppendVentingEntry={(entry) =>
                       setVentingHistory((prev) =>
