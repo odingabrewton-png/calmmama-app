@@ -3,7 +3,7 @@
  * Full profile editing lives on MidnightLoungeProfileEditPanel (deep page).
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MIDNIGHT } from './midnightLoungeTheme';
 import VillageRewardsCard from './VillageRewardsCard.js';
 import AdminPortalPanel from './AdminPortalPanel.js';
+import MeProfileBackgroundSwitcher from './MeProfileBackgroundSwitcher.js';
 import { isAdmin } from './adminAccess.js';
 import { useVillageRewards } from './VillageRewardsContext';
+import {
+  getMeBackgroundById,
+  ME_PROFILE_CONTENT_MAX_WIDTH,
+  ME_PROFILE_H_PAD,
+} from './meProfileBackgrounds';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -109,96 +116,129 @@ function MidnightLoungeProfilePanel({
   const displayName = String(mamaName || '').trim() || 'Mama';
   const bioLine = String(shortBio || '').trim();
   const stageLabel = STAGE_LABELS[activeMode] || STAGE_LABELS.pregnant;
+  const background = useMemo(
+    () => getMeBackgroundById(rewards.selectedMeBackgroundId),
+    [rewards.selectedMeBackgroundId],
+  );
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
-      <Text style={[styles.sectionTitle, SANS]}>Me</Text>
-
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryAvatarWrap}>
-          {profilePhotoUri ? (
-            <Image
-              source={{ uri: profilePhotoUri }}
-              style={styles.summaryAvatar}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={180}
-              accessibilityLabel="Your profile photo"
-            />
-          ) : (
-            <View style={[styles.summaryAvatar, styles.summaryAvatarEmpty]}>
-              <Text style={styles.summaryAvatarInitial}>
-                {displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={[styles.summaryName, PLAYFUL]}>{displayName}</Text>
-        <CustomTitleBadge title={rewards.customProfileTitle} />
-        {bioLine ? (
-          <Text style={[styles.summaryBio, SANS]} numberOfLines={3}>
-            {bioLine}
-          </Text>
-        ) : (
-          <Text style={[styles.summaryBioMuted, SANS]}>Add a short bio on your profile page.</Text>
-        )}
-        <Text style={[styles.summaryStage, SANS]}>{stageLabel}</Text>
-
-        <TouchableOpacity
-          style={styles.editProfileBtn}
-          onPress={onOpenProfileEdit}
-          activeOpacity={0.88}
-          accessibilityRole="button"
-          accessibilityLabel="Customize profile"
-        >
-          <Text style={[styles.editProfileBtnText, SANS]}>Customize Profile</Text>
-        </TouchableOpacity>
-      </View>
-
-      <VillageRewardsCard />
-
-      {showAdminPortal ? (
-        <AdminPortalPanel
-          accountEmail={accountEmail}
-          onAccountEmailChange={onAccountEmailChange}
-          isVipLifetime={isVipLifetime}
-          onToggleVipLifetime={onToggleVipLifetime}
-          onSendTestNewsletter={onSendTestNewsletter}
-          onGrantTestPoints={onGrantTestPoints}
-          onResetTestPoints={onResetTestPoints}
-          currentPoints={currentPoints}
-        />
-      ) : null}
-
-      <VillageBoutiqueBanner onPress={onOpenBoutique} />
-
-      <TouchableOpacity
-        style={styles.deleteAccountBtn}
-        onPress={onDeleteAccount}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Delete account"
+    <View style={styles.root}>
+      <LinearGradient
+        colors={background.colors}
+        locations={background.locations}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
+      />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.deleteAccountText, SANS]}>Delete Account</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <View style={styles.contentColumn}>
+          <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
+          <Text style={[styles.sectionTitle, SANS]}>Me</Text>
+
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryAvatarWrap}>
+              {profilePhotoUri ? (
+                <Image
+                  source={{ uri: profilePhotoUri }}
+                  style={styles.summaryAvatar}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={180}
+                  accessibilityLabel="Your profile photo"
+                />
+              ) : (
+                <View style={[styles.summaryAvatar, styles.summaryAvatarEmpty]}>
+                  <Text style={styles.summaryAvatarInitial}>
+                    {displayName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.summaryName, PLAYFUL]}>{displayName}</Text>
+            <CustomTitleBadge title={rewards.customProfileTitle} />
+            {bioLine ? (
+              <Text style={[styles.summaryBio, SANS]} numberOfLines={3}>
+                {bioLine}
+              </Text>
+            ) : (
+              <Text style={[styles.summaryBioMuted, SANS]}>
+                Add a short bio on your profile page.
+              </Text>
+            )}
+            <Text style={[styles.summaryStage, SANS]}>{stageLabel}</Text>
+
+            <TouchableOpacity
+              style={styles.editProfileBtn}
+              onPress={onOpenProfileEdit}
+              activeOpacity={0.88}
+              accessibilityRole="button"
+              accessibilityLabel="Customize profile"
+            >
+              <Text style={[styles.editProfileBtnText, SANS]}>Customize Profile</Text>
+            </TouchableOpacity>
+          </View>
+
+          <MeProfileBackgroundSwitcher />
+
+          <VillageRewardsCard />
+
+          {showAdminPortal ? (
+            <AdminPortalPanel
+              accountEmail={accountEmail}
+              onAccountEmailChange={onAccountEmailChange}
+              isVipLifetime={isVipLifetime}
+              onToggleVipLifetime={onToggleVipLifetime}
+              onSendTestNewsletter={onSendTestNewsletter}
+              onGrantTestPoints={onGrantTestPoints}
+              onResetTestPoints={onResetTestPoints}
+              currentPoints={currentPoints}
+            />
+          ) : null}
+
+          <VillageBoutiqueBanner onPress={onOpenBoutique} />
+
+          <TouchableOpacity
+            style={styles.deleteAccountBtn}
+            onPress={onDeleteAccount}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+          >
+            <Text style={[styles.deleteAccountText, SANS]}>Delete Account</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 export default MidnightLoungeProfilePanel;
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
+  root: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+  },
+  scroll: { flex: 1, width: '100%' },
   scrollContent: {
-    paddingHorizontal: 18,
+    flexGrow: 1,
+    width: '100%',
+    alignItems: 'center',
     paddingTop: 8,
     paddingBottom: 120,
+    paddingHorizontal: ME_PROFILE_H_PAD,
+  },
+  contentColumn: {
+    width: '100%',
+    maxWidth: ME_PROFILE_CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   sectionEyebrow: {
     fontSize: 14,
@@ -223,6 +263,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: MIDNIGHT.border,
     marginBottom: 8,
+    width: '100%',
   },
   summaryAvatarWrap: {
     marginBottom: 12,
@@ -303,6 +344,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: MIDNIGHT.textSecondary,
     textAlign: 'center',
+    width: '100%',
   },
   summaryBioMuted: {
     marginTop: 10,
@@ -327,6 +369,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     alignItems: 'center',
     minWidth: 200,
+    width: '100%',
+    maxWidth: 280,
   },
   editProfileBtnText: {
     fontSize: 16,
@@ -344,6 +388,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     overflow: 'hidden',
     position: 'relative',
+    width: '100%',
     ...Platform.select({
       web: { boxShadow: '0 8px 22px rgba(74, 64, 56, 0.12)' },
       default: {

@@ -372,6 +372,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: 18,
     borderRadius: 22,
+    width: '100%',
+    alignSelf: 'stretch',
     backgroundColor: MIDNIGHT.bgCard,
     borderWidth: 1,
     borderColor: 'rgba(212, 184, 150, 0.28)',

@@ -2,7 +2,7 @@
  * Deep Me page — customize lounge identity (fields formerly above Save Changes).
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,18 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MIDNIGHT } from './midnightLoungeTheme';
 import MamaBirthdayField from './MamaBirthdayField.js';
 import SecretThemeSwitcher from './SecretThemeSwitcher.js';
+import MeProfileBackgroundSwitcher from './MeProfileBackgroundSwitcher.js';
 import HybridLittleOnesSection from './HybridLittleOnesSection.js';
 import { useVillageRewards } from './VillageRewardsContext';
+import {
+  getMeBackgroundById,
+  ME_PROFILE_CONTENT_MAX_WIDTH,
+  ME_PROFILE_H_PAD,
+} from './meProfileBackgrounds';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -78,6 +85,10 @@ export default function MidnightLoungeProfileEditPanel({
   const [savedFlash, setSavedFlash] = useState(false);
   const canEditTitle = Boolean(rewards.hasFairyGodmotherPerk || rewards.hasMatriarchPerk);
   const secretThemesUnlocked = Boolean(rewards.hasFairyGodmotherPerk);
+  const background = useMemo(
+    () => getMeBackgroundById(rewards.selectedMeBackgroundId),
+    [rewards.selectedMeBackgroundId],
+  );
 
   useEffect(() => {
     setNameDraft(mamaName || '');
@@ -103,148 +114,182 @@ export default function MidnightLoungeProfileEditPanel({
   };
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
-      <Text style={[styles.sectionTitle, SANS]}>Customize Profile</Text>
-
-      <TouchableOpacity
-        style={styles.avatarDashed}
-        onPress={onPickProfilePhoto}
-        activeOpacity={0.88}
-        accessibilityRole="button"
-        accessibilityLabel="Upload profile photo"
-      >
-        <View style={styles.avatarInner}>
-          {profilePhotoUri ? (
-            <Image
-              source={{ uri: profilePhotoUri }}
-              style={styles.avatarImage}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={180}
-              accessibilityLabel="Your profile photo"
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarPlus}>+</Text>
-              <Text style={[styles.avatarHint, SANS]}>Add Photo</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      <Text style={[styles.fieldLabel, SANS]}>Display Name</Text>
-      <TextInput
-        style={[styles.fieldInput, SANS]}
-        value={nameDraft}
-        onChangeText={setNameDraft}
-        placeholder="How should the village greet you?"
-        placeholderTextColor={MIDNIGHT.textMuted}
+    <View style={styles.root}>
+      <LinearGradient
+        colors={background.colors}
+        locations={background.locations}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+        pointerEvents="none"
       />
-      <CustomTitleBadge title={rewards.customProfileTitle || titleDraft} />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.contentColumn}>
+          <Text style={[styles.sectionEyebrow, SANS]}>YOUR LOUNGE IDENTITY</Text>
+          <Text style={[styles.sectionTitle, SANS]}>Customize Profile</Text>
 
-      {canEditTitle ? (
-        <>
-          <Text style={[styles.fieldLabel, SANS]}>Custom Profile Title</Text>
+          <TouchableOpacity
+            style={styles.avatarDashed}
+            onPress={onPickProfilePhoto}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Upload profile photo"
+          >
+            <View style={styles.avatarInner}>
+              {profilePhotoUri ? (
+                <Image
+                  source={{ uri: profilePhotoUri }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={180}
+                  accessibilityLabel="Your profile photo"
+                />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarPlus}>+</Text>
+                  <Text style={[styles.avatarHint, SANS]}>Add Photo</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <Text style={[styles.fieldLabel, SANS]}>Display Name</Text>
           <TextInput
             style={[styles.fieldInput, SANS]}
-            value={titleDraft}
-            onChangeText={setTitleDraft}
-            placeholder="e.g. Feature Fairy Godmother"
+            value={nameDraft}
+            onChangeText={setNameDraft}
+            placeholder="How should the village greet you?"
             placeholderTextColor={MIDNIGHT.textMuted}
-            maxLength={48}
           />
-        </>
-      ) : null}
+          <CustomTitleBadge title={rewards.customProfileTitle || titleDraft} />
 
-      <Text style={[styles.fieldLabel, SANS]}>Short Bio / Mantra</Text>
-      <TextInput
-        style={[styles.fieldInput, styles.fieldInputMultiline, SANS]}
-        value={bioDraft}
-        onChangeText={setBioDraft}
-        placeholder="A line you carry into the quiet hours…"
-        placeholderTextColor={MIDNIGHT.textMuted}
-        multiline
-        textAlignVertical="top"
-      />
+          {canEditTitle ? (
+            <>
+              <Text style={[styles.fieldLabel, SANS]}>Custom Profile Title</Text>
+              <TextInput
+                style={[styles.fieldInput, SANS]}
+                value={titleDraft}
+                onChangeText={setTitleDraft}
+                placeholder="e.g. Feature Fairy Godmother"
+                placeholderTextColor={MIDNIGHT.textMuted}
+                maxLength={48}
+              />
+            </>
+          ) : null}
 
-      <MamaBirthdayField
-        birthday={mamaBirthday}
-        onBirthdayChange={onBirthdayChange}
-        variant="midnight"
-      />
+          <Text style={[styles.fieldLabel, SANS]}>Short Bio / Mantra</Text>
+          <TextInput
+            style={[styles.fieldInput, styles.fieldInputMultiline, SANS]}
+            value={bioDraft}
+            onChangeText={setBioDraft}
+            placeholder="A line you carry into the quiet hours…"
+            placeholderTextColor={MIDNIGHT.textMuted}
+            multiline
+            textAlignVertical="top"
+          />
 
-      <Text style={[styles.fieldLabel, SANS]}>Account email</Text>
-      <TextInput
-        style={[styles.fieldInput, SANS]}
-        value={accountEmail || ''}
-        onChangeText={onAccountEmailChange}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        placeholder="Used for membership & village mail"
-        placeholderTextColor={MIDNIGHT.textMuted}
-      />
+          <MamaBirthdayField
+            birthday={mamaBirthday}
+            onBirthdayChange={onBirthdayChange}
+            variant="midnight"
+          />
 
-      <Text style={[styles.fieldLabel, SANS]}>Your village stage</Text>
-      <Text style={[styles.stageHint, SANS]}>
-        Pregnant and parenting a little one? Choose Both — then use the Home pills to switch tracks.
-      </Text>
-      <View style={styles.stageRow}>
-        {STAGE_OPTIONS.map((option) => {
-          const selected = activeMode === option.id;
-          return (
-            <TouchableOpacity
-              key={option.id}
-              style={[styles.stagePill, selected && styles.stagePillActive]}
-              onPress={() => onSelectJourneyMode?.(option.id)}
-              activeOpacity={0.88}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-            >
-              <Text style={[styles.stagePillLabel, SANS, selected && styles.stagePillLabelActive]}>
-                {option.label}
-              </Text>
-              <Text style={[styles.stagePillHint, SANS, selected && styles.stagePillHintActive]}>
-                {option.hint}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      {activeMode === 'hybrid' ? (
-        <>
-          <HybridLittleOnesSection littleOnes={littleOnes} onChildrenChange={onChildrenChange} />
-          <Text style={[styles.hybridReadyNote, SANS]}>
-            Hybrid on — open Home for Pregnancy / Toddler pills.
+          <Text style={[styles.fieldLabel, SANS]}>Account email</Text>
+          <TextInput
+            style={[styles.fieldInput, SANS]}
+            value={accountEmail || ''}
+            onChangeText={onAccountEmailChange}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            placeholder="Used for membership & village mail"
+            placeholderTextColor={MIDNIGHT.textMuted}
+          />
+
+          <Text style={[styles.fieldLabel, SANS]}>Your village stage</Text>
+          <Text style={[styles.stageHint, SANS]}>
+            Pregnant and parenting a little one? Choose Both — then use the Home pills to switch
+            tracks.
           </Text>
-        </>
-      ) : null}
+          <View style={styles.stageRow}>
+            {STAGE_OPTIONS.map((option) => {
+              const selected = activeMode === option.id;
+              return (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[styles.stagePill, selected && styles.stagePillActive]}
+                  onPress={() => onSelectJourneyMode?.(option.id)}
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <Text
+                    style={[styles.stagePillLabel, SANS, selected && styles.stagePillLabelActive]}
+                  >
+                    {option.label}
+                  </Text>
+                  <Text
+                    style={[styles.stagePillHint, SANS, selected && styles.stagePillHintActive]}
+                  >
+                    {option.hint}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {activeMode === 'hybrid' ? (
+            <>
+              <HybridLittleOnesSection littleOnes={littleOnes} onChildrenChange={onChildrenChange} />
+              <Text style={[styles.hybridReadyNote, SANS]}>
+                Hybrid on — open Home for Pregnancy / Toddler pills.
+              </Text>
+            </>
+          ) : null}
 
-      <SecretThemeSwitcher unlocked={secretThemesUnlocked} />
+          <MeProfileBackgroundSwitcher />
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.88}>
-        <Text style={[styles.saveBtnText, SANS]}>{savedFlash ? 'Saved ✓' : 'Save Changes'}</Text>
-      </TouchableOpacity>
+          <SecretThemeSwitcher unlocked={secretThemesUnlocked} />
 
-      <TouchableOpacity style={styles.doneBtn} onPress={onClose} activeOpacity={0.88}>
-        <Text style={[styles.doneBtnText, SANS]}>Done</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.88}>
+            <Text style={[styles.saveBtnText, SANS]}>
+              {savedFlash ? 'Saved ✓' : 'Save Changes'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.doneBtn} onPress={onClose} activeOpacity={0.88}>
+            <Text style={[styles.doneBtnText, SANS]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
+  root: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+  },
+  scroll: { flex: 1, width: '100%' },
   scrollContent: {
-    paddingHorizontal: 18,
+    flexGrow: 1,
+    width: '100%',
+    alignItems: 'center',
     paddingTop: 4,
     paddingBottom: 48,
+    paddingHorizontal: ME_PROFILE_H_PAD,
+  },
+  contentColumn: {
+    width: '100%',
+    maxWidth: ME_PROFILE_CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   sectionEyebrow: {
     fontSize: 14,
@@ -319,6 +364,7 @@ const styles = StyleSheet.create({
     fontSize: 19,
     color: MIDNIGHT.textPrimary,
     marginBottom: 14,
+    width: '100%',
   },
   titleBadge: {
     alignSelf: 'center',
@@ -432,6 +478,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     marginTop: 8,
+    width: '100%',
   },
   saveBtnText: {
     fontSize: 18,

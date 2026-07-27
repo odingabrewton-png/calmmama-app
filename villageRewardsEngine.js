@@ -7,6 +7,10 @@ import {
   DEFAULT_FAIRY_OMBRE_ID,
   resolveFairyThemeId,
 } from './secretFairyThemes';
+import {
+  DEFAULT_ME_BACKGROUND_ID,
+  resolveMeBackgroundId,
+} from './meProfileBackgrounds';
 
 export const VILLAGE_REWARDS_STORAGE_KEY = 'villageRewards';
 
@@ -171,6 +175,7 @@ export function createDefaultVillageRewards() {
     hasCustomSticker: false,
     customProfileTitle: '',
     selectedSecretThemeId: null,
+    selectedMeBackgroundId: DEFAULT_ME_BACKGROUND_ID,
     discountCoupons: [],
   };
 }
@@ -280,6 +285,7 @@ export function normalizeVillageRewards(raw) {
       if (perks.hasFairyGodmotherPerk) return DEFAULT_FAIRY_OMBRE_ID;
       return null;
     })(),
+    selectedMeBackgroundId: resolveMeBackgroundId(raw.selectedMeBackgroundId),
     discountCoupons: coupons,
   };
 }
@@ -457,6 +463,9 @@ export function updateRewardsProfileFields(rewards, fields = {}) {
   if (fields.selectedSecretThemeId !== undefined) {
     const resolved = resolveFairyThemeId(fields.selectedSecretThemeId);
     next.selectedSecretThemeId = resolved || (next.hasFairyGodmotherPerk ? DEFAULT_FAIRY_OMBRE_ID : null);
+  }
+  if (fields.selectedMeBackgroundId !== undefined) {
+    next.selectedMeBackgroundId = resolveMeBackgroundId(fields.selectedMeBackgroundId);
   }
   return normalizeVillageRewards(next);
 }

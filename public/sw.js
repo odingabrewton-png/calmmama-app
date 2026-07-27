@@ -1,6 +1,6 @@
 /* Calm Mama Village — baseline PWA service worker (cache + web push). */
 /* Bump CACHE_NAME on every release that must reach installed PWAs. */
-const CACHE_NAME = 'calmmama-village-static-v4';
+const CACHE_NAME = 'calmmama-village-static-v5';
 const CORE_ASSETS = [
   '/manifest.json',
   '/logo192.png',
