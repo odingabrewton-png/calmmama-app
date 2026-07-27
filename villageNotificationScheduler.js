@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { presentVillageWebNotification } from './pwaWebPush';
+import { syncVillageWebReminderSchedule } from './villageWebReminderScheduler';
 import {
+  ACTIVE_VILLAGE_NOTIFICATION_IDS,
   FEEDING_SCHEDULE_SLOTS,
   LEGACY_NOTIFICATION_IDS,
   NOTIFICATION_COPY,
@@ -14,7 +16,6 @@ import {
 const ANDROID_CHANNEL_ID = 'calmmama-village-reminders';
 
 let handlerConfigured = false;
-let legacySchedulesPurged = false;
 
 export function configureVillageNotificationHandler() {
   if (handlerConfigured) return;
@@ -30,30 +31,37 @@ export function configureVillageNotificationHandler() {
   });
 }
 
-export async function resetLegacyNotificationSchedules() {
+async function ensureAndroidChannel() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: 'Village Reminders',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 180, 80, 180],
+    lightColor: '#E8E5F7',
+  });
+}
+
+/** Cancel only known village reminder IDs — never wipe unrelated OS schedules. */
+export async function cancelKnownVillageNotificationSchedules() {
   if (Platform.OS === 'web') return;
 
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-  } catch (_) {
-    /* ignore — best-effort OS cache wipe */
-  }
-
+  const ids = [...ACTIVE_VILLAGE_NOTIFICATION_IDS, ...LEGACY_NOTIFICATION_IDS];
   await Promise.all(
-    LEGACY_NOTIFICATION_IDS.map((id) =>
-      Notifications.cancelScheduledNotificationAsync(id).catch(() => {})
-    )
+    ids.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})),
   );
+}
+
+/** @deprecated Prefer cancelKnownVillageNotificationSchedules */
+export async function resetLegacyNotificationSchedules() {
+  await cancelKnownVillageNotificationSchedules();
 }
 
 export async function bootstrapVillageNotifications() {
   if (Platform.OS === 'web') return;
 
   configureVillageNotificationHandler();
-
-  if (legacySchedulesPurged) return;
-  legacySchedulesPurged = true;
-  await resetLegacyNotificationSchedules();
+  // Create Android channel before any permission prompt (Android 13+).
+  await ensureAndroidChannel();
 }
 
 export async function ensureNotificationPermissions() {
@@ -62,6 +70,7 @@ export async function ensureNotificationPermissions() {
   }
 
   configureVillageNotificationHandler();
+  await ensureAndroidChannel();
 
   const existing = await Notifications.getPermissionsAsync();
   if (existing.granted) {
@@ -103,7 +112,6 @@ const MOMENT_ROUTES = Object.freeze({
 /**
  * Fire an immediate iOS/Android OS banner for in-app moments
  * (points earned, kitchen log, checklist, bloom reminder, etc.).
- * No-op on web / when permission is denied.
  */
 export async function presentVillageMomentNotification({
   title,
@@ -135,13 +143,12 @@ export async function presentVillageMomentNotification({
   }
 
   configureVillageNotificationHandler();
+  await ensureAndroidChannel();
 
   const permission = await ensureNotificationPermissions();
   if (!permission.granted) {
     return { ok: false, reason: 'permission-denied' };
   }
-
-  await ensureAndroidChannel();
 
   try {
     const id = await Notifications.scheduleNotificationAsync({
@@ -156,7 +163,6 @@ export async function presentVillageMomentNotification({
         sound: true,
         ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
       },
-      // null = deliver immediately as a real OS notification
       trigger: null,
     });
     return { ok: true, id };
@@ -168,25 +174,13 @@ export async function presentVillageMomentNotification({
   }
 }
 
-async function ensureAndroidChannel() {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: 'Village Reminders',
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 180, 80, 180],
-    lightColor: '#E8E5F7',
-  });
-}
-
 function buildContent({ title, body, route, categoryIdentifier }) {
   return {
     title,
     body,
     data: { route },
     sound: true,
-    ...(Platform.OS === 'android'
-      ? { channelId: ANDROID_CHANNEL_ID }
-      : {}),
+    ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
     ...(categoryIdentifier ? { categoryIdentifier } : {}),
   };
 }
@@ -217,19 +211,24 @@ async function scheduleWeekly({ identifier, weekday, hour, minute, copy }) {
 }
 
 export async function cancelAllVillageNotifications() {
-  await resetLegacyNotificationSchedules();
+  await cancelKnownVillageNotificationSchedules();
 }
 
 export async function syncVillageNotificationSchedule(userJourney = 'pregnant') {
-  if (Platform.OS === 'web') return { scheduled: 0, skipped: 'web' };
+  if (Platform.OS === 'web') {
+    return syncVillageWebReminderSchedule(userJourney);
+  }
+
+  configureVillageNotificationHandler();
+  await ensureAndroidChannel();
 
   const permission = await ensureNotificationPermissions();
   if (!permission.granted) {
     return { scheduled: 0, skipped: 'permission-denied' };
   }
 
-  await ensureAndroidChannel();
-  await resetLegacyNotificationSchedules();
+  // Permission OK — now safely replace known schedules.
+  await cancelKnownVillageNotificationSchedules();
 
   const shared = [
     scheduleDaily({
@@ -237,6 +236,18 @@ export async function syncVillageNotificationSchedule(userJourney = 'pregnant') 
       hour: 7,
       minute: 30,
       copy: NOTIFICATION_COPY.morningKitchen,
+    }),
+    scheduleDaily({
+      identifier: NOTIFICATION_IDS.MIDDAY_CHECKIN,
+      hour: 12,
+      minute: 30,
+      copy: NOTIFICATION_COPY.middayCheckin,
+    }),
+    scheduleDaily({
+      identifier: NOTIFICATION_IDS.AFTERNOON_SOFT,
+      hour: 16,
+      minute: 0,
+      copy: NOTIFICATION_COPY.afternoonSoft,
     }),
     scheduleDaily({
       identifier: NOTIFICATION_IDS.EVENING_LOUNGE,
@@ -258,7 +269,7 @@ export async function syncVillageNotificationSchedule(userJourney = 'pregnant') 
       }),
     ]);
     if (userJourney === 'pregnant') {
-      return { scheduled: 3, journey: 'pregnant' };
+      return { scheduled: 5, journey: 'pregnant' };
     }
   }
 
@@ -269,7 +280,7 @@ export async function syncVillageNotificationSchedule(userJourney = 'pregnant') 
         hour: slot.hour,
         minute: slot.minute,
         copy: getFeedingNotificationCopy(slot.hour),
-      })
+      }),
     );
 
     await Promise.all([
@@ -293,14 +304,14 @@ export async function syncVillageNotificationSchedule(userJourney = 'pregnant') 
     return {
       scheduled:
         userJourney === 'hybrid'
-          ? 4 + 1 + FEEDING_SCHEDULE_SLOTS.length
-          : 3 + 1 + FEEDING_SCHEDULE_SLOTS.length,
+          ? 5 + 1 + 1 + FEEDING_SCHEDULE_SLOTS.length
+          : 4 + 1 + 1 + FEEDING_SCHEDULE_SLOTS.length,
       journey: userJourney,
     };
   }
 
   await Promise.all(shared);
-  return { scheduled: 2, journey: userJourney || 'default' };
+  return { scheduled: 4, journey: userJourney || 'default' };
 }
 
 export function getRouteFromNotification(notification) {

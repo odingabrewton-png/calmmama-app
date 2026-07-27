@@ -10,6 +10,8 @@ export const NOTIFICATION_ROUTES = {
 /** Stable identifiers for the 2026 village reminder schedule. */
 export const NOTIFICATION_IDS = {
   MORNING_KITCHEN: 'calmmama.notification.morning-kitchen',
+  MIDDAY_CHECKIN: 'calmmama.notification.midday-checkin',
+  AFTERNOON_SOFT: 'calmmama.notification.afternoon-soft',
   EVENING_LOUNGE: 'calmmama.notification.evening-lounge',
   WEEKLY_BLOOM: 'calmmama.notification.weekly-bloom',
   NURSERY_SUPPORT: 'calmmama.notification.nursery-support',
@@ -40,6 +42,8 @@ export const FEEDING_SCHEDULE_SLOTS = [
 
 export const ACTIVE_VILLAGE_NOTIFICATION_IDS = [
   NOTIFICATION_IDS.MORNING_KITCHEN,
+  NOTIFICATION_IDS.MIDDAY_CHECKIN,
+  NOTIFICATION_IDS.AFTERNOON_SOFT,
   NOTIFICATION_IDS.EVENING_LOUNGE,
   NOTIFICATION_IDS.WEEKLY_BLOOM,
   NOTIFICATION_IDS.NURSERY_SUPPORT,
@@ -52,6 +56,16 @@ export const NOTIFICATION_COPY = {
     title: 'The Mama Kitchen',
     body: 'Good morning, Mama. ☀️ Start your day with a nourishing, high-protein breakfast. Tap to open your Kitchen guide.',
     route: NOTIFICATION_ROUTES.KITCHEN,
+  },
+  middayCheckin: {
+    title: 'Midday village check-in',
+    body: 'Pause for water, a soft breath, and one kind note to yourself. Your village is with you. 💧',
+    route: NOTIFICATION_ROUTES.HOME,
+  },
+  afternoonSoft: {
+    title: 'Afternoon soft landing',
+    body: 'A gentle afternoon nudge — stretch, snack, or open Soul Sanctuary for a quiet reset. 🌿',
+    route: NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE,
   },
   eveningLounge: {
     title: 'Midnight Lounge',

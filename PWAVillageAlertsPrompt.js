@@ -19,6 +19,7 @@ import {
   isPwaStandaloneMode,
   notificationPermissionState,
   registerVillageServiceWorker,
+  resyncVillageWebPushSubscription,
 } from './pwaWebPush';
 
 const DISMISS_INSTALL_KEY = 'calmmama.pwa.installTip.dismissed';
@@ -59,19 +60,33 @@ function PWAVillageAlertsPrompt() {
     const standalone = isPwaStandaloneMode();
     const iosFamily = isIosSafariBrowser();
     const permission = notificationPermissionState();
+    const pushCapable =
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      'serviceWorker' in navigator &&
+      'PushManager' in window;
 
     if (!standalone && iosFamily && !readDismissed(DISMISS_INSTALL_KEY)) {
       setMode('install');
       return undefined;
     }
 
-    if (standalone && permission !== 'granted' && !readDismissed(DISMISS_PUSH_KEY)) {
-      setMode('push');
+    // Already granted — quietly re-sync subscription so daytime pushes keep working.
+    if (permission === 'granted' && pushCapable) {
+      resyncVillageWebPushSubscription().catch(() => {});
+      if (standalone || !iosFamily) {
+        setMode(null);
+      }
       return undefined;
     }
 
-    if (standalone && permission === 'granted') {
-      setMode(null);
+    if (
+      permission !== 'granted' &&
+      !readDismissed(DISMISS_PUSH_KEY) &&
+      (standalone || (pushCapable && !iosFamily))
+    ) {
+      setMode('push');
+      return undefined;
     }
 
     return undefined;
@@ -92,8 +107,8 @@ function PWAVillageAlertsPrompt() {
       if (result.ok && result.permission === 'granted') {
         setStatusLine(
           result.subscribed
-            ? 'Village alerts enabled — you are ready for web push. 🔔'
-            : 'Notifications enabled on this device. 🔔',
+            ? 'Village alerts enabled — daytime reminders can reach you now. 🔔'
+            : 'Notifications enabled on this device. Keep the Village open for soft daytime nudges. 🔔',
         );
         setMode('done');
         writeDismissed(DISMISS_PUSH_KEY);

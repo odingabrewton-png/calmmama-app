@@ -35,6 +35,9 @@ yarn-error.*
 .env*.local
 .env.production
 
+# web push subscription store (runtime)
+data/
+
 # Replit (ignore if present — not used on Render)
 .replit
 replit.nix

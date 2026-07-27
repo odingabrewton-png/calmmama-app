@@ -12,6 +12,10 @@ const {
   createSubscriptionCheckoutSession,
   resolveAppOrigin,
 } = require('./stripeCheckoutSession');
+const {
+  upsertSubscription,
+  dispatchDueVillagePush,
+} = require('./webPushService');
 
 const ADMIN_EMAIL = 'odingabrewton@gmail.com';
 
@@ -142,6 +146,55 @@ async function handleStripeCheckoutSession(req, res) {
 
 app.post('/api/stripe/checkout-session', handleStripeCheckoutSession);
 app.post('/api/checkout', handleStripeCheckoutSession);
+
+/** Persist browser Web Push subscription for daytime village reminders. */
+app.post('/api/web-push/subscribe', (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = upsertSubscription({
+      subscription: body.subscription || body,
+      journey: body.journey,
+      timeZone: body.timeZone || body.timezone,
+      platform: body.platform || 'web',
+    });
+    res.status(result.status || (result.ok ? 200 : 400)).json(result);
+  } catch (err) {
+    console.warn('[CalmMama] web-push subscribe error', err?.message || err);
+    res.status(500).json({ ok: false, error: 'Unexpected subscribe error' });
+  }
+});
+
+/** Cron: dispatch due village reminders to stored web-push subscribers. */
+app.get('/api/web-push/dispatch', async (req, res) => {
+  const auth = assertCronAuthorized(req);
+  if (!auth.ok) {
+    res.status(auth.status).json({ ok: false, error: auth.error });
+    return;
+  }
+  try {
+    const result = await dispatchDueVillagePush({ windowMinutes: 8 });
+    const status = result.ok ? 200 : result.reason === 'missing-vapid' ? 503 : 500;
+    res.status(status).json(result);
+  } catch (err) {
+    console.warn('[CalmMama] web-push dispatch error', err?.message || err);
+    res.status(500).json({ ok: false, error: 'Unexpected dispatch error' });
+  }
+});
+app.post('/api/web-push/dispatch', async (req, res) => {
+  const auth = assertCronAuthorized(req);
+  if (!auth.ok) {
+    res.status(auth.status).json({ ok: false, error: auth.error });
+    return;
+  }
+  try {
+    const result = await dispatchDueVillagePush({ windowMinutes: 8 });
+    const status = result.ok ? 200 : result.reason === 'missing-vapid' ? 503 : 500;
+    res.status(status).json(result);
+  } catch (err) {
+    console.warn('[CalmMama] web-push dispatch error', err?.message || err);
+    res.status(500).json({ ok: false, error: 'Unexpected dispatch error' });
+  }
+});
 
 /** Admin sandbox: single test newsletter to allowlisted email only. */
 app.post('/api/admin/test-newsletter', async (req, res) => {

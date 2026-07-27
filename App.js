@@ -4663,6 +4663,13 @@ function CalmMamaApp() {
         console.warn('[CalmMama Village] Notification schedule sync failed:', err);
       }
     });
+    if (Platform.OS === 'web') {
+      import('./pwaWebPush')
+        .then((mod) =>
+          mod.resyncVillageWebPushSubscription?.({ journey: journeyForNotifications }),
+        )
+        .catch(() => {});
+    }
   }, [isOnboarded, activeMode, effectiveJourney]);
 
   // Soft weekly Bloom reminder — once per calendar week for pregnant / hybrid mamas.

@@ -3,7 +3,7 @@
  */
 
 const SW_PATH = '/sw.js';
-const SW_CACHE_BUST = 'v5';
+const SW_CACHE_BUST = 'v6';
 const SUBSCRIPTION_STORAGE_KEY = 'calmmama.webPush.subscription';
 const PERMISSION_STORAGE_KEY = 'calmmama.webPush.permission';
 
@@ -112,10 +112,17 @@ function storeSubscription(subscriptionJson) {
   }
 }
 
-async function postSubscriptionToServer(subscriptionJson) {
-  const endpoint = String(process.env.EXPO_PUBLIC_PUSH_SUBSCRIBE_URL || '').trim();
-  if (!endpoint || !subscriptionJson) return { ok: false, reason: 'no-endpoint' };
+async function postSubscriptionToServer(subscriptionJson, extras = {}) {
+  const configured = String(process.env.EXPO_PUBLIC_PUSH_SUBSCRIBE_URL || '').trim();
+  const endpoint = configured || '/api/web-push/subscribe';
+  if (!subscriptionJson) return { ok: false, reason: 'no-subscription' };
   try {
+    let timeZone = null;
+    try {
+      timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (_) {
+      timeZone = null;
+    }
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -123,6 +130,8 @@ async function postSubscriptionToServer(subscriptionJson) {
         subscription: subscriptionJson,
         platform: 'web',
         standalone: isPwaStandaloneMode(),
+        timeZone,
+        journey: extras.journey || 'pregnant',
       }),
     });
     return { ok: res.ok, status: res.status };
@@ -134,7 +143,7 @@ async function postSubscriptionToServer(subscriptionJson) {
 /**
  * Request notification permission and (when VAPID is configured) create a push subscription.
  */
-export async function enableVillageWebPush() {
+export async function enableVillageWebPush(options = {}) {
   if (!canUseDom()) {
     return { ok: false, reason: 'no-dom' };
   }
@@ -188,13 +197,61 @@ export async function enableVillageWebPush() {
 
     const json = subscription?.toJSON?.() || subscription;
     storeSubscription(json);
-    await postSubscriptionToServer(json);
-    return { ok: true, permission: 'granted', subscribed: true, subscription: json };
+    const posted = await postSubscriptionToServer(json, {
+      journey: options.journey || 'pregnant',
+    });
+    return {
+      ok: true,
+      permission: 'granted',
+      subscribed: true,
+      storedOnServer: Boolean(posted.ok),
+      subscription: json,
+    };
   } catch (err) {
     if (typeof console !== 'undefined') {
       console.warn('[CalmMama PWA] Push subscribe failed:', err);
     }
     return { ok: true, permission: 'granted', subscribed: false, reason: 'subscribe-failed' };
+  }
+}
+
+/**
+ * Re-sync an existing granted subscription (journey / timezone) without re-prompting.
+ */
+export async function resyncVillageWebPushSubscription(options = {}) {
+  if (!canUseDom() || typeof Notification === 'undefined') {
+    return { ok: false, reason: 'unsupported' };
+  }
+  if (Notification.permission !== 'granted') {
+    return { ok: false, reason: 'denied' };
+  }
+
+  const registration = await registerVillageServiceWorker();
+  if (!registration?.pushManager) {
+    return { ok: false, reason: 'no-push-manager' };
+  }
+
+  const vapidKey = String(process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY || '').trim();
+  if (!vapidKey) {
+    return { ok: false, reason: 'missing-vapid' };
+  }
+
+  try {
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+    }
+    const json = subscription?.toJSON?.() || subscription;
+    storeSubscription(json);
+    const posted = await postSubscriptionToServer(json, {
+      journey: options.journey || 'pregnant',
+    });
+    return { ok: Boolean(posted.ok), subscribed: true, storedOnServer: Boolean(posted.ok) };
+  } catch (err) {
+    return { ok: false, reason: 'subscribe-failed' };
   }
 }
 
