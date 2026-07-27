@@ -1,7 +1,10 @@
 import React from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MIDNIGHT } from './midnightLoungeTheme';
-import { SECRET_FAIRY_THEMES } from './secretFairyThemes';
+import {
+  DEFAULT_FAIRY_OMBRE_ID,
+  SECRET_FAIRY_THEMES,
+} from './secretFairyThemes';
 import { useVillageRewards } from './VillageRewardsContext';
 
 const SANS = Platform.select({
@@ -11,30 +14,23 @@ const SANS = Platform.select({
 });
 
 /**
- * Hidden pastel / starlight themes — Fairy Godmother (or Pro) unlock.
+ * Fairy Godmother settings — pick one of 5 custom ombre blends for the village backdrop.
  */
 export default function SecretThemeSwitcher({ unlocked = false }) {
   const { rewards, updateProfileFields } = useVillageRewards();
 
   if (!unlocked) return null;
 
-  const selectedId = rewards.selectedSecretThemeId || null;
+  const selectedId = rewards.selectedSecretThemeId || DEFAULT_FAIRY_OMBRE_ID;
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.eyebrow, SANS]}>SECRET STARLIGHT THEMES</Text>
+      <Text style={[styles.eyebrow, SANS]}>FAIRY GODMOTHER OMBRE BLENDS</Text>
       <Text style={[styles.hint, SANS]}>
-        Fairy Godmother unlock — choose a hidden pastel wash for the village backdrop.
+        Your 4,000-pt Fairy Godmother perk is active — choose a custom ombre wash for the whole
+        village backdrop.
       </Text>
       <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.swatch, !selectedId && styles.swatchActive]}
-          onPress={() => updateProfileFields({ selectedSecretThemeId: null })}
-          activeOpacity={0.88}
-        >
-          <View style={[styles.swatchDot, { backgroundColor: '#9CB89C' }]} />
-          <Text style={[styles.swatchLabel, SANS]}>Default</Text>
-        </TouchableOpacity>
         {SECRET_FAIRY_THEMES.map((theme) => {
           const active = selectedId === theme.id;
           return (
@@ -44,16 +40,13 @@ export default function SecretThemeSwitcher({ unlocked = false }) {
               onPress={() => updateProfileFields({ selectedSecretThemeId: theme.id })}
               activeOpacity={0.88}
               accessibilityLabel={theme.label}
+              accessibilityState={{ selected: active }}
             >
-              <View
-                style={[
-                  styles.swatchDot,
-                  {
-                    backgroundColor: theme.colors.b,
-                    borderColor: theme.colors.accent,
-                  },
-                ]}
-              />
+              <View style={styles.swatchPreview}>
+                <View style={[styles.swatchBand, { backgroundColor: theme.colors.a }]} />
+                <View style={[styles.swatchBand, { backgroundColor: theme.colors.b }]} />
+                <View style={[styles.swatchBand, { backgroundColor: theme.colors.c }]} />
+              </View>
               <Text style={[styles.swatchLabel, SANS]}>
                 {theme.emoji} {theme.label}
               </Text>
@@ -103,24 +96,32 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'transparent',
-    minWidth: 92,
+    minWidth: 118,
+    maxWidth: '48%',
+    flexGrow: 1,
   },
   swatchActive: {
     borderColor: 'rgba(212, 184, 150, 0.7)',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  swatchDot: {
-    width: 28,
+  swatchPreview: {
+    width: '100%',
     height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 10,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
     marginBottom: 6,
+  },
+  swatchBand: {
+    flex: 1,
   },
   swatchLabel: {
     fontSize: 11,
     color: MIDNIGHT.textPrimary,
     textAlign: 'center',
     fontWeight: '600',
+    lineHeight: 14,
   },
 });

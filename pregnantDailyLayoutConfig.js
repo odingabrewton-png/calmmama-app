@@ -7,6 +7,9 @@
  * - Home: pregnantHomeLayoutConfig.js ("UNLOCK LAYOUT")
  * - Bloom: pregnantBloomLayoutConfig.js ("UNLOCK BLOOM LAYOUT")
  * - Kitchen images may be updated without unlocking this tab.
+ *
+ * Note: nesting-checklist-card region now hosts the Pregnancy Sanctuary opener
+ * (replacing Nesting Intentions) — same stack slot / nativeID by product request.
  */
 
 export const PREGNANT_DAILY_LAYOUT_LOCKED = true;

@@ -3,25 +3,51 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  DEFAULT_FAIRY_OMBRE_ID,
+  resolveFairyThemeId,
+} from './secretFairyThemes';
 
 export const VILLAGE_REWARDS_STORAGE_KEY = 'villageRewards';
 
 /** Crown Points redeem tiers (spend balance to claim). */
 export const REWARD_TIERS = [
   {
-    id: 'exclusive_badge',
+    id: 'streak_freeze',
+    points: 250,
+    title: 'Streak Freeze',
+    type: 'streak_freeze',
+    shopGroup: 'redeemable',
+    perk: 'Protect one journal streak day',
+    description: 'Freeze your journal streak for one missed day — soft grace for hard weeks.',
+    emoji: '🧊',
+  },
+  {
+    id: 'custom_sticker',
+    points: 300,
+    title: 'Custom Sticker',
+    type: 'cosmetic',
+    shopGroup: 'redeemable',
+    perk: 'Unlock a village sticker pack',
+    description: 'A custom sticker pack for notes, journals, and village moments.',
+    emoji: '✨',
+  },
+  {
+    id: 'themed_app_icon',
     points: 500,
-    title: 'Exclusive Top-Tier Badge',
-    type: 'badge',
-    perk: 'Wear your crown in the village',
-    description: 'A gleaming top-tier badge for your Village profile.',
-    emoji: '👑',
+    title: 'Themed App Icon Swap',
+    type: 'cosmetic',
+    shopGroup: 'redeemable',
+    perk: 'Swap your Calm Mama home icon',
+    description: 'Unlock a themed app icon swap for your home screen sanctuary.',
+    emoji: '📱',
   },
   {
     id: 'store_10',
     points: 1000,
     title: '10% Off Store Discount',
     type: 'discount',
+    shopGroup: 'redeemable',
     value: 10,
     perk: '10% OFF Boutique',
     code: 'CROWN10',
@@ -33,6 +59,7 @@ export const REWARD_TIERS = [
     points: 2000,
     title: 'The Village Oracle (Beta Tester Pass)',
     type: 'early_access',
+    shopGroup: 'redeemable',
     perk: 'Test new features early',
     description: 'Test new features 2 weeks early',
     emoji: '🔮',
@@ -42,6 +69,7 @@ export const REWARD_TIERS = [
     points: 3000,
     title: '20% Off Store Discount',
     type: 'discount',
+    shopGroup: 'redeemable',
     value: 20,
     perk: '20% OFF Boutique',
     code: 'CROWN20',
@@ -53,9 +81,10 @@ export const REWARD_TIERS = [
     points: 4000,
     title: 'Feature Fairy Godmother Perks',
     type: 'fairy_godmother',
-    perk: 'Secret themes + premium prompts',
+    shopGroup: 'redeemable',
+    perk: 'Secret ombre themes + premium prompts',
     description:
-      'Permanent unlock of all premium prompts/secret themes + custom profile title',
+      'Permanent unlock of all premium prompts, 5 custom ombre blends, and a custom profile title',
     emoji: '🧚',
   },
   {
@@ -63,6 +92,7 @@ export const REWARD_TIERS = [
     points: 5000,
     title: 'Founding Matriarch Bundle',
     type: 'matriarch',
+    shopGroup: 'redeemable',
     perk: 'Badge + co-create + dual 50% coupons',
     description: 'Custom profile badge + Co-create a feature + Two 50% off coupons',
     emoji: '🏛️',
@@ -70,11 +100,18 @@ export const REWARD_TIERS = [
   },
 ];
 
-/** Point awards by action key. */
+/** Legacy exclusive badge / older shop ids → current redeemables. */
+const LEGACY_TIER_ID_MAP = Object.freeze({
+  village_sister: 'themed_app_icon',
+  exclusive_badge: 'themed_app_icon',
+  sanctuary_queen: 'store_10',
+  founding_legend: 'store_20',
+});
 export const REWARD_POINT_VALUES = {
   dailyJournal: 10,
   weeklyJournalBonus: 50,
   dailyChecklist: 5,
+  nurseryChecklistItem: 5,
   pollFeedback: 100,
   registryCompleted: 250,
   dailyPuzzle: 15,
@@ -89,16 +126,13 @@ export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
 export const WEEKLY_JOURNAL_BONUS_TOAST =
   'Weekly Sanctuary streak — bonus unlocked! +50 pts';
 export const DAILY_CHECKLIST_TOAST = 'Daily checklist complete — soft win! +5 pts';
+export const NURSERY_CHECKLIST_ITEM_TOAST =
+  'Nursery survival check — +5 Crown Points';
+export const NURSERY_CHECKLIST_DAILY_CAP = 6;
 export const KITCHEN_COOKED_TOAST = "Mama's Kitchen — nourishment logged! +15 pts";
 export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium welcome bonus unlocked! +250 pts';
 export const VIP_PROMO_TOAST = 'VIP welcome bonus unlocked! +500 pts';
 export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated';
-
-const LEGACY_TIER_ID_MAP = Object.freeze({
-  village_sister: 'exclusive_badge',
-  sanctuary_queen: 'store_10',
-  founding_legend: 'store_20',
-});
 
 function mapLegacyTierId(id) {
   return LEGACY_TIER_ID_MAP[id] || id;
@@ -117,6 +151,8 @@ export function createDefaultVillageRewards() {
       dailyJournalDate: null,
       dailyPuzzleDate: null,
       dailyChecklistDate: null,
+      nurseryChecklistDate: null,
+      nurseryChecklistCount: 0,
       kitchenCookedDate: null,
       dailyEncouragementsCount: 0,
       dailyEncourageDate: null,
@@ -131,6 +167,8 @@ export function createDefaultVillageRewards() {
     hasOracleBetaPass: false,
     hasMatriarchPerk: false,
     hasExclusiveBadge: false,
+    hasStreakFreeze: false,
+    hasCustomSticker: false,
     customProfileTitle: '',
     selectedSecretThemeId: null,
     discountCoupons: [],
@@ -177,11 +215,16 @@ function normalizeRedeemedTiers(raw) {
 function derivePerkFlags(redeemedTiers, raw = {}) {
   const set = new Set(redeemedTiers);
   return {
-    hasExclusiveBadge: Boolean(raw.hasExclusiveBadge) || set.has('exclusive_badge'),
+    hasExclusiveBadge:
+      Boolean(raw.hasExclusiveBadge) ||
+      set.has('exclusive_badge') ||
+      set.has('themed_app_icon'),
     hasOracleBetaPass: Boolean(raw.hasOracleBetaPass) || set.has('oracle_beta'),
     hasFairyGodmotherPerk:
       Boolean(raw.hasFairyGodmotherPerk) || set.has('fairy_godmother'),
     hasMatriarchPerk: Boolean(raw.hasMatriarchPerk) || set.has('founding_matriarch'),
+    hasStreakFreeze: Boolean(raw.hasStreakFreeze) || set.has('streak_freeze'),
+    hasCustomSticker: Boolean(raw.hasCustomSticker) || set.has('custom_sticker'),
   };
 }
 
@@ -217,6 +260,8 @@ export function normalizeVillageRewards(raw) {
       dailyJournalDate: actions.dailyJournalDate || null,
       dailyPuzzleDate: actions.dailyPuzzleDate || null,
       dailyChecklistDate: actions.dailyChecklistDate || null,
+      nurseryChecklistDate: actions.nurseryChecklistDate || null,
+      nurseryChecklistCount: Math.max(0, Number(actions.nurseryChecklistCount) || 0),
       kitchenCookedDate: actions.kitchenCookedDate || null,
       dailyEncouragementsCount: Math.max(0, Number(actions.dailyEncouragementsCount) || 0),
       dailyEncourageDate: actions.dailyEncourageDate || null,
@@ -228,7 +273,13 @@ export function normalizeVillageRewards(raw) {
     unlockedBadges: redeemedTiers,
     ...perks,
     customProfileTitle: String(raw.customProfileTitle || '').trim().slice(0, 48),
-    selectedSecretThemeId: raw.selectedSecretThemeId || null,
+    selectedSecretThemeId: (() => {
+      const resolved = resolveFairyThemeId(raw.selectedSecretThemeId);
+      if (resolved) return resolved;
+      // Fairy Godmother always keeps an active ombre blend selected.
+      if (perks.hasFairyGodmotherPerk) return DEFAULT_FAIRY_OMBRE_ID;
+      return null;
+    })(),
     discountCoupons: coupons,
   };
 }
@@ -362,10 +413,15 @@ export function applyRedeemTier(rewards, tierId) {
     unlockedBadges: redeemedTiers,
   };
 
-  if (tier.type === 'badge') next.hasExclusiveBadge = true;
+  if (tier.type === 'badge' || tier.id === 'themed_app_icon') next.hasExclusiveBadge = true;
+  if (tier.type === 'streak_freeze' || tier.id === 'streak_freeze') next.hasStreakFreeze = true;
+  if (tier.id === 'custom_sticker') next.hasCustomSticker = true;
   if (tier.type === 'early_access') next.hasOracleBetaPass = true;
   if (tier.type === 'fairy_godmother') {
     next.hasFairyGodmotherPerk = true;
+    if (!resolveFairyThemeId(next.selectedSecretThemeId)) {
+      next.selectedSecretThemeId = DEFAULT_FAIRY_OMBRE_ID;
+    }
     if (!next.customProfileTitle) {
       next.customProfileTitle = 'Feature Fairy Godmother';
     }
@@ -399,7 +455,8 @@ export function updateRewardsProfileFields(rewards, fields = {}) {
     next.customProfileTitle = String(fields.customProfileTitle || '').trim().slice(0, 48);
   }
   if (fields.selectedSecretThemeId !== undefined) {
-    next.selectedSecretThemeId = fields.selectedSecretThemeId || null;
+    const resolved = resolveFairyThemeId(fields.selectedSecretThemeId);
+    next.selectedSecretThemeId = resolved || (next.hasFairyGodmotherPerk ? DEFAULT_FAIRY_OMBRE_ID : null);
   }
   return normalizeVillageRewards(next);
 }
@@ -615,6 +672,27 @@ export function applyAddPoints(rewards, amount, actionKey) {
   } else if (key === 'adminTestGrant') {
     return finishAward(current, actions, awardAmount, {
       toastMessage: `Admin test +${awardAmount} pts`,
+    });
+  } else if (key === 'nurseryChecklistItem') {
+    if (actions.nurseryChecklistDate !== today) {
+      actions.nurseryChecklistDate = today;
+      actions.nurseryChecklistCount = 0;
+    }
+    if (actions.nurseryChecklistCount >= NURSERY_CHECKLIST_DAILY_CAP) {
+      return {
+        awarded: false,
+        amount: 0,
+        reason: 'daily_cap',
+        rewards: { ...current, completedActions: actions },
+        newlyUnlocked: [],
+        toastMessage: null,
+        bonusToastMessage: null,
+        bonusAmount: 0,
+      };
+    }
+    actions.nurseryChecklistCount += 1;
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: NURSERY_CHECKLIST_ITEM_TOAST,
     });
   } else if (key === 'encourage') {
     if (actions.dailyEncourageDate !== today) {

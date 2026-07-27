@@ -118,6 +118,23 @@ function installWebFatalErrorReporter() {
 
 installWebFatalErrorReporter();
 
+function registerWebServiceWorker() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  if (!('serviceWorker' in navigator)) return;
+  const run = () => {
+    import('./pwaWebPush')
+      .then((mod) => mod.registerVillageServiceWorker?.())
+      .catch(() => {});
+  };
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(run, { timeout: 2500 });
+  } else {
+    setTimeout(run, 1200);
+  }
+}
+
+registerWebServiceWorker();
+
 function Root() {
   useEffect(() => {
     const timer = setTimeout(() => {

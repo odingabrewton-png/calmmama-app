@@ -31,15 +31,20 @@ import {
 import WeeklyBloomScreen from './WeeklyBloomScreen'; // layout locked — pregnantBloomLayoutConfig.js
 import AppBrandHeader from './AppBrandHeader';
 import VillageOmbreBackdrop from './VillageOmbreBackdrop';
+import PWAVillageAlertsPrompt from './PWAVillageAlertsPrompt';
 import { CALM_MAMA_PASTEL } from './calmMamaPastelPalette';
 import CloudNurseryScreen from './CloudNurseryScreen';
 import LittleHorizonsScreen from './LittleHorizonsScreen';
+import PregnancySanctuaryModal from './PregnancySanctuaryModal';
+import PostpartumNurseryWelcomeModal from './PostpartumNurseryWelcomeModal';
+import { DEFAULT_NURSERY_SURVIVAL_TASKS } from './NurserySwipeChecklist';
 import SubscriptionScreen from './SubscriptionScreen';
 import VillageCommunityPortal from './src/VillageCommunityPortal';
 import MamasKitchenScreen from './MamasKitchenScreen';
 import HomeScreen from './HomeScreen';
 import HomeModeToggle from './HomeModeToggle';
 import BirthdayBoutiqueModal from './BirthdayBoutiqueModal';
+import CelebrationConfetti from './CelebrationConfetti';
 import TabFreezeBoundary from './TabFreezeBoundary';
 import { TAB_NAV_PERF } from './tabShellConfig';
 import LegalComplianceModal from './LegalComplianceModal';
@@ -727,11 +732,10 @@ const SANCTUARY_SYMPTOMS = [
   { id: 'foggy', emoji: '🧠', label: 'Foggy' },
 ];
 
-const DEFAULT_NESTING_TASKS = [
-  { id: 1, text: 'Pack hospital bag', done: false },
-  { id: 2, text: 'Set up birth plan', done: false },
-  { id: 3, text: 'Wash baby clothes', done: false },
-];
+const DEFAULT_NURSERY_SURVIVAL_CHECKLIST = DEFAULT_NURSERY_SURVIVAL_TASKS.map((task) => ({
+  ...task,
+  done: false,
+}));
 
 const POSTPARTUM_VIBES = [
   { id: 'empty', emoji: '☕', label: 'Running on Empty' },
@@ -995,11 +999,7 @@ function renderPregnantDailyTracker({
   kickSessionLog,
   onLogKick,
   onSaveKickSession,
-  nestingTasks,
-  onToggleNestingTask,
-  newNestingTask,
-  onNewNestingTaskChange,
-  onAddNestingTask,
+  onOpenPregnancySanctuary,
   therapeuticMeals,
   therapeuticHeadline,
   onOpenKitchen,
@@ -1025,7 +1025,7 @@ function renderPregnantDailyTracker({
     >
       <View style={styles.dailyTabHeader} nativeID={PREGNANT_DAILY_STACK[0]}>
         <Text style={styles.dailyTabTitle}>✨ Daily Village</Text>
-        <Text style={styles.dailyTabSub}>Symptoms, kicks & nesting — all in one gentle place</Text>
+        <Text style={styles.dailyTabSub}>Symptoms, kicks & Pregnancy Sanctuary — all in one gentle place</Text>
       </View>
 
       <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.symptom}>
@@ -1123,35 +1123,24 @@ function renderPregnantDailyTracker({
       </View>
 
       <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.nesting}>
-        <Text style={styles.homeCardTitle}>📝 Nesting Intentions Checklist</Text>
-        <Text style={styles.homeCardHint}>Check off cozy preparations at your own pace</Text>
-        {nestingTasks.map((task) => (
-          <TouchableOpacity
-            key={task.id}
-            style={styles.nestingRow}
-            onPress={() => onToggleNestingTask(task.id)}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.nestingCheck, task.done && styles.nestingCheckOn]}>
-              {task.done ? <Text style={styles.nestingCheckMark}>✓</Text> : null}
-            </View>
-            <Text style={[styles.nestingText, task.done && styles.nestingTextDone]}>{task.text}</Text>
-          </TouchableOpacity>
-        ))}
-        <View style={styles.nestingAddRow}>
-          <TextInput
-            style={styles.nestingInput}
-            placeholder="Add a nesting intention…"
-            placeholderTextColor="#7A8E82"
-            value={newNestingTask}
-            onChangeText={onNewNestingTaskChange}
-            onSubmitEditing={onAddNestingTask}
-            returnKeyType="done"
-          />
-          <TouchableOpacity style={styles.nestingAddBtn} onPress={onAddNestingTask}>
-            <Text style={styles.nestingAddBtnText}>+</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.homeCardTitle}>🕊️ Pregnancy Sanctuary</Text>
+        <Text style={styles.homeCardHint}>
+          Doula tips, birth plan templates, and a contraction timer — open your soft prep space.
+        </Text>
+        <TouchableOpacity
+          style={styles.pregnancySanctuaryBtn}
+          onPress={onOpenPregnancySanctuary}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.pregnancySanctuaryBtnEmoji}>🌿</Text>
+          <View style={styles.pregnancySanctuaryBtnCopy}>
+            <Text style={styles.pregnancySanctuaryBtnTitle}>Enter Pregnancy Sanctuary</Text>
+            <Text style={styles.pregnancySanctuaryBtnSub}>
+              Weekly doula wisdom · Birth plan · Contraction timer
+            </Text>
+          </View>
+          <Text style={styles.pregnancySanctuaryBtnChevron}>→</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -1187,52 +1176,83 @@ function MamaWinRow({ task, onToggle }) {
   );
 }
 
-const FLOWER_FIREWORK_EMOJIS = ['🌸', '🌷', '🌼', '💐', '🪷', '🌺', '🏵️', '💮', '🌻', '🌿'];
+const FLOWER_FIREWORK_EMOJIS = [
+  '🌸',
+  '🌷',
+  '🌼',
+  '💐',
+  '🪷',
+  '🌺',
+  '🏵️',
+  '💮',
+  '🌻',
+  '🌿',
+  '✨',
+  '💗',
+  '✿',
+  '❀',
+  '💫',
+  '🦋',
+];
 
 function buildFlowerParticles(emojis, { spread = 0.48, powerBase = 52, powerStep = 14, lift = 42 }) {
   return emojis.map((emoji, index) => {
     const spreadOffset = (index - (emojis.length - 1) / 2) * spread;
     const angle = -Math.PI / 2 + spreadOffset;
     const power = powerBase + (index % 5) * powerStep;
-    const endX = Math.cos(angle) * power;
-    const endY = Math.sin(angle) * power - 18;
-    const peakX = endX * 0.45;
-    const peakY = endY - lift - (index % 4) * 10;
-    return { emoji, endX, endY, peakX, peakY, spin: index % 2 === 0 ? 14 : -12 };
+    const endX = Math.cos(angle) * power * (0.85 + (index % 3) * 0.08);
+    // Soft gravity: settle lower after the peak so petals drift down smoothly.
+    const endY = Math.sin(angle) * power * 0.55 + 36 + (index % 4) * 8;
+    const peakX = endX * 0.42;
+    const peakY = Math.sin(angle) * power - lift - (index % 4) * 12;
+    return {
+      emoji,
+      endX,
+      endY,
+      peakX,
+      peakY,
+      spin: index % 2 === 0 ? 22 + (index % 5) * 4 : -(18 + (index % 4) * 5),
+    };
   });
 }
 
-const FLOWER_BURST_INNER = buildFlowerParticles(FLOWER_FIREWORK_EMOJIS.slice(0, 6), {
-  spread: 0.5,
-  powerBase: 72,
-  lift: 58,
+const FLOWER_BURST_INNER = buildFlowerParticles(FLOWER_FIREWORK_EMOJIS.slice(0, 8), {
+  spread: 0.42,
+  powerBase: 68,
+  lift: 62,
+});
+const FLOWER_BURST_MID = buildFlowerParticles(FLOWER_FIREWORK_EMOJIS.slice(4, 14), {
+  spread: 0.55,
+  powerBase: 88,
+  powerStep: 12,
+  lift: 74,
 });
 const FLOWER_BURST_OUTER = buildFlowerParticles(FLOWER_FIREWORK_EMOJIS, {
-  spread: 0.62,
-  powerBase: 98,
-  powerStep: 14,
-  lift: 78,
+  spread: 0.68,
+  powerBase: 112,
+  powerStep: 16,
+  lift: 92,
 });
 
-const FIREWORK_BURST_EASING = Easing.bezier(0.22, 0.85, 0.18, 1);
+const FIREWORK_BURST_EASING = Easing.bezier(0.16, 0.84, 0.22, 1);
 
 function renderFlowerParticles(burstProgress, particles, fontSize) {
   return particles.map((particle, index) => {
     const tx = burstProgress.interpolate({
-      inputRange: [0, 0.22, 0.48, 0.78, 1],
-      outputRange: [0, particle.peakX * 0.4, particle.peakX, particle.endX * 0.94, particle.endX],
+      inputRange: [0, 0.18, 0.42, 0.72, 1],
+      outputRange: [0, particle.peakX * 0.35, particle.peakX, particle.endX * 0.92, particle.endX],
     });
     const ty = burstProgress.interpolate({
-      inputRange: [0, 0.22, 0.48, 0.78, 1],
-      outputRange: [0, particle.peakY * 0.3, particle.peakY, particle.endY * 0.9, particle.endY],
+      inputRange: [0, 0.16, 0.38, 0.68, 1],
+      outputRange: [0, particle.peakY * 0.28, particle.peakY, particle.endY * 0.55, particle.endY],
     });
     const opacity = burstProgress.interpolate({
-      inputRange: [0, 0.06, 0.2, 0.55, 0.82, 1],
-      outputRange: [0, 1, 1, 1, 0.65, 0],
+      inputRange: [0, 0.05, 0.18, 0.58, 0.84, 1],
+      outputRange: [0, 1, 1, 0.95, 0.45, 0],
     });
     const scale = burstProgress.interpolate({
-      inputRange: [0, 0.12, 0.35, 0.65, 1],
-      outputRange: [0.15, 1.2, 1.08, 0.95, 0.4],
+      inputRange: [0, 0.1, 0.32, 0.7, 1],
+      outputRange: [0.12, 1.18, 1.05, 0.92, 0.55],
     });
     const rotate = burstProgress.interpolate({
       inputRange: [0, 1],
@@ -1256,12 +1276,13 @@ function renderFlowerParticles(burstProgress, particles, fontSize) {
   });
 }
 
-function FireworksBurst({ burstProgress, bloomProgress }) {
+function FireworksBurst({ burstProgress, bloomProgress, midProgress }) {
   return (
     <View style={styles.fireworksStage} pointerEvents="none" collapsable={false}>
       <View style={styles.fireworksOrigin} collapsable={false}>
-        {renderFlowerParticles(burstProgress, FLOWER_BURST_INNER, 36)}
-        {renderFlowerParticles(bloomProgress, FLOWER_BURST_OUTER, 42)}
+        {renderFlowerParticles(burstProgress, FLOWER_BURST_INNER, 34)}
+        {renderFlowerParticles(midProgress || bloomProgress, FLOWER_BURST_MID, 30)}
+        {renderFlowerParticles(bloomProgress, FLOWER_BURST_OUTER, 40)}
       </View>
     </View>
   );
@@ -1295,6 +1316,7 @@ function PostpartumDailyTracker({
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const burstAnim = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
+  const midAnim = useRef(new Animated.Value(0)).current;
   const celebrationTimers = useRef([]);
 
   const clearCelebrationTimers = () => {
@@ -1311,23 +1333,34 @@ function PostpartumDailyTracker({
     clearCelebrationTimers();
     burstAnim.stopAnimation();
     bloomAnim.stopAnimation();
+    midAnim.stopAnimation();
     burstAnim.setValue(0);
     bloomAnim.setValue(0);
+    midAnim.setValue(0);
     setShowFireworks(true);
 
     const startId = setTimeout(() => {
       Animated.parallel([
         Animated.timing(burstAnim, {
           toValue: 1,
-          duration: 2800,
+          duration: 3000,
           easing: FIREWORK_BURST_EASING,
           useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.sequence([
-          Animated.delay(160),
+          Animated.delay(90),
+          Animated.timing(midAnim, {
+            toValue: 1,
+            duration: 2900,
+            easing: FIREWORK_BURST_EASING,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.delay(180),
           Animated.timing(bloomAnim, {
             toValue: 1,
-            duration: 2600,
+            duration: 2800,
             easing: FIREWORK_BURST_EASING,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
@@ -1336,8 +1369,8 @@ function PostpartumDailyTracker({
     }, 48);
     celebrationTimers.current.push(startId);
 
-    scheduleCelebration(() => setShowFireworks(false), 4000);
-  }, [burstAnim, bloomAnim]);
+    scheduleCelebration(() => setShowFireworks(false), 4500);
+  }, [burstAnim, bloomAnim, midAnim]);
 
   const handleWinToggle = useCallback(
     (taskId) => {
@@ -1550,7 +1583,12 @@ function PostpartumDailyTracker({
         onRequestClose={() => setShowFireworks(false)}
       >
         <View style={styles.fireworkModalRoot} pointerEvents="none">
-          <FireworksBurst burstProgress={burstAnim} bloomProgress={bloomAnim} />
+          <CelebrationConfetti active={showFireworks} density="rich" seed={88} />
+          <FireworksBurst
+            burstProgress={burstAnim}
+            bloomProgress={bloomAnim}
+            midProgress={midAnim}
+          />
         </View>
       </Modal>
     </View>
@@ -1679,6 +1717,8 @@ function renderMainTabContent({
   onMinutesForMeChange,
   goldenHourKeepsakes,
   onAddGoldenHourKeepsake,
+  nurserySurvivalTasks,
+  onToggleNurserySurvivalTask,
   weightEntries,
   setWeeksPregnant,
   setWeightEntries,
@@ -1693,11 +1733,7 @@ function renderMainTabContent({
   kickSessionLog,
   onLogKick,
   onSaveKickSession,
-  nestingTasks,
-  onToggleNestingTask,
-  newNestingTask,
-  onNewNestingTaskChange,
-  onAddNestingTask,
+  onOpenPregnancySanctuary,
   selectedPostpartumVibes,
   onTogglePostpartumVibe,
   postpartumVibeHistory,
@@ -1811,11 +1847,7 @@ function renderMainTabContent({
       kickSessionLog,
       onLogKick,
       onSaveKickSession,
-      nestingTasks,
-      onToggleNestingTask,
-      newNestingTask,
-      onNewNestingTaskChange,
-      onAddNestingTask,
+      onOpenPregnancySanctuary,
       therapeuticMeals,
       therapeuticHeadline: pregnantTherapeuticHeadline,
       onOpenKitchen: onOpenKitchenTab,
@@ -1939,6 +1971,8 @@ function renderMainTabContent({
           onAddLog={onAddNurseryLog}
           goldenHourKeepsakes={goldenHourKeepsakes}
           onAddGoldenHourKeepsake={onAddGoldenHourKeepsake}
+          survivalTasks={nurserySurvivalTasks}
+          onToggleSurvivalTask={onToggleNurserySurvivalTask}
         />
       </ScrollView>
     );
@@ -3008,9 +3042,12 @@ function CalmMamaApp() {
   const [kickSessionLog, setKickSessionLog] = useState([]);
   const kickLogIdRef = useRef(0);
   const [kitchenTherapeuticTags, setKitchenTherapeuticTags] = useState(null);
-  const [nestingTasks, setNestingTasks] = useState(DEFAULT_NESTING_TASKS);
-  const [newNestingTask, setNewNestingTask] = useState('');
-  const nestingTaskIdRef = useRef(3);
+  const [pregnancySanctuaryOpen, setPregnancySanctuaryOpen] = useState(false);
+  const [nurseryWelcomeOpen, setNurseryWelcomeOpen] = useState(false);
+  const [nurserySurvivalTasks, setNurserySurvivalTasks] = useState(
+    DEFAULT_NURSERY_SURVIVAL_CHECKLIST,
+  );
+  const nurserySurvivalDayRef = useRef(getPostpartumWinsDayKey());
   const symptomLogIdRef = useRef(0);
   const [selectedPostpartumVibes, setSelectedPostpartumVibes] = useState([]);
   const [postpartumVibeHistory, setPostpartumVibeHistory] = useState([]);
@@ -3062,6 +3099,10 @@ function CalmMamaApp() {
         postpartumWinsDayRef.current = today;
         return getPostpartumDailyWins();
       });
+      if (nurserySurvivalDayRef.current !== today) {
+        nurserySurvivalDayRef.current = today;
+        setNurserySurvivalTasks(DEFAULT_NURSERY_SURVIVAL_CHECKLIST);
+      }
     };
 
     applyDailyWins();
@@ -4077,7 +4118,9 @@ function CalmMamaApp() {
             setSelectedSymptoms([]);
             setSymptomHistory([]);
             setKickSession({ count: 0, startedAt: null });
-            setNestingTasks(DEFAULT_NESTING_TASKS);
+            setNurserySurvivalTasks(DEFAULT_NURSERY_SURVIVAL_CHECKLIST);
+            setPregnancySanctuaryOpen(false);
+            setNurseryWelcomeOpen(false);
             setSelectedPostpartumVibes([]);
             setPostpartumVibeHistory([]);
             setMamaWinsTasks(getPostpartumDailyWins());
@@ -4625,44 +4668,15 @@ function CalmMamaApp() {
     runTabTransition('kitchen');
   };
 
-  const handleToggleNestingTask = (taskId) => {
-    setNestingTasks((prev) => {
-      const task = prev.find((item) => item.id === taskId);
-      const markingDone = Boolean(task) && !task.done;
-      const completesAll =
-        markingDone &&
-        prev.length > 0 &&
-        prev.every((item) => item.id === taskId || item.done);
+  const handleToggleNurserySurvivalTask = useCallback((taskId) => {
+    setNurserySurvivalTasks((prev) =>
+      prev.map((item) => (item.id === taskId ? { ...item, done: !item.done } : item)),
+    );
+  }, []);
 
-      if (completesAll) {
-        Promise.resolve().then(() => addPoints(5, 'dailyChecklist'));
-      } else if (markingDone) {
-        const remaining = prev.filter((item) => item.id !== taskId && !item.done).length;
-        Promise.resolve().then(() =>
-          notify({
-            category: 'checklist',
-            title: 'Daily Checklist',
-            message:
-              remaining > 0
-                ? `Checked off — ${remaining} soft win${remaining === 1 ? '' : 's'} left today.`
-                : 'Nice check — keep going, mama.',
-          }),
-        );
-      }
-
-      return prev.map((item) =>
-        item.id === taskId ? { ...item, done: !item.done } : item,
-      );
-    });
-  };
-
-  const handleAddNestingTask = () => {
-    const text = newNestingTask.trim();
-    if (!text) return;
-    nestingTaskIdRef.current += 1;
-    setNestingTasks((prev) => [...prev, { id: nestingTaskIdRef.current, text, done: false }]);
-    setNewNestingTask('');
-  };
+  const handleOpenPregnancySanctuary = useCallback(() => {
+    setPregnancySanctuaryOpen(true);
+  }, []);
 
   const appendNurseryLog = (entry) => {
     const now = new Date();
@@ -4749,10 +4763,14 @@ function CalmMamaApp() {
     setUserJourney('postpartum');
     setHomeTrack(HOME_TRACKS.TODDLER);
     setActiveTab('nursery');
-    Alert.alert(
-      '🌟 Welcome to Postpartum',
-      'Your Cloud Nursery tracker is now live. We are so glad you and baby are here.'
-    );
+    setNurserySurvivalTasks(DEFAULT_NURSERY_SURVIVAL_CHECKLIST);
+    nurserySurvivalDayRef.current = getPostpartumWinsDayKey();
+    setNurseryWelcomeOpen(true);
+  };
+
+  const handleExploreNurseryWelcome = () => {
+    setNurseryWelcomeOpen(false);
+    setActiveTab('nursery');
   };
 
   const handleOpenBirthPrompt = () => {
@@ -4887,11 +4905,9 @@ function CalmMamaApp() {
       kickSessionLog,
       onLogKick: handleLogKick,
       onSaveKickSession: handleSaveKickSession,
-      nestingTasks,
-      onToggleNestingTask: handleToggleNestingTask,
-      newNestingTask,
-      onNewNestingTaskChange: setNewNestingTask,
-      onAddNestingTask: handleAddNestingTask,
+      onOpenPregnancySanctuary: handleOpenPregnancySanctuary,
+      nurserySurvivalTasks,
+      onToggleNurserySurvivalTask: handleToggleNurserySurvivalTask,
       selectedPostpartumVibes,
       onTogglePostpartumVibe: handleTogglePostpartumVibe,
       postpartumVibeHistory,
@@ -4945,8 +4961,9 @@ function CalmMamaApp() {
       symptomHistory,
       kickSession,
       kickSessionLog,
-      nestingTasks,
-      newNestingTask,
+      nurserySurvivalTasks,
+      handleToggleNurserySurvivalTask,
+      handleOpenPregnancySanctuary,
       selectedPostpartumVibes,
       postpartumVibeHistory,
       selectedToddlerVibes,
@@ -4997,6 +5014,7 @@ function CalmMamaApp() {
         <AppStatusBar />
         {/* Isolated sage/lavender/peach ombre — lives in VillageOmbreBackdrop.js only */}
         <VillageOmbreBackdrop />
+        {Platform.OS === 'web' && isOnboarded ? <PWAVillageAlertsPrompt /> : null}
 
         {/* Single hardware-accelerated canvas — opacity fades only, then swap the child */}
         <Animated.View
@@ -5126,6 +5144,18 @@ function CalmMamaApp() {
               reason={birthPromptReason}
               onConfirm={handleGraduationSwitch}
               onDismiss={handleDismissBirthPrompt}
+            />
+
+            <PregnancySanctuaryModal
+              visible={pregnancySanctuaryOpen && userJourney === 'pregnant'}
+              onClose={() => setPregnancySanctuaryOpen(false)}
+              weeksPregnant={weeksPregnant}
+            />
+
+            <PostpartumNurseryWelcomeModal
+              visible={nurseryWelcomeOpen && userJourney === 'postpartum'}
+              onExploreNursery={handleExploreNurseryWelcome}
+              onDismiss={() => setNurseryWelcomeOpen(false)}
             />
 
             <BirthdayBoutiqueModal
@@ -8275,6 +8305,41 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.45)',
+  },
+  pregnancySanctuaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(107, 143, 120, 0.35)',
+  },
+  pregnancySanctuaryBtnEmoji: {
+    fontSize: 26,
+  },
+  pregnancySanctuaryBtnCopy: {
+    flex: 1,
+  },
+  pregnancySanctuaryBtnTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2A382E',
+  },
+  pregnancySanctuaryBtnSub: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#5A6E58',
+    fontWeight: '600',
+  },
+  pregnancySanctuaryBtnChevron: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#6B8F78',
   },
   nestingCheck: {
     width: 22,

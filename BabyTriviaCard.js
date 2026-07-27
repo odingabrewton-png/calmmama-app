@@ -34,12 +34,13 @@ const FROSTED_GLASS = {
   padding: 16,
 };
 
-const PARTICLE_SPECS = Array.from({ length: 16 }, (_, index) => ({
+const PARTICLE_COUNT = 28;
+const PARTICLE_SPECS = Array.from({ length: PARTICLE_COUNT }, (_, index) => ({
   id: index,
-  angle: (index / 16) * Math.PI * 2 + (index % 3) * 0.18,
-  distance: 24 + (index % 5) * 12,
-  glyph: ['✿', '✾', '❀', '🌸', '✿', '✾'][index % 6],
-  color: [LAVENDER, PEACH, MINT, '#D4B5CE', '#B8D4C8', LAVENDER][index % 6],
+  angle: (index / PARTICLE_COUNT) * Math.PI * 2 + (index % 3) * 0.18,
+  distance: 28 + (index % 7) * 14,
+  glyph: ['✿', '✾', '❀', '🌸', '✨', '💗', '🌼', '🌷'][index % 8],
+  color: [LAVENDER, PEACH, MINT, '#D4B5CE', '#B8D4C8', LAVENDER, '#F2C4D8', '#C9E4D0'][index % 8],
 }));
 
 const FlowerParticle = memo(function FlowerParticle({ spec, burstKey }) {
@@ -54,8 +55,8 @@ const FlowerParticle = memo(function FlowerParticle({ spec, burstKey }) {
     progress.value = 0;
     runNativeGuard('babyTrivia:particle', () => {
       progress.value = withTiming(1, {
-        duration: 920,
-        easing: Easing.out(Easing.cubic),
+        duration: 1180,
+        easing: Easing.bezier(0.16, 0.84, 0.22, 1),
       });
     });
   }, [burstKey, progress]);
@@ -66,11 +67,22 @@ const FlowerParticle = memo(function FlowerParticle({ spec, burstKey }) {
     top: '50%',
     marginLeft: -7,
     marginTop: -7,
-    opacity: interpolate(progress.value, [0, 0.12, 0.55, 1], [0, 1, 0.85, 0]),
+    opacity: interpolate(progress.value, [0, 0.1, 0.45, 0.78, 1], [0, 1, 0.92, 0.45, 0]),
     transform: [
       { translateX: Math.cos(spec.angle) * spec.distance * progress.value },
-      { translateY: Math.sin(spec.angle) * spec.distance * progress.value },
-      { scale: interpolate(progress.value, [0, 0.3, 1], [0.15, 1.2, 0.5]) },
+      {
+        translateY:
+          Math.sin(spec.angle) * spec.distance * progress.value +
+          progress.value * progress.value * 28,
+      },
+      { scale: interpolate(progress.value, [0, 0.25, 0.65, 1], [0.12, 1.22, 1.0, 0.55]) },
+      {
+        rotate: interpolate(
+          progress.value,
+          [0, 1],
+          ['0deg', spec.id % 2 === 0 ? '28deg' : '-24deg'],
+        ),
+      },
     ],
   }));
 

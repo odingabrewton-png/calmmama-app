@@ -8,83 +8,16 @@ import {
   Animated,
   Easing,
   Linking,
-  Dimensions,
 } from 'react-native';
 import {
   BIRTHDAY_MERCH_DISCOUNT_PERCENT,
   BIRTHDAY_MERCH_STORE_URL,
 } from './birthdayBoutiqueConfig';
+import CelebrationConfetti from './CelebrationConfetti';
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import { VILLAGE_SNAPPY_SPRING } from './villageScreenTransitions';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const { width: SCREEN_W } = Dimensions.get('window');
-const CONFETTI_PIECES = ['🎀', '✨', '🌸', '🎁', '💗', '🎉', '⭐', '🫧', '💫'];
-
-function ConfettiLayer({ active }) {
-  if (!active) return null;
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {CONFETTI_PIECES.map((emoji, index) => (
-        <ConfettiPiece key={`${emoji}-${index}`} emoji={emoji} index={index} />
-      ))}
-    </View>
-  );
-}
-
-function ConfettiPiece({ emoji, index }) {
-  const fall = useRef(new Animated.Value(-40)).current;
-  const sway = useRef(new Animated.Value(0)).current;
-  const left = (index * 17 + 8) % 92;
-  const delay = (index * 137) % 900;
-  const duration = 2800 + (index * 211) % 1400;
-  const drift = index % 2 === 0 ? 1 : -1;
-
-  useEffect(() => {
-    const loopFall = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(fall, {
-          toValue: SCREEN_W * 1.1,
-          duration,
-          easing: Easing.linear,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(fall, { toValue: -40, duration: 0, useNativeDriver: USE_NATIVE_DRIVER }),
-      ])
-    );
-    const loopSway = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sway, {
-          toValue: drift * 14,
-          duration: 900,
-          easing: VILLAGE_IN_OUT_SIN,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(sway, {
-          toValue: drift * -14,
-          duration: 900,
-          easing: VILLAGE_IN_OUT_SIN,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ])
-    );
-    loopFall.start();
-    loopSway.start();
-    return () => {
-      loopFall.stop();
-      loopSway.stop();
-    };
-  }, [delay, drift, duration, fall, sway]);
-
-  return (
-    <Animated.Text
-      style={[styles.confettiPiece, { left: `${left}%`, transform: [{ translateY: fall }, { translateX: sway }] }]}
-    >
-      {emoji}
-    </Animated.Text>
-  );
-}
 
 export default function BirthdayBoutiqueModal({ visible, onClose }) {
   const cardScale = useRef(new Animated.Value(0.86)).current;
@@ -138,7 +71,7 @@ export default function BirthdayBoutiqueModal({ visible, onClose }) {
 
   return (
     <View style={styles.overlay}>
-      <ConfettiLayer active={visible} />
+      <CelebrationConfetti active={visible} density="dense" seed={27} />
       <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} activeOpacity={1} />
 
       <Animated.View
@@ -182,12 +115,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 24,
   },
-  confettiPiece: {
-    position: 'absolute',
-    top: 0,
-    fontSize: 16,
-    opacity: 0.88,
-  },
   modalCard: {
     width: '100%',
     maxWidth: 360,
@@ -199,6 +126,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: Platform.OS === 'ios' ? 22 : 18,
     alignItems: 'center',
+    zIndex: 2,
     ...Platform.select({
       web: { boxShadow: '0 24px 60px rgba(80, 60, 100, 0.28)' },
       default: {

@@ -1,7 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-  Dimensions,
-  Easing,
   Modal,
   Platform,
   Pressable,
@@ -9,8 +7,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Animated,
 } from 'react-native';
+import CelebrationConfetti from './CelebrationConfetti';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -23,81 +21,6 @@ const PLAYFUL = Platform.select({
   ios: { fontFamily: 'Georgia' },
   default: { fontFamily: 'serif' },
 });
-
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-const { height: SCREEN_H } = Dimensions.get('window');
-const CONFETTI_PIECES = ['🌸', '👑', '✨', '💗', '🎉', '⭐', '💫', '🎀', '🫧'];
-
-function ConfettiPiece({ emoji, index }) {
-  const fall = useRef(new Animated.Value(-40)).current;
-  const sway = useRef(new Animated.Value(0)).current;
-  const left = (index * 17 + 8) % 92;
-  const delay = (index * 137) % 900;
-  const duration = 2600 + ((index * 211) % 1200);
-
-  useEffect(() => {
-    const loopFall = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(fall, {
-          toValue: SCREEN_H,
-          duration,
-          easing: Easing.linear,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(fall, {
-          toValue: -40,
-          duration: 0,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]),
-    );
-    const loopSway = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sway, {
-          toValue: 14,
-          duration: 900,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(sway, {
-          toValue: -14,
-          duration: 900,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]),
-    );
-    loopFall.start();
-    loopSway.start();
-    return () => {
-      loopFall.stop();
-      loopSway.stop();
-    };
-  }, [delay, duration, fall, sway]);
-
-  return (
-    <Animated.Text
-      style={[
-        styles.confettiPiece,
-        { left: `${left}%`, transform: [{ translateY: fall }, { translateX: sway }] },
-      ]}
-    >
-      {emoji}
-    </Animated.Text>
-  );
-}
-
-function ConfettiLayer({ active }) {
-  if (!active) return null;
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {CONFETTI_PIECES.map((emoji, index) => (
-        <ConfettiPiece key={`${emoji}-${index}`} emoji={emoji} index={index} />
-      ))}
-    </View>
-  );
-}
 
 /**
  * Celebratory modal after Stripe success, VIP, or Founding Mother code redeem.
@@ -139,7 +62,7 @@ export default function PremiumUpgradeWelcomeModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <ConfettiLayer active={visible && showConfetti} />
+        <CelebrationConfetti active={visible && showConfetti} density="dense" seed={11} />
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation?.()}>
           <Text style={styles.emoji}>🌸👑</Text>
           <Text style={[styles.header, PLAYFUL]}>{header}</Text>
@@ -164,13 +87,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-  },
-  confettiPiece: {
-    position: 'absolute',
-    top: 0,
-    fontSize: 16,
-    opacity: 0.9,
-    zIndex: 1,
   },
   card: {
     width: '100%',

@@ -76,6 +76,91 @@ export async function ensureNotificationPermissions() {
   });
 }
 
+const MOMENT_TITLES = Object.freeze({
+  rewards: 'Village Rewards',
+  checklist: 'Daily Checklist',
+  kitchen: "Mama's Kitchen",
+  sanctuary: 'Soul Sanctuary',
+  bloom: 'Weekly Bloom',
+  nursery: 'Cloud Nursery',
+  community: 'Village Love',
+  membership: 'Village Access',
+});
+
+const MOMENT_ROUTES = Object.freeze({
+  kitchen: NOTIFICATION_ROUTES.KITCHEN,
+  bloom: NOTIFICATION_ROUTES.BLOOM,
+  nursery: NOTIFICATION_ROUTES.NURSERY,
+  sanctuary: NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE,
+  checklist: NOTIFICATION_ROUTES.HOME,
+  rewards: NOTIFICATION_ROUTES.HOME,
+  community: NOTIFICATION_ROUTES.MIDNIGHT_LOUNGE,
+  membership: NOTIFICATION_ROUTES.HOME,
+});
+
+/**
+ * Fire an immediate iOS/Android OS banner for in-app moments
+ * (points earned, kitchen log, checklist, bloom reminder, etc.).
+ * No-op on web / when permission is denied.
+ */
+export async function presentVillageMomentNotification({
+  title,
+  body,
+  category = 'rewards',
+  route,
+  emoji,
+} = {}) {
+  if (Platform.OS === 'web') {
+    return { ok: false, reason: 'web' };
+  }
+
+  const message = String(body || '').trim();
+  if (!message) {
+    return { ok: false, reason: 'empty' };
+  }
+
+  configureVillageNotificationHandler();
+
+  const permission = await ensureNotificationPermissions();
+  if (!permission.granted) {
+    return { ok: false, reason: 'permission-denied' };
+  }
+
+  await ensureAndroidChannel();
+
+  const resolvedCategory = String(category || 'rewards');
+  const resolvedTitle =
+    String(title || '').trim() ||
+    MOMENT_TITLES[resolvedCategory] ||
+    MOMENT_TITLES.rewards;
+  const resolvedRoute = route || MOMENT_ROUTES[resolvedCategory] || NOTIFICATION_ROUTES.HOME;
+  const prefix = emoji ? `${emoji} ` : '';
+
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: resolvedTitle,
+        body: `${prefix}${message}`,
+        data: {
+          route: resolvedRoute,
+          category: resolvedCategory,
+          kind: 'village_moment',
+        },
+        sound: true,
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
+      },
+      // null = deliver immediately as a real OS notification
+      trigger: null,
+    });
+    return { ok: true, id };
+  } catch (err) {
+    if (__DEV__ && typeof console !== 'undefined') {
+      console.warn('[CalmMama Village] Moment notification failed:', err);
+    }
+    return { ok: false, reason: 'schedule-failed' };
+  }
+}
+
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {

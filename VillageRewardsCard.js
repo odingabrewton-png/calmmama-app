@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -30,6 +31,12 @@ const PLAYFUL = Platform.select({
   ios: { fontFamily: 'Georgia' },
   default: { fontFamily: 'serif' },
 });
+
+const SHOP_TABS = Object.freeze([
+  { id: 'all', label: 'All Tiers' },
+  { id: 'redeemable', label: 'Redeemable Rewards' },
+  { id: 'unlocks', label: 'My Unlocks' },
+]);
 
 function perkLine(tier) {
   if (tier.type === 'discount' && tier.value != null) {
@@ -80,7 +87,36 @@ function CodeRevealModal({ visible, codes = [], title, onClose }) {
   );
 }
 
-function TierCard({ tier, redeemed, canAfford, redeeming, onRedeem, onViewCodes }) {
+function ShopPillTabs({ activeTab, onChange }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.pillRow}
+      style={styles.pillScroll}
+    >
+      {SHOP_TABS.map((tab) => {
+        const active = activeTab === tab.id;
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            style={[styles.pill, active && styles.pillActive]}
+            onPress={() => onChange(tab.id)}
+            activeOpacity={0.88}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+          >
+            <Text style={[styles.pillText, SANS, active && styles.pillTextActive]}>{tab.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function TierCard({ tier, redeemed, balance, redeeming, onRedeem, onViewCodes }) {
+  const canAfford = !redeemed && balance >= tier.points;
+  const pointsNeeded = Math.max(0, tier.points - balance);
   const showCodes =
     redeemed &&
     (tier.type === 'discount' || (tier.type === 'matriarch' && Array.isArray(tier.coupons)));
@@ -110,11 +146,25 @@ function TierCard({ tier, redeemed, canAfford, redeeming, onRedeem, onViewCodes 
       </TouchableOpacity>
     );
   } else {
-    action = <Text style={[styles.lockedHint, SANS]}>Need {tier.points.toLocaleString()} pts</Text>;
+    action = (
+      <View style={styles.needMoreWrap}>
+        <Text style={[styles.lockedHint, SANS]}>
+          Need {pointsNeeded.toLocaleString()} more point{pointsNeeded === 1 ? '' : 's'}
+        </Text>
+        <View style={[styles.claimBtn, styles.claimBtnGrayed]}>
+          <Text style={[styles.claimBtnTextGrayed, SANS]}>Redeem</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
-    <View style={[styles.badgeCard, redeemed || canAfford ? styles.badgeUnlocked : styles.badgeLocked]}>
+    <View
+      style={[
+        styles.badgeCard,
+        redeemed || canAfford ? styles.badgeUnlocked : styles.badgeLocked,
+      ]}
+    >
       <Text style={styles.badgeLock}>{redeemed || canAfford ? tier.emoji : '🔒'}</Text>
       <Text style={[styles.badgeTitle, SANS, !(redeemed || canAfford) && styles.badgeTitleLocked]}>
         {tier.title}
@@ -133,10 +183,12 @@ function TierCard({ tier, redeemed, canAfford, redeeming, onRedeem, onViewCodes 
  */
 export default function VillageRewardsCard() {
   const { rewards, redeemTier, notify } = useVillageRewards();
+  const [shopTab, setShopTab] = useState('all');
   const [codeTier, setCodeTier] = useState(null);
   const [redeemingId, setRedeemingId] = useState(null);
   const [celebration, setCelebration] = useState(null);
 
+  const balance = Number(rewards.points || 0);
   const progress = useMemo(() => getNextTierProgress(rewards), [rewards]);
   const weeklyJournal = useMemo(() => getWeeklyJournalProgress(rewards), [rewards]);
   const redeemedSet = useMemo(
@@ -144,9 +196,20 @@ export default function VillageRewardsCard() {
     [rewards.redeemedTiers, rewards.unlockedBadges],
   );
 
+  const visibleTiers = useMemo(() => {
+    if (shopTab === 'unlocks') {
+      return REWARD_TIERS.filter((tier) => redeemedSet.has(tier.id));
+    }
+    if (shopTab === 'redeemable') {
+      // Full redeemable catalog (250 → 5k), including already-claimed cards.
+      return REWARD_TIERS.filter((tier) => tier.shopGroup === 'redeemable' || !tier.shopGroup);
+    }
+    return REWARD_TIERS;
+  }, [redeemedSet, shopTab]);
+
   const progressLabel = progress.nextTier
-    ? `${Number(rewards.points || 0).toLocaleString()} / ${progress.nextThreshold.toLocaleString()} pts · ${progress.pointsToNext} to go`
-    : `${Number(rewards.points || 0).toLocaleString()} pts · all redeemable tiers claimed`;
+    ? `${balance.toLocaleString()} / ${progress.nextThreshold.toLocaleString()} pts · ${progress.pointsToNext} to go`
+    : `${balance.toLocaleString()} pts · all redeemable tiers claimed`;
 
   const handleRedeem = async (tier) => {
     if (!tier?.id || redeemingId) return;
@@ -156,7 +219,7 @@ export default function VillageRewardsCard() {
       if (!result.ok) {
         const msg =
           result.reason === 'insufficient_points'
-            ? `Need ${result.pointsNeeded} more pts to redeem`
+            ? `Need ${(result.pointsNeeded || 0).toLocaleString()} more pts to redeem`
             : result.reason === 'already_redeemed'
               ? 'Already redeemed'
               : 'Could not redeem this tier';
@@ -179,6 +242,11 @@ export default function VillageRewardsCard() {
         codes,
         tier: result.tier,
       });
+
+      if (shopTab === 'redeemable') {
+        // Keep mama in the shop flow after a claim.
+        setShopTab('redeemable');
+      }
     } finally {
       setRedeemingId(null);
     }
@@ -202,15 +270,18 @@ export default function VillageRewardsCard() {
     return [];
   })();
 
+  const emptyCopy =
+    shopTab === 'unlocks'
+      ? 'No unlocks yet — redeem a reward to fill this shelf.'
+      : 'No tiers to show.';
+
   return (
     <View style={styles.card}>
       <Text style={[styles.eyebrow, SANS]}>CROWN POINTS REWARDS</Text>
       <View style={styles.pointsRow}>
         <Text style={styles.crown}>👑</Text>
         <View style={styles.pointsCopy}>
-          <Text style={[styles.pointsValue, PLAYFUL]}>
-            {Number(rewards.points || 0).toLocaleString()} pts
-          </Text>
+          <Text style={[styles.pointsValue, PLAYFUL]}>{balance.toLocaleString()} pts</Text>
           <Text style={[styles.streak, SANS]}>
             {rewards.dailyStreak > 0
               ? `${rewards.dailyStreak}-day journal streak ✨`
@@ -223,7 +294,7 @@ export default function VillageRewardsCard() {
         <View style={[styles.trackFill, { width: `${Math.round(progress.progress * 100)}%` }]} />
       </View>
       <Text style={[styles.progressLabel, SANS]}>{progressLabel}</Text>
-      <Text style={[styles.tierMarks, SANS]}>500 · 1k · 2k · 3k · 4k · 5k</Text>
+      <Text style={[styles.tierMarks, SANS]}>250 · 300 · 500 · 1k · 2k · 3k · 4k · 5k</Text>
       <Text style={[styles.weeklyHint, SANS]}>
         {weeklyJournal.bonusClaimed
           ? `Weekly Sanctuary Bonus claimed (${weeklyJournal.threshold}/${weeklyJournal.threshold}) 🌸`
@@ -234,22 +305,24 @@ export default function VillageRewardsCard() {
         (max 5/day) · Poll +100 · Registry +250
       </Text>
 
+      <ShopPillTabs activeTab={shopTab} onChange={setShopTab} />
+
       <View style={styles.badgeGrid}>
-        {REWARD_TIERS.map((tier) => {
-          const redeemed = redeemedSet.has(tier.id);
-          const canAfford = !redeemed && Number(rewards.points || 0) >= tier.points;
-          return (
+        {visibleTiers.length === 0 ? (
+          <Text style={[styles.emptyShop, SANS]}>{emptyCopy}</Text>
+        ) : (
+          visibleTiers.map((tier) => (
             <TierCard
               key={tier.id}
               tier={tier}
-              redeemed={redeemed}
-              canAfford={canAfford}
+              redeemed={redeemedSet.has(tier.id)}
+              balance={balance}
               redeeming={redeemingId === tier.id}
               onRedeem={handleRedeem}
               onViewCodes={setCodeTier}
             />
-          );
-        })}
+          ))
+        )}
       </View>
 
       <PremiumUpgradeWelcomeModal
@@ -362,14 +435,51 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   matrixSummary: {
-    marginBottom: 16,
+    marginBottom: 14,
     fontSize: 11,
     lineHeight: 16,
     color: MIDNIGHT.textMuted,
     textAlign: 'center',
   },
+  pillScroll: {
+    marginBottom: 14,
+    maxHeight: 44,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 2,
+  },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 150, 0.28)',
+    backgroundColor: 'rgba(37, 34, 50, 0.55)',
+  },
+  pillActive: {
+    backgroundColor: 'rgba(212, 184, 150, 0.92)',
+    borderColor: 'rgba(212, 184, 150, 0.95)',
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: MIDNIGHT.textSecondary,
+  },
+  pillTextActive: {
+    color: '#3F3428',
+  },
   badgeGrid: {
     gap: 10,
+  },
+  emptyShop: {
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19,
+    color: MIDNIGHT.textMuted,
+    paddingVertical: 18,
   },
   badgeCard: {
     borderRadius: 16,
@@ -388,7 +498,7 @@ const styles = StyleSheet.create({
   badgeLocked: {
     backgroundColor: 'rgba(37, 34, 50, 0.65)',
     borderColor: MIDNIGHT.borderSoft,
-    opacity: 0.62,
+    opacity: 0.72,
   },
   badgeLock: {
     fontSize: 22,
@@ -433,10 +543,23 @@ const styles = StyleSheet.create({
   claimBtnDisabled: {
     opacity: 0.7,
   },
+  claimBtnGrayed: {
+    backgroundColor: 'rgba(120, 112, 130, 0.45)',
+    opacity: 1,
+    marginTop: 8,
+  },
   claimBtnText: {
     fontSize: 13,
     fontWeight: '800',
     color: '#3F3428',
+  },
+  claimBtnTextGrayed: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: 'rgba(232, 229, 247, 0.45)',
+  },
+  needMoreWrap: {
+    alignItems: 'center',
   },
   lockedHint: {
     marginTop: 8,

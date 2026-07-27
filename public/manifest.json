@@ -1,12 +1,16 @@
 {
-  "name": "CalmMama Village",
-  "short_name": "CalmMama",
-  "description": "A calm sanctuary for pregnancy and postpartum mamas.",
+  "name": "Calm Mama Village",
+  "short_name": "Calm Mama",
+  "description": "A soft sanctuary for pregnancy and postpartum mamas — kitchen, lounge, bloom, and village care.",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#E5FCE8",
-  "theme_color": "#E5FCE8",
+  "background_color": "#F4EFE8",
+  "theme_color": "#C4B8E8",
+  "lang": "en",
+  "categories": ["lifestyle", "health", "social"],
   "icons": [
     {
       "src": "/logo192.png",
@@ -15,10 +19,22 @@
       "purpose": "any"
     },
     {
+      "src": "/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
       "src": "/logo512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any"
+    },
+    {
+      "src": "/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     },
     {
       "src": "/apple-touch-icon.png",

@@ -236,8 +236,8 @@ function PWAInstallPrompt({ onBindPrimary, autoOpenIosSheet = true }) {
               <Text style={styles.stepNum}>1</Text>
             </View>
             <Text style={styles.stepText}>
-              Tap the Share icon at the bottom of your Safari menu (the square with the up arrow
-              📤).
+              Tap the Share button ↗️ and select &apos;Add to Home Screen&apos; to unlock full
+              village alerts &amp; rewards!
             </Text>
           </View>
 
@@ -246,8 +246,8 @@ function PWAInstallPrompt({ onBindPrimary, autoOpenIosSheet = true }) {
               <Text style={styles.stepNum}>2</Text>
             </View>
             <Text style={styles.stepText}>
-              Select <Text style={styles.focus}>Add to Home Screen</Text> from the menu sheet to
-              launch Calm Mama Village effortlessly anytime.
+              Open the Home Screen app, then tap <Text style={styles.focus}>Enable Village Notifications 🔔</Text>{' '}
+              for soft reminders.
             </Text>
           </View>
 

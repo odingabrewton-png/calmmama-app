@@ -6,6 +6,9 @@ import {
   StyleSheet,
 } from 'react-native';
 import GoldenHourCapsule from './GoldenHourCapsule';
+import NurserySwipeChecklist, {
+  DEFAULT_NURSERY_SURVIVAL_TASKS,
+} from './NurserySwipeChecklist';
 import {
   injectNurseryWebFonts,
   retroPageTitle,
@@ -32,6 +35,8 @@ function CloudNurseryScreen({
   onAddLog,
   goldenHourKeepsakes = [],
   onAddGoldenHourKeepsake,
+  survivalTasks = DEFAULT_NURSERY_SURVIVAL_TASKS,
+  onToggleSurvivalTask,
 }) {
   const [sleepRunning, setSleepRunning] = useState(false);
   const [sleepSeconds, setSleepSeconds] = useState(0);
@@ -102,6 +107,8 @@ function CloudNurseryScreen({
         <Text style={styles.opHeaderTitle}>☁️ Cloud Nursery Tracker</Text>
         <Text style={styles.opHeaderSub}>Little one · {babyAge}</Text>
       </View>
+
+      <NurserySwipeChecklist tasks={survivalTasks} onToggleTask={onToggleSurvivalTask} />
 
       <View style={styles.oneTapGrid}>
         {oneTapIcons.map((item) => (

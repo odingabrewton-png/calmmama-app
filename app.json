@@ -34,10 +34,10 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/favicon.png",
-      "name": "CalmMama Village",
-      "shortName": "CalmMama",
-      "themeColor": "#E5FCE8",
-      "backgroundColor": "#E5FCE8",
+      "name": "Calm Mama Village",
+      "shortName": "Calm Mama",
+      "themeColor": "#C4B8E8",
+      "backgroundColor": "#F4EFE8",
       "display": "standalone",
       "meta": {
         "viewport": "width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
