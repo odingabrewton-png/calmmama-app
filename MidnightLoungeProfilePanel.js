@@ -25,6 +25,7 @@ import {
   ME_PROFILE_CONTENT_MAX_WIDTH,
   ME_PROFILE_H_PAD,
 } from './meProfileBackgrounds';
+import { getAppIconById, getStickerById } from './villageCosmeticPerks';
 
 const SANS = Platform.select({
   web: { fontFamily: 'system-ui, -apple-system, "SF Pro Text", sans-serif' },
@@ -120,6 +121,12 @@ function MidnightLoungeProfilePanel({
     () => getMeBackgroundById(rewards.selectedMeBackgroundId),
     [rewards.selectedMeBackgroundId],
   );
+  const activeSticker = rewards.hasCustomSticker
+    ? getStickerById(rewards.selectedStickerId)
+    : null;
+  const activeAppIcon = rewards.hasExclusiveBadge
+    ? getAppIconById(rewards.selectedAppIconId)
+    : null;
 
   return (
     <View style={styles.root}>
@@ -143,6 +150,16 @@ function MidnightLoungeProfilePanel({
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryAvatarWrap}>
+              {activeAppIcon ? (
+                <LinearGradient
+                  colors={activeAppIcon.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.summaryAppIcon}
+                >
+                  <Text style={styles.summaryAppIconEmoji}>{activeAppIcon.emoji}</Text>
+                </LinearGradient>
+              ) : null}
               {profilePhotoUri ? (
                 <Image
                   source={{ uri: profilePhotoUri }}
@@ -159,9 +176,24 @@ function MidnightLoungeProfilePanel({
                   </Text>
                 </View>
               )}
+              {activeSticker ? (
+                <View style={styles.summaryStickerBadge}>
+                  <Text style={styles.summaryStickerEmoji}>{activeSticker.emoji}</Text>
+                </View>
+              ) : null}
             </View>
             <Text style={[styles.summaryName, PLAYFUL]}>{displayName}</Text>
             <CustomTitleBadge title={rewards.customProfileTitle} />
+            {activeAppIcon || activeSticker ? (
+              <Text style={[styles.summaryCosmetics, SANS]}>
+                {[
+                  activeAppIcon ? `Icon · ${activeAppIcon.label}` : null,
+                  activeSticker ? `Sticker · ${activeSticker.label}` : null,
+                ]
+                  .filter(Boolean)
+                  .join('  ·  ')}
+              </Text>
+            ) : null}
             {bioLine ? (
               <Text style={[styles.summaryBio, SANS]} numberOfLines={3}>
                 {bioLine}
@@ -267,6 +299,42 @@ const styles = StyleSheet.create({
   },
   summaryAvatarWrap: {
     marginBottom: 12,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryAppIcon: {
+    position: 'absolute',
+    top: -10,
+    left: -18,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    zIndex: 2,
+  },
+  summaryAppIconEmoji: {
+    fontSize: 20,
+  },
+  summaryStickerBadge: {
+    position: 'absolute',
+    right: -8,
+    bottom: -4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(37, 34, 50, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 150, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  summaryStickerEmoji: {
+    fontSize: 18,
   },
   summaryAvatar: {
     width: 96,
@@ -289,6 +357,13 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '700',
     color: MIDNIGHT.textPrimary,
+    textAlign: 'center',
+  },
+  summaryCosmetics: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: MIDNIGHT.accentGold,
     textAlign: 'center',
   },
   titleBadge: {

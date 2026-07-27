@@ -11,6 +11,12 @@ import {
   DEFAULT_ME_BACKGROUND_ID,
   resolveMeBackgroundId,
 } from './meProfileBackgrounds';
+import {
+  DEFAULT_APP_ICON_ID,
+  DEFAULT_STICKER_ID,
+  resolveAppIconId,
+  resolveStickerId,
+} from './villageCosmeticPerks';
 
 export const VILLAGE_REWARDS_STORAGE_KEY = 'villageRewards';
 
@@ -176,6 +182,8 @@ export function createDefaultVillageRewards() {
     customProfileTitle: '',
     selectedSecretThemeId: null,
     selectedMeBackgroundId: DEFAULT_ME_BACKGROUND_ID,
+    selectedStickerId: null,
+    selectedAppIconId: null,
     discountCoupons: [],
   };
 }
@@ -286,6 +294,14 @@ export function normalizeVillageRewards(raw) {
       return null;
     })(),
     selectedMeBackgroundId: resolveMeBackgroundId(raw.selectedMeBackgroundId),
+    selectedStickerId: (() => {
+      if (!perks.hasCustomSticker) return null;
+      return resolveStickerId(raw.selectedStickerId || DEFAULT_STICKER_ID);
+    })(),
+    selectedAppIconId: (() => {
+      if (!perks.hasExclusiveBadge) return null;
+      return resolveAppIconId(raw.selectedAppIconId || DEFAULT_APP_ICON_ID);
+    })(),
     discountCoupons: coupons,
   };
 }
@@ -419,9 +435,15 @@ export function applyRedeemTier(rewards, tierId) {
     unlockedBadges: redeemedTiers,
   };
 
-  if (tier.type === 'badge' || tier.id === 'themed_app_icon') next.hasExclusiveBadge = true;
+  if (tier.type === 'badge' || tier.id === 'themed_app_icon') {
+    next.hasExclusiveBadge = true;
+    if (!next.selectedAppIconId) next.selectedAppIconId = DEFAULT_APP_ICON_ID;
+  }
   if (tier.type === 'streak_freeze' || tier.id === 'streak_freeze') next.hasStreakFreeze = true;
-  if (tier.id === 'custom_sticker') next.hasCustomSticker = true;
+  if (tier.id === 'custom_sticker') {
+    next.hasCustomSticker = true;
+    if (!next.selectedStickerId) next.selectedStickerId = DEFAULT_STICKER_ID;
+  }
   if (tier.type === 'early_access') next.hasOracleBetaPass = true;
   if (tier.type === 'fairy_godmother') {
     next.hasFairyGodmotherPerk = true;
@@ -466,6 +488,16 @@ export function updateRewardsProfileFields(rewards, fields = {}) {
   }
   if (fields.selectedMeBackgroundId !== undefined) {
     next.selectedMeBackgroundId = resolveMeBackgroundId(fields.selectedMeBackgroundId);
+  }
+  if (fields.selectedStickerId !== undefined) {
+    next.selectedStickerId = next.hasCustomSticker
+      ? resolveStickerId(fields.selectedStickerId)
+      : null;
+  }
+  if (fields.selectedAppIconId !== undefined) {
+    next.selectedAppIconId = next.hasExclusiveBadge
+      ? resolveAppIconId(fields.selectedAppIconId)
+      : null;
   }
   return normalizeVillageRewards(next);
 }

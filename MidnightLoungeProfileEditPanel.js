@@ -18,6 +18,10 @@ import { MIDNIGHT } from './midnightLoungeTheme';
 import MamaBirthdayField from './MamaBirthdayField.js';
 import SecretThemeSwitcher from './SecretThemeSwitcher.js';
 import MeProfileBackgroundSwitcher from './MeProfileBackgroundSwitcher.js';
+import {
+  VillageAppIconPicker,
+  VillageStickerPicker,
+} from './VillageCosmeticPickers.js';
 import HybridLittleOnesSection from './HybridLittleOnesSection.js';
 import { useVillageRewards } from './VillageRewardsContext';
 import {
@@ -85,6 +89,8 @@ export default function MidnightLoungeProfileEditPanel({
   const [savedFlash, setSavedFlash] = useState(false);
   const canEditTitle = Boolean(rewards.hasFairyGodmotherPerk || rewards.hasMatriarchPerk);
   const secretThemesUnlocked = Boolean(rewards.hasFairyGodmotherPerk);
+  const stickerUnlocked = Boolean(rewards.hasCustomSticker);
+  const appIconUnlocked = Boolean(rewards.hasExclusiveBadge);
   const background = useMemo(
     () => getMeBackgroundById(rewards.selectedMeBackgroundId),
     [rewards.selectedMeBackgroundId],
@@ -253,6 +259,10 @@ export default function MidnightLoungeProfileEditPanel({
           ) : null}
 
           <MeProfileBackgroundSwitcher />
+
+          <VillageStickerPicker unlocked={stickerUnlocked} />
+
+          <VillageAppIconPicker unlocked={appIconUnlocked} />
 
           <SecretThemeSwitcher unlocked={secretThemesUnlocked} />
 
