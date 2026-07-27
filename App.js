@@ -37,7 +37,6 @@ import CloudNurseryScreen from './CloudNurseryScreen';
 import LittleHorizonsScreen from './LittleHorizonsScreen';
 import PregnancySanctuaryModal from './PregnancySanctuaryModal';
 import PostpartumNurseryWelcomeModal from './PostpartumNurseryWelcomeModal';
-import HybridLittleOnesSection from './HybridLittleOnesSection';
 import { DEFAULT_NURSERY_SURVIVAL_TASKS } from './NurserySwipeChecklist';
 import NurserySwipeChecklist from './NurserySwipeChecklist';
 import SubscriptionScreen from './SubscriptionScreen';
@@ -1034,9 +1033,6 @@ function renderPregnantDailyTracker({
   onLogKick,
   onSaveKickSession,
   onOpenPregnancySanctuary,
-  activeMode,
-  children,
-  onChildrenChange,
   therapeuticMeals,
   therapeuticHeadline,
   onOpenKitchen,
@@ -1064,16 +1060,6 @@ function renderPregnantDailyTracker({
         <Text style={styles.dailyTabTitle}>✨ Daily Village</Text>
         <Text style={styles.dailyTabSub}>Symptoms, kicks & Pregnancy Sanctuary — all in one gentle place</Text>
       </View>
-
-      {activeMode === ACTIVE_MODES.HYBRID ? (
-        <View style={styles.homeGlassCard}>
-          <HybridLittleOnesSection
-            littleOnes={children}
-            onChildrenChange={onChildrenChange}
-            variant="daily"
-          />
-        </View>
-      ) : null}
 
       <View style={styles.homeGlassCard} nativeID={PREGNANT_DAILY_CARDS.symptom}>
         <Text style={styles.homeCardTitle}>🤰 Quick Daily Symptom Tracker</Text>
@@ -1897,9 +1883,6 @@ function renderMainTabContent({
       onLogKick,
       onSaveKickSession,
       onOpenPregnancySanctuary,
-      activeMode,
-      children,
-      onChildrenChange,
       therapeuticMeals,
       therapeuticHeadline: pregnantTherapeuticHeadline,
       onOpenKitchen: onOpenKitchenTab,
