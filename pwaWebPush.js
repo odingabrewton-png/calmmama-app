@@ -3,6 +3,7 @@
  */
 
 const SW_PATH = '/sw.js';
+const SW_CACHE_BUST = 'v3';
 const SUBSCRIPTION_STORAGE_KEY = 'calmmama.webPush.subscription';
 const PERMISSION_STORAGE_KEY = 'calmmama.webPush.permission';
 
@@ -46,9 +47,29 @@ export async function registerVillageServiceWorker() {
   if (!('serviceWorker' in navigator)) return null;
 
   try {
-    const registration = await navigator.serviceWorker.register(SW_PATH, {
+    const registration = await navigator.serviceWorker.register(`${SW_PATH}?v=${SW_CACHE_BUST}`, {
       scope: '/',
+      updateViaCache: 'none',
     });
+
+    // Pull newer SW immediately after each page load / deploy.
+    try {
+      registration.update();
+    } catch (_) {
+      /* ignore */
+    }
+
+    // When a new worker takes control, reload once so the hashed bundle swaps in.
+    if (!window.__calmmamaSwReloadBound) {
+      window.__calmmamaSwReloadBound = true;
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+    }
+
     return registration;
   } catch (err) {
     if (typeof console !== 'undefined') {

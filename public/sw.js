@@ -1,8 +1,7 @@
 /* Calm Mama Village — baseline PWA service worker (cache + web push). */
-const CACHE_NAME = 'calmmama-village-static-v2';
+/* Bump CACHE_NAME on every release that must reach installed PWAs. */
+const CACHE_NAME = 'calmmama-village-static-v3';
 const CORE_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/logo192.png',
   '/logo512.png',
@@ -23,9 +22,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
-      )
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
@@ -37,16 +34,12 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for navigations so deploys aren't stuck offline forever.
-  if (request.mode === 'navigate') {
+  // Never serve stale HTML / app shell from Cache Storage after a deploy.
+  if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/app') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html'))),
+      fetch(request, { cache: 'no-store' })
+        .then((response) => response)
+        .catch(() => caches.match('/index.html')),
     );
     return;
   }
@@ -54,8 +47,16 @@ self.addEventListener('fetch', (event) => {
   // Network-first for JS bundles so deploys reach installed PWAs quickly.
   if (url.pathname.endsWith('.js') || url.pathname.includes('/_expo/')) {
     event.respondWith(
-      fetch(request).catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html'))),
+      fetch(request, { cache: 'no-store' }).catch(() =>
+        caches.match(request).then((cached) => cached || caches.match('/index.html')),
+      ),
     );
+    return;
+  }
+
+  // Never cache the service worker itself.
+  if (url.pathname === '/sw.js') {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
     return;
   }
 
