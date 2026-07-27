@@ -48,7 +48,7 @@
     },
     {
       "path": "/api/web-push/dispatch",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 14 * * *"
     }
   ]
 }
