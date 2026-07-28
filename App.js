@@ -3722,11 +3722,19 @@ function CalmMamaApp() {
   ]);
 
   useEffect(() => {
+    if (!isOnboarded) {
+      pulseLoopRef.current?.stop();
+      pulseLoopRef.current = null;
+      pulseAnim.setValue(1);
+      return undefined;
+    }
+
     startLogoPulseLoop(pulseAnim, pulseLoopRef);
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       try {
         const onVisible = () => {
+          if (!isOnboarded) return;
           if (document.visibilityState === 'visible') {
             startLogoPulseLoop(pulseAnim, pulseLoopRef);
           }
@@ -3734,6 +3742,7 @@ function CalmMamaApp() {
         document.addEventListener('visibilitychange', onVisible);
         return () => {
           pulseLoopRef.current?.stop();
+          pulseLoopRef.current = null;
           document.removeEventListener('visibilitychange', onVisible);
         };
       } catch (visibilityError) {
@@ -3741,8 +3750,11 @@ function CalmMamaApp() {
       }
     }
 
-    return () => pulseLoopRef.current?.stop();
-  }, [pulseAnim]);
+    return () => {
+      pulseLoopRef.current?.stop();
+      pulseLoopRef.current = null;
+    };
+  }, [pulseAnim, isOnboarded]);
 
   // Skip enter springs on cold boot — only animate after the shell has settled once.
   useEffect(() => {
@@ -5181,26 +5193,22 @@ function CalmMamaApp() {
     sceneSwapLockRef.current = true;
     suppressVillageLayoutAnimation();
 
-    // Navigate first — defer asset warm so a web asset bug can never block Continue.
-    runNativeOpacitySceneSwap(sceneCanvasOpacity, () => {
-      onboardingStepBlend.setValue(1);
-      setOnboardingStep('welcome');
-    }, {
-      onComplete: () => {
-        sceneSwapLockRef.current = false;
-        setTimeout(() => {
-          try {
-            if (userJourney === 'postpartum') {
-              warmPostpartumHome(userJourney, babyAge);
-            } else if (userJourney === 'pregnant') {
-              warmPregnantHome(userJourney, weeksPregnant);
-            }
-          } catch (_) {
-            /* warm is best-effort */
-          }
-        }, 0);
-      },
-    });
+    // Instant step swap — opacity fades read as glitchy flicker during onboarding.
+    onboardingStepBlend.setValue(1);
+    setOnboardingStep('welcome');
+    sceneSwapLockRef.current = false;
+
+    setTimeout(() => {
+      try {
+        if (userJourney === 'postpartum') {
+          warmPostpartumHome(userJourney, babyAge);
+        } else if (userJourney === 'pregnant') {
+          warmPregnantHome(userJourney, weeksPregnant);
+        }
+      } catch (_) {
+        /* warm is best-effort */
+      }
+    }, 0);
   };
 
   const handleCompleteOnboarding = async () => {
@@ -5385,7 +5393,7 @@ function CalmMamaApp() {
     return (
       <AppLayout>
         <AppStatusBar />
-        <VillageOmbreBackdrop />
+        <VillageOmbreBackdrop paused />
         <SafeAreaView style={styles.screenForeground} />
       </AppLayout>
     );
@@ -5411,7 +5419,7 @@ function CalmMamaApp() {
     <AppLayout>
         <AppStatusBar />
         {/* Isolated sage/lavender/peach ombre — lives in VillageOmbreBackdrop.js only */}
-        <VillageOmbreBackdrop />
+        <VillageOmbreBackdrop paused={showOnboarding} />
         {Platform.OS === 'web' && isOnboarded ? <PWAVillageAlertsPrompt /> : null}
 
         {/* Single hardware-accelerated canvas — opacity fades only, then swap the child */}
@@ -5837,7 +5845,7 @@ function CalmMamaApp() {
                   <View style={styles.onboardingSceneLayer}>
                     <OnboardingStageScreen
                       logoUri={CALMMAMA_VILLAGE_BADGE}
-                      pulseAnim={pulseAnim}
+                      pulseAnim={null}
                       userJourney={userJourney}
                       onSelectJourney={handleSelectOnboardingJourney}
                       mamaName={mamaName}

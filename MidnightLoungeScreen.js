@@ -17,7 +17,9 @@ import {
   InteractionManager,
   Keyboard,
   InputAccessoryView,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LotusFlowerButton from './LotusFlowerButton';
 import MidnightLoungeProfilePanel from './MidnightLoungeProfilePanel.js';
@@ -58,6 +60,16 @@ import {
 } from './postpartumLoungeRitualScreens';
 import TwoAMPregnancyOracleScreen from './screens/TwoAMPregnancyOracleScreen';
 import { getTonightMantra } from './tonightMantraEngine';
+import {
+  createUserFeedPost,
+  loadLoungeFeedState,
+  mergeLoungeFeedPosts,
+  saveLoungeFeedState,
+  buildShareText,
+  shareLoungePostNative,
+  shareLoungePostSms,
+  openSocialShare,
+} from './midnightLoungeFeedStorage';
 
 /** MIDNIGHT LOUNGE — layout locked. User must say "UNLOCK LOUNGE LAYOUT" before structural edits. */
 
@@ -90,6 +102,205 @@ const LOUNGE_SERIF = Platform.select({
 function configureFeedSpringLayout() {
   // No-op: LayoutAnimation fights native-driver lounge/sheet animations and causes feed stutter.
 }
+
+const FeedComposerBar = memo(function FeedComposerBar({
+  draft,
+  onDraftChange,
+  onPublish,
+  lightText,
+  publishing,
+}) {
+  const canPost = Boolean(String(draft || '').trim()) && !publishing;
+  return (
+    <View style={[styles.askFeedCard, lightText && styles.askFeedCardLight]}>
+      <Text style={[styles.askFeedEyebrow, lightText && styles.askFeedTextLight, SANS]}>
+        SHARE WITH THE VILLAGE
+      </Text>
+      <Text style={[styles.askFeedHint, lightText && styles.askFeedHintLight, SANS]}>
+        What&apos;s on your heart tonight? Other mamas can like, comment, and share your post.
+      </Text>
+      <TextInput
+        style={styles.askFeedInput}
+        value={draft}
+        onChangeText={onDraftChange}
+        placeholder="A gentle midnight thought for the circle…"
+        placeholderTextColor="rgba(44, 44, 44, 0.45)"
+        multiline
+        maxLength={480}
+        blurOnSubmit
+        returnKeyType="done"
+      />
+      <TouchableOpacity
+        style={[styles.askFeedBtn, !canPost && styles.askFeedBtnDisabled]}
+        onPress={onPublish}
+        disabled={!canPost}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel="Post to Midnight Lounge feed"
+      >
+        <Text style={styles.askFeedBtnText}>{publishing ? 'Posting…' : 'Post to feed ✨'}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+const FeedCommentSheet = memo(function FeedCommentSheet({
+  visible,
+  post,
+  draft,
+  onDraftChange,
+  onClose,
+  onSubmit,
+}) {
+  if (!post) return null;
+  const comments = Array.isArray(post.commentList) ? post.commentList : [];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.gratitudeBackdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+        <View style={styles.commentSheet}>
+          <Text style={[styles.gratitudeTitle, SANS]}>Comments</Text>
+          <Text style={[styles.commentPostPreview, SANS]} numberOfLines={3}>
+            {post.body}
+          </Text>
+          <ScrollView style={styles.commentList} keyboardShouldPersistTaps="handled">
+            {comments.length ? (
+              comments.map((entry) => (
+                <View key={entry.id} style={styles.commentRow}>
+                  <Text style={[styles.commentAuthor, SANS]}>{entry.name || 'Mama'}</Text>
+                  <Text style={[styles.commentBody, SANS]}>{entry.body}</Text>
+                  <Text style={[styles.commentTime, SANS]}>{entry.timestamp}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={[styles.commentEmpty, SANS]}>
+                Be the first to leave a gentle word for this mama.
+              </Text>
+            )}
+          </ScrollView>
+          <TextInput
+            style={[styles.commentInput, SANS]}
+            value={draft}
+            onChangeText={onDraftChange}
+            placeholder="Leave a kind comment…"
+            placeholderTextColor={MIDNIGHT.textMuted}
+            multiline
+          />
+          <TouchableOpacity style={styles.gratitudeDoneBtn} onPress={onSubmit} activeOpacity={0.88}>
+            <Text style={[styles.gratitudeDoneText, SANS]}>Post comment</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+});
+
+const FeedShareSheet = memo(function FeedShareSheet({ visible, post, onClose, onCopied }) {
+  if (!post) return null;
+
+  const runShare = async (action) => {
+    if (action === 'native') {
+      await shareLoungePostNative(post);
+      onClose?.();
+      return;
+    }
+    if (action === 'sms') {
+      await shareLoungePostSms(post);
+      onClose?.();
+      return;
+    }
+    if (action === 'copy') {
+      try {
+        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(buildShareText(post));
+        } else {
+          await Clipboard.setStringAsync(buildShareText(post));
+        }
+        onCopied?.();
+      } catch (_) {
+        /* ignore */
+      }
+      onClose?.();
+      return;
+    }
+    if (action === 'twitter' || action === 'facebook' || action === 'whatsapp' || action === 'email') {
+      await openSocialShare(post, action === 'email' ? 'email' : action);
+      onClose?.();
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.gratitudeBackdrop} onPress={onClose}>
+        <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+          <Text style={[styles.gratitudeTitle, SANS]}>Share with mamas</Text>
+          <Text style={[styles.commentPostPreview, SANS]} numberOfLines={3}>
+            {post.body}
+          </Text>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={() => runShare('native')} activeOpacity={0.88}>
+            <Text style={[styles.shareOptionText, SANS]}>Share via device…</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={() => runShare('sms')} activeOpacity={0.88}>
+            <Text style={[styles.shareOptionText, SANS]}>Text another mama 💬</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={() => runShare('whatsapp')} activeOpacity={0.88}>
+            <Text style={[styles.shareOptionText, SANS]}>WhatsApp</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={() => runShare('twitter')} activeOpacity={0.88}>
+            <Text style={[styles.shareOptionText, SANS]}>Share on X / Twitter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={() => runShare('facebook')} activeOpacity={0.88}>
+            <Text style={[styles.shareOptionText, SANS]}>Facebook</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareOptionBtn} onPress={() => runShare('copy')} activeOpacity={0.88}>
+            <Text style={[styles.shareOptionText, SANS]}>Copy post text</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.shareCancelBtn} onPress={onClose} activeOpacity={0.88}>
+            <Text style={[styles.shareCancelText, SANS]}>Cancel</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+const FeedListHeader = memo(function FeedListHeader({
+  isLight,
+  feedDraft,
+  onFeedDraftChange,
+  onPublishFeedPost,
+  publishingFeed,
+}) {
+  return (
+    <>
+      <View
+        style={[styles.feedIntro, isLight && styles.feedIntroLight]}
+        nativeID={MIDNIGHT_LOUNGE_FEED_STACK[0]}
+      >
+        <Text style={[styles.feedIntroEyebrow, isLight && styles.feedIntroTextLight, SANS]}>
+          AFTER HOURS · VILLAGE CIRCLE
+        </Text>
+        <Text style={[styles.feedIntroTitle, isLight && styles.feedIntroTextLight, SANS]}>
+          You are not alone in the quiet
+        </Text>
+        <Text style={[styles.feedIntroSub, isLight && styles.feedIntroSubLight, SANS]}>
+          A soft-lit space for mamas awake when the world sleeps.
+        </Text>
+      </View>
+      <FeedComposerBar
+        draft={feedDraft}
+        onDraftChange={onFeedDraftChange}
+        onPublish={onPublishFeedPost}
+        lightText={isLight}
+        publishing={publishingFeed}
+      />
+    </>
+  );
+});
 
 function featureEmoji(featureId) {
   if (featureId === 'ml-journal') return '📓';
@@ -220,15 +431,17 @@ const MidnightLoungeHeader = memo(function MidnightLoungeHeader({ onBack }) {
 });
 
 const FeedPostCard = memo(
-  function FeedPostCard({ post, onLike, onComment, onOpenProfile, lightFeedText, gratitudeHighlight }) {
+  function FeedPostCard({ post, onLike, onComment, onShare, onOpenProfile, lightFeedText, gratitudeHighlight }) {
     if (!post) return null;
 
     return (
       <View style={[styles.feedCard, gratitudeHighlight && styles.feedCardGratitude]}>
         <TouchableOpacity
           style={styles.feedAuthorRow}
-          onPress={() => onOpenProfile(post.authorId)}
+          onPress={() => onOpenProfile(post)}
           activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${post.name ?? 'mama'} profile`}
         >
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarEmoji}>{post.avatarEmoji ?? '💜'}</Text>
@@ -238,7 +451,7 @@ const FeedPostCard = memo(
               {post.name ?? 'Mama'}
             </Text>
             <Text style={[styles.feedAuthorHandle, lightFeedText && styles.feedAuthorHandleLight, SANS]}>
-              {post.handle ?? '@mama'} · {post.timestamp ?? 'Just now'}
+              {post.handle ?? '@mama'} · {post.timestamp ?? 'Just now'} · Tap for profile
             </Text>
           </View>
         </TouchableOpacity>
@@ -266,6 +479,9 @@ const FeedPostCard = memo(
               💬 {post?.comments ?? 0}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.feedToolBtn} onPress={() => onShare(post.id)} activeOpacity={0.85}>
+            <Text style={[styles.feedToolText, lightFeedText && styles.feedToolTextLight]}>↗ Share</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -280,12 +496,13 @@ const FeedPostCard = memo(
       prev.lightFeedText === next.lightFeedText &&
       prev.onLike === next.onLike &&
       prev.onComment === next.onComment &&
+      prev.onShare === next.onShare &&
       prev.onOpenProfile === next.onOpenProfile
     );
   },
 );
 
-function MamaProfileSheet({ visible, profile, slideAnim, onClose, onStartChat, onFollow }) {
+function MamaProfileSheet({ visible, profile, slideAnim, onClose, onStartChat, onFollow, isSelf }) {
   if (!profile) return null;
 
   return (
@@ -294,6 +511,7 @@ function MamaProfileSheet({ visible, profile, slideAnim, onClose, onStartChat, o
         <Pressable onPress={(e) => e.stopPropagation()}>
           <Animated.View style={[styles.profileSheet, { transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.sheetHandle} />
+          <Text style={[styles.profilePreviewEyebrow, SANS]}>PROFILE PREVIEW</Text>
           <View style={styles.profileHeader}>
             <View style={styles.profileAvatarLarge}>
               <Text style={styles.profileAvatarEmoji}>{profile.avatarEmoji}</Text>
@@ -313,14 +531,24 @@ function MamaProfileSheet({ visible, profile, slideAnim, onClose, onStartChat, o
           <Text style={[styles.profileBio, SANS]}>{profile.bio}</Text>
 
           <View style={styles.profileActions}>
-            <TouchableOpacity style={styles.chatBtnFilled} onPress={onStartChat} activeOpacity={0.88}>
-              <Text style={[styles.chatBtnFilledText, SANS]}>💬 Start Private Chat</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.followBtnOutline} onPress={onFollow} activeOpacity={0.88}>
-              <Text style={[styles.followBtnOutlineText, SANS]}>
-                {profile.following ? '✓ Following' : '➕ Follow Mama'}
-              </Text>
-            </TouchableOpacity>
+            {isSelf ? (
+              <View style={styles.profileSelfNote}>
+                <Text style={[styles.profileSelfNoteText, SANS]}>
+                  This is you, mama — edit your profile from the Me tab.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity style={styles.chatBtnFilled} onPress={onStartChat} activeOpacity={0.88}>
+                  <Text style={[styles.chatBtnFilledText, SANS]}>💬 Chat with this mama</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.followBtnOutline} onPress={onFollow} activeOpacity={0.88}>
+                  <Text style={[styles.followBtnOutlineText, SANS]}>
+                    {profile.following ? '✓ Following' : '➕ Follow Mama'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
           </Animated.View>
         </Pressable>
@@ -564,6 +792,12 @@ function MidnightLoungeScreen({
   const profileEditAnimatingRef = useRef(false);
   const [posts, setPosts] = useState(MIDNIGHT_LOUNGE_POSTS);
   const [profiles, setProfiles] = useState(MIDNIGHT_MAMA_PROFILES);
+  const [feedDraft, setFeedDraft] = useState('');
+  const [publishingFeed, setPublishingFeed] = useState(false);
+  const [commentPostId, setCommentPostId] = useState(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [sharePostId, setSharePostId] = useState(null);
+  const feedHydratedRef = useRef(false);
   const [selectedProfileId, setSelectedProfileId] = useState(null);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const [chatProfileId, setChatProfileId] = useState(null);
@@ -581,6 +815,27 @@ function MidnightLoungeScreen({
     },
   ]);
   const { addPoints } = useVillageRewards();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await loadLoungeFeedState();
+      if (cancelled) return;
+      setPosts((prev) => mergeLoungeFeedPosts(saved, prev));
+      feedHydratedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!feedHydratedRef.current) return;
+    void saveLoungeFeedState(posts);
+  }, [posts]);
+
+  const commentPost = commentPostId ? posts.find((entry) => entry.id === commentPostId) : null;
+  const sharePost = sharePostId ? posts.find((entry) => entry.id === sharePostId) : null;
 
   useEffect(() => {
     if (!focusToken) return;
@@ -685,17 +940,55 @@ function MidnightLoungeScreen({
 
   const selectedProfile = selectedProfileId ? profiles[selectedProfileId] : null;
   const chatProfile = chatProfileId ? profiles[chatProfileId] : null;
+  const isViewingSelfProfile = selectedProfileId === 'self';
 
-  const openProfile = useCallback((authorId) => {
-    setSelectedProfileId(authorId);
-    setProfileSheetOpen(true);
-    sheetY.setValue(420);
-    Animated.spring(sheetY, {
-      toValue: 0,
-      ...VILLAGE_SNAPPY_SPRING,
-      useNativeDriver: USE_NATIVE_DRIVER,
-    }).start();
-  }, [sheetY]);
+  const openProfile = useCallback(
+    (postOrAuthorId) => {
+      const fromPost = postOrAuthorId && typeof postOrAuthorId === 'object';
+      const authorId = fromPost
+        ? postOrAuthorId.authorId || 'self'
+        : postOrAuthorId;
+      if (!authorId) return;
+
+      if (fromPost && !profiles[authorId]) {
+        const displayName = postOrAuthorId.name?.trim() || mamaName?.trim() || 'Mama';
+        const handle =
+          postOrAuthorId.handle ||
+          `@${displayName.replace(/\s+/g, '')}`;
+        setProfiles((prev) => ({
+          ...prev,
+          [authorId]: {
+            id: authorId,
+            name: displayName,
+            handle,
+            avatarEmoji: postOrAuthorId.avatarEmoji || '🌙',
+            location: 'Your village',
+            phase:
+              userJourney === 'pregnant'
+                ? 'Expecting mama'
+                : userJourney === 'postpartum'
+                  ? 'Postpartum mama'
+                  : 'Village mama',
+            bio:
+              authorId === 'self'
+                ? shortBio?.trim() || 'Sharing from the midnight lounge.'
+                : 'A mama in the Midnight Lounge circle.',
+            following: false,
+          },
+        }));
+      }
+
+      setSelectedProfileId(authorId);
+      setProfileSheetOpen(true);
+      sheetY.setValue(420);
+      Animated.spring(sheetY, {
+        toValue: 0,
+        ...VILLAGE_SNAPPY_SPRING,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }).start();
+    },
+    [sheetY, profiles, mamaName, userJourney, shortBio],
+  );
 
   const closeProfile = useCallback(() => {
     Animated.timing(sheetY, {
@@ -710,7 +1003,7 @@ function MidnightLoungeScreen({
   }, [sheetY]);
 
   const startPrivateChat = useCallback(() => {
-    if (!selectedProfileId) return;
+    if (!selectedProfileId || selectedProfileId === 'self') return;
     setChatProfileId(selectedProfileId);
     closeProfile();
     setLoungeTab('chat');
@@ -745,6 +1038,97 @@ function MidnightLoungeScreen({
     });
   }, [addPoints]);
 
+  const handlePublishFeedPost = useCallback(() => {
+    const trimmed = feedDraft.trim();
+    if (!trimmed || publishingFeed) return;
+
+    setPublishingFeed(true);
+    const displayName = mamaName?.trim() || 'Mama';
+    const newPost = createUserFeedPost({
+      body: trimmed,
+      mamaName: displayName,
+      userJourney,
+      kind: 'post',
+      avatarEmoji: '🌙',
+    });
+    if (!newPost) {
+      setPublishingFeed(false);
+      return;
+    }
+
+    configureFeedSpringLayout();
+    setProfiles((prev) => ({
+      ...prev,
+      self: prev.self ?? {
+        id: 'self',
+        name: displayName,
+        handle: newPost.handle,
+        avatarEmoji: '🌙',
+        location: 'Your village',
+        phase: userJourney === 'pregnant' ? 'Expecting mama' : 'Postpartum mama',
+        bio: shortBio?.trim() || 'Sharing from the midnight lounge.',
+        following: false,
+      },
+    }));
+    setPosts((prev) => [newPost, ...prev]);
+    setFeedDraft('');
+    setPublishingFeed(false);
+    void addPoints(40, 'share');
+  }, [feedDraft, publishingFeed, mamaName, userJourney, shortBio, addPoints]);
+
+  const handleFeedComment = useCallback((postId) => {
+    setCommentPostId(postId);
+    setCommentDraft('');
+  }, []);
+
+  const closeCommentSheet = useCallback(() => {
+    setCommentPostId(null);
+    setCommentDraft('');
+  }, []);
+
+  const handleSubmitComment = useCallback(() => {
+    const trimmed = commentDraft.trim();
+    if (!commentPostId || !trimmed) return;
+
+    const displayName = mamaName?.trim() || 'Mama';
+    const now = new Date();
+    const entry = {
+      id: `c-${now.getTime()}`,
+      name: displayName,
+      body: trimmed,
+      timestamp: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+    };
+
+    setPosts((prev) =>
+      prev.map((post) => {
+        if (post.id !== commentPostId) return post;
+        const commentList = Array.isArray(post.commentList) ? [...post.commentList, entry] : [entry];
+        return {
+          ...post,
+          comments: commentList.length,
+          commentList,
+        };
+      }),
+    );
+    setCommentDraft('');
+    closeCommentSheet();
+    void addPoints(15, 'comment');
+  }, [commentDraft, commentPostId, mamaName, closeCommentSheet, addPoints]);
+
+  const handleFeedShare = useCallback((postId) => {
+    setSharePostId(postId);
+  }, []);
+
+  const closeShareSheet = useCallback(() => {
+    setSharePostId(null);
+  }, []);
+
+  const handleShareCopied = useCallback(() => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Copied', 'Post copied — paste it into a text or social app for another mama.');
+    }
+  }, []);
+
   const handleSendChat = useCallback(() => {
     const trimmed = chatDraft.trim();
     if (!trimmed) return;
@@ -772,23 +1156,20 @@ function MidnightLoungeScreen({
     }
 
     const now = new Date();
-    const timestamp = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const displayName = mamaName?.trim() || 'Mama';
     const handle = `@${displayName.replace(/\s+/g, '')}`;
-    const gratitudePost = {
-      id: `gratitude-${now.getTime()}`,
-      authorId: 'self',
-      name: displayName,
-      handle,
-      avatarEmoji: '🙏',
-      timestamp,
+    const gratitudePost = createUserFeedPost({
       body: `Tonight I am holding gratitude for: ${trimmed}`,
-      imageUri: null,
-      likes: 0,
-      comments: 0,
-      liked: false,
+      mamaName: displayName,
+      userJourney,
       kind: 'gratitude',
-    };
+      avatarEmoji: '🙏',
+    });
+    if (!gratitudePost) {
+      setGratitudeOpen(false);
+      return;
+    }
+    gratitudePost.id = `gratitude-${now.getTime()}`;
 
     configureFeedSpringLayout();
     setProfiles((prev) => ({
@@ -878,58 +1259,22 @@ function MidnightLoungeScreen({
     [enterLoungeSubView, isPostpartumJourney],
   );
 
-  const handleFeedComment = useCallback(
-    (postId) => {
-      const post = posts.find((entry) => entry.id === postId);
-      if (post) openProfile(post.authorId);
-    },
-    [posts, openProfile],
-  );
-
   const feedListHeader = useMemo(
     () => (
-      <>
-        <View
-          style={[
-            styles.feedIntro,
-            (isPregnantJourney || isPostpartumJourney) && styles.feedIntroLight,
-          ]}
-          nativeID={MIDNIGHT_LOUNGE_FEED_STACK[0]}
-        >
-          <Text
-            style={[
-              styles.feedIntroEyebrow,
-              (isPregnantJourney || isPostpartumJourney) && styles.feedIntroTextLight,
-              SANS,
-            ]}
-          >
-            AFTER HOURS · VILLAGE CIRCLE
-          </Text>
-          <Text
-            style={[
-              styles.feedIntroTitle,
-              (isPregnantJourney || isPostpartumJourney) && styles.feedIntroTextLight,
-              SANS,
-            ]}
-          >
-            You are not alone in the quiet
-          </Text>
-          <Text
-            style={[
-              styles.feedIntroSub,
-              (isPregnantJourney || isPostpartumJourney) && styles.feedIntroSubLight,
-              SANS,
-            ]}
-          >
-            A soft-lit space for mamas awake when the world sleeps.
-          </Text>
-        </View>
-
-      </>
+      <FeedListHeader
+        isLight={isPregnantJourney || isPostpartumJourney}
+        feedDraft={feedDraft}
+        onFeedDraftChange={setFeedDraft}
+        onPublishFeedPost={handlePublishFeedPost}
+        publishingFeed={publishingFeed}
+      />
     ),
     [
       isPregnantJourney,
       isPostpartumJourney,
+      feedDraft,
+      handlePublishFeedPost,
+      publishingFeed,
     ],
   );
 
@@ -939,12 +1284,13 @@ function MidnightLoungeScreen({
         post={item}
         onLike={handleLike}
         onComment={handleFeedComment}
+        onShare={handleFeedShare}
         onOpenProfile={openProfile}
         lightFeedText={isPregnantJourney || isPostpartumJourney}
         gratitudeHighlight={isPostpartumJourney && item.kind === 'gratitude'}
       />
     ),
-    [handleLike, handleFeedComment, openProfile, isPregnantJourney, isPostpartumJourney],
+    [handleLike, handleFeedComment, handleFeedShare, openProfile, isPregnantJourney, isPostpartumJourney],
   );
 
   const feedKeyExtractor = useCallback((item) => item.id, []);
@@ -1258,6 +1604,7 @@ function MidnightLoungeScreen({
         onClose={closeProfile}
         onStartChat={startPrivateChat}
         onFollow={toggleFollow}
+        isSelf={isViewingSelfProfile}
       />
 
       <Modal
@@ -1292,6 +1639,22 @@ function MidnightLoungeScreen({
           </View>
         </View>
       </Modal>
+
+      <FeedCommentSheet
+        visible={Boolean(commentPostId)}
+        post={commentPost}
+        draft={commentDraft}
+        onDraftChange={setCommentDraft}
+        onClose={closeCommentSheet}
+        onSubmit={handleSubmitComment}
+      />
+
+      <FeedShareSheet
+        visible={Boolean(sharePostId)}
+        post={sharePost}
+        onClose={closeShareSheet}
+        onCopied={handleShareCopied}
+      />
     </View>
   );
 }
@@ -1423,6 +1786,16 @@ const styles = StyleSheet.create({
     marginBottom: MIDNIGHT_LOUNGE_LAYOUT.askCardMarginBottom,
     overflow: 'visible',
   },
+  askFeedCardLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  askFeedTextLight: {
+    color: '#FFFFFF',
+  },
+  askFeedHintLight: {
+    color: 'rgba(255, 255, 255, 0.88)',
+  },
   askFeedEyebrow: {
     fontSize: 11,
     fontWeight: '700',
@@ -1440,7 +1813,7 @@ const styles = StyleSheet.create({
   },
   askFeedInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: 99,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     paddingVertical: 14,
@@ -1450,6 +1823,8 @@ const styles = StyleSheet.create({
     color: CHARCOAL,
     fontWeight: '600',
     marginBottom: 12,
+    minHeight: 88,
+    textAlignVertical: 'top',
   },
   askFeedBtn: {
     alignSelf: 'stretch',
@@ -1802,6 +2177,97 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#2A2540',
   },
+  commentSheet: {
+    backgroundColor: MIDNIGHT.bgCardSoft,
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+    maxHeight: '78%',
+  },
+  commentPostPreview: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '500',
+    color: MIDNIGHT.textSecondary,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  commentList: {
+    maxHeight: 220,
+    marginBottom: 12,
+  },
+  commentRow: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: MIDNIGHT.borderSoft,
+  },
+  commentAuthor: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: MIDNIGHT.textPrimary,
+    marginBottom: 4,
+  },
+  commentBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: MIDNIGHT.textPrimary,
+  },
+  commentTime: {
+    fontSize: 11,
+    color: MIDNIGHT.textMuted,
+    marginTop: 4,
+  },
+  commentEmpty: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: MIDNIGHT.textMuted,
+    fontStyle: 'italic',
+    paddingVertical: 8,
+  },
+  commentInput: {
+    minHeight: 72,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+    backgroundColor: MIDNIGHT.bgCard,
+    padding: 14,
+    fontSize: 15,
+    color: MIDNIGHT.textPrimary,
+    marginBottom: 12,
+  },
+  shareSheet: {
+    backgroundColor: MIDNIGHT.bgCardSoft,
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+  },
+  shareOptionBtn: {
+    backgroundColor: MIDNIGHT.bgCard,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  shareOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: MIDNIGHT.textPrimary,
+    textAlign: 'center',
+  },
+  shareCancelBtn: {
+    marginTop: 4,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  shareCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: MIDNIGHT.textMuted,
+  },
   feedCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: 24,
@@ -1917,6 +2383,29 @@ const styles = StyleSheet.create({
     backgroundColor: MIDNIGHT.lavenderMuted,
     alignSelf: 'center',
     marginBottom: 18,
+  },
+  profilePreviewEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: MIDNIGHT.textMuted,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  profileSelfNote: {
+    backgroundColor: MIDNIGHT.bgCard,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  profileSelfNoteText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+    color: MIDNIGHT.textSecondary,
+    textAlign: 'center',
   },
   profileHeader: {
     alignItems: 'center',

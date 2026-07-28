@@ -202,7 +202,7 @@ function syncWebBodyFairyOmbre(theme) {
   }
 }
 
-function OmbreWashLayers({ style, palette, themeId }) {
+function OmbreWashLayers({ style, palette, themeId, paused = false }) {
   const phase = useSharedValue(0);
 
   useEffect(() => {
@@ -210,8 +210,15 @@ function OmbreWashLayers({ style, palette, themeId }) {
     cancelAnimation(phase);
     phase.value = 0;
 
+    if (paused) {
+      return () => {
+        active = false;
+        cancelAnimation(phase);
+      };
+    }
+
     const startLoop = () => {
-      if (!active) return;
+      if (!active || paused) return;
       safeStartOmbrePhase(
         phase,
         withRepeat(
@@ -229,6 +236,7 @@ function OmbreWashLayers({ style, palette, themeId }) {
     startLoop();
 
     const sub = AppState.addEventListener('change', (nextState) => {
+      if (paused) return;
       if (nextState === 'active') startLoop();
       else cancelAnimation(phase);
     });
@@ -238,16 +246,16 @@ function OmbreWashLayers({ style, palette, themeId }) {
       cancelAnimation(phase);
       sub.remove();
     };
-  }, [phase, themeId]);
+  }, [phase, themeId, paused]);
 
   const washA = useAnimatedStyle(() => ({
-    opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [1, 0.15, 0.1, 0.2, 1]),
+    opacity: paused ? 1 : interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [1, 0.15, 0.1, 0.2, 1]),
   }));
   const washB = useAnimatedStyle(() => ({
-    opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [0.12, 0.85, 0.2, 0.15, 0.12]),
+    opacity: paused ? 0 : interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [0.12, 0.85, 0.2, 0.15, 0.12]),
   }));
   const washC = useAnimatedStyle(() => ({
-    opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [0.1, 0.15, 0.9, 0.2, 0.1]),
+    opacity: paused ? 0 : interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [0.1, 0.15, 0.9, 0.2, 0.1]),
   }));
 
   return (
@@ -287,7 +295,7 @@ function shouldSyncWebBodyOmbre() {
   return false;
 }
 
-function WebOmbreBackdrop({ style, palette, themeKey, theme }) {
+function WebOmbreBackdrop({ style, palette, themeKey, theme, paused = false }) {
   useEffect(() => {
     ensureTitleShimmerCss();
     // Marketing shell already paints #calmmama-body-ombre — don't fight it with Fairy body CSS
@@ -296,17 +304,21 @@ function WebOmbreBackdrop({ style, palette, themeKey, theme }) {
       syncWebBodyFairyOmbre(null);
       return undefined;
     }
+    if (paused) {
+      syncWebBodyFairyOmbre(null);
+      return undefined;
+    }
     syncWebBodyFairyOmbre(theme);
     return () => {
       syncWebBodyFairyOmbre(null);
     };
-  }, [palette, themeKey, theme]);
+  }, [palette, themeKey, theme, paused]);
 
   // Always render Reanimated washes so fairy + default animate inside the app shell too.
-  return <OmbreWashLayers style={style} palette={palette} themeId={themeKey} />;
+  return <OmbreWashLayers style={style} palette={palette} themeId={themeKey} paused={paused} />;
 }
 
-export default function VillageOmbreBackdrop({ style }) {
+export default function VillageOmbreBackdrop({ style, paused = false }) {
   const { rewards } = useVillageRewards();
 
   const fairyTheme = useMemo(
@@ -331,11 +343,12 @@ export default function VillageOmbreBackdrop({ style }) {
         palette={palette}
         themeKey={themeKey}
         theme={fairyTheme}
+        paused={paused}
       />
     );
   }
 
-  return <OmbreWashLayers style={style} palette={palette} themeId={themeKey} />;
+  return <OmbreWashLayers style={style} palette={palette} themeId={themeKey} paused={paused} />;
 }
 
 const styles = StyleSheet.create({
