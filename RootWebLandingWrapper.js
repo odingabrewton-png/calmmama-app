@@ -14,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import SmoothOmbreBackground from './SmoothOmbreBackground';
 import PWAInstallPrompt from './PWAInstallPrompt';
 import {
   DESKTOP_PHONE,
@@ -205,16 +204,13 @@ function FallingPetal({ spec, fallDistance }) {
 /** Shared petal rain — desktop landing + mobile browser landing. */
 export const RainingFlowerPetals = memo(function RainingFlowerPetals({ count = 36 }) {
   const { height, width } = useViewportSize();
-  // Cover full viewport (and tall scroll canvases) edge to edge
-  const fallDistance = Math.max(
-    height || 800,
-    width || 0,
-    Platform.OS === 'web' && typeof document !== 'undefined'
-      ? Math.max(document.documentElement?.scrollHeight || 0, document.body?.scrollHeight || 0)
-      : 0,
-    900,
-  );
-  const specs = useMemo(() => buildPetalSpecs(count), [count]);
+  // Freeze to viewport size — document scrollHeight grows after paint and teleports petals.
+  const fallDistance = Math.max(height || 800, width || 0, 900);
+  const petalCount =
+    Platform.OS === 'web' && typeof window !== 'undefined' && window.innerWidth < 768
+      ? Math.min(count, 14)
+      : Math.min(count, 28);
+  const specs = useMemo(() => buildPetalSpecs(petalCount), [petalCount]);
 
   return (
     <View style={petalStyles.layer} pointerEvents="none">
@@ -618,7 +614,7 @@ function WaitlistFormCard({
       </View>
 
       {isSubmitted ? (
-        <View style={styles.successBlock}>
+        <View style={[styles.successBlock, styles.waitlistBodySlot]}>
           <Text style={[styles.successTitle, SERIF]}>{successTitle}</Text>
           <Text style={[styles.successBody, SANS]}>{successBody}</Text>
           <Pressable
@@ -630,17 +626,20 @@ function WaitlistFormCard({
           </Pressable>
         </View>
       ) : (
-        <>
-          {isFounding ? (
-            <View style={styles.premierTierBadge}>
-              <Text style={[styles.premierTierBadgeText, SANS]}>PREMIER ANNUAL TIER</Text>
-            </View>
-          ) : null}
-          {isFree ? (
-            <View style={styles.freeTierBadge}>
-              <Text style={[styles.freeTierBadgeText, SANS]}>START ANYTIME · NO CARD</Text>
-            </View>
-          ) : null}
+        <View style={styles.waitlistBodySlot}>
+          <View style={styles.tierBadgeSlot}>
+            {isFounding ? (
+              <View style={styles.premierTierBadge}>
+                <Text style={[styles.premierTierBadgeText, SANS]}>PREMIER ANNUAL TIER</Text>
+              </View>
+            ) : isFree ? (
+              <View style={styles.freeTierBadge}>
+                <Text style={[styles.freeTierBadgeText, SANS]}>START ANYTIME · NO CARD</Text>
+              </View>
+            ) : (
+              <View style={styles.tierBadgePlaceholder} />
+            )}
+          </View>
           <Text style={[styles.waitlistDescription, SANS]}>{waitlistDescription}</Text>
           <View style={styles.tierFeatureList}>
             {tierFeatures.map((feature) => (
@@ -678,20 +677,22 @@ function WaitlistFormCard({
             pulsing={!isSubmitting}
             style={styles.waitlistBtn}
           />
-          {!isFree ? (
-            <Pressable
-              onPress={isSubmitting ? undefined : onOpenGift}
-              disabled={isSubmitting}
-              accessibilityRole="button"
-              style={styles.giftButton}
-            >
-              <Text style={[styles.giftButtonText, SANS]}>Gift a Mama 🎁</Text>
-            </Pressable>
-          ) : (
-            <Text style={[styles.freeAccessNote, SANS]}>
-              We will email you {APP_ACCESS_URL} so you can return anytime.
-            </Text>
-          )}
+          <View style={styles.giftRowSlot}>
+            {!isFree ? (
+              <Pressable
+                onPress={isSubmitting ? undefined : onOpenGift}
+                disabled={isSubmitting}
+                accessibilityRole="button"
+                style={styles.giftButton}
+              >
+                <Text style={[styles.giftButtonText, SANS]}>Gift a Mama 🎁</Text>
+              </Pressable>
+            ) : (
+              <Text style={[styles.freeAccessNote, SANS]}>
+                We will email you {APP_ACCESS_URL} so you can return anytime.
+              </Text>
+            )}
+          </View>
 
           <View style={styles.foundingCodeBlock}>
             <Pressable
@@ -742,7 +743,7 @@ function WaitlistFormCard({
               </View>
             ) : null}
           </View>
-        </>
+        </View>
       )}
     </FrostCard>
   );
@@ -802,12 +803,16 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
 
+    let timer = null;
     const checkMode = () => {
-      const isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.navigator.standalone === true;
-      setIsInstalledAppMode(!!isStandalone || readForceAppMode());
-      setIsPhoneBrowser(readIsPhoneBrowser());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const isStandalone =
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.navigator.standalone === true;
+        setIsInstalledAppMode(!!isStandalone || readForceAppMode());
+        setIsPhoneBrowser(readIsPhoneBrowser());
+      }, 140);
     };
     checkMode();
 
@@ -818,6 +823,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     window.addEventListener('resize', checkMode);
 
     return () => {
+      if (timer) clearTimeout(timer);
       mq?.removeEventListener?.('change', onMq);
       mq?.removeListener?.(onMq);
       window.removeEventListener('resize', checkMode);
@@ -1142,9 +1148,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
     return (
       <View style={styles.mobileRoot}>
         <View style={styles.mobileAmbient} pointerEvents="none">
-          <View style={styles.mobileOmbreFill}>
-            <SmoothOmbreBackground />
-          </View>
+          <View style={styles.mobileOmbreFill} />
           <View style={styles.ambientVeil} />
           <RainingFlowerPetals count={32} />
         </View>
@@ -1226,7 +1230,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
   return (
     <View style={styles.masterCanvas}>
       <View style={styles.ambientStage} pointerEvents="none">
-        <SmoothOmbreBackground />
+        <View style={styles.mobileOmbreFill} />
         <View style={styles.ambientVeil} />
         <RainingFlowerPetals count={40} />
       </View>
@@ -1637,6 +1641,23 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     alignSelf: 'stretch',
   },
+  waitlistBodySlot: {
+    minHeight: 340,
+  },
+  tierBadgeSlot: {
+    minHeight: 28,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tierBadgePlaceholder: {
+    height: 28,
+  },
+  giftRowSlot: {
+    minHeight: 36,
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   tierToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1697,7 +1718,7 @@ const styles = StyleSheet.create({
   },
   freeTierBadge: {
     alignSelf: 'center',
-    marginBottom: 10,
+    marginBottom: 0,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 999,
@@ -1712,7 +1733,7 @@ const styles = StyleSheet.create({
     color: '#4f6b58',
   },
   freeAccessNote: {
-    marginTop: 12,
+    marginTop: 0,
     textAlign: 'center',
     fontSize: 12,
     lineHeight: 17,
@@ -1732,7 +1753,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 5,
     paddingHorizontal: 10,
-    marginBottom: 10,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: 'rgba(138, 106, 26, 0.34)',
     backgroundColor: 'rgba(212, 175, 55, 0.16)',

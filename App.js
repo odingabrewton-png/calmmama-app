@@ -120,8 +120,8 @@ import { normalizeJournalStage } from './sanctuaryJournalPrompts';
 import LotusFlowerButton from './LotusFlowerButton';
 
 import MidnightLoungeScreen from './MidnightLoungeScreen'; // layout locked — midnightLoungeLayoutConfig.js
-const PostpartumInfantHome = lazy(() => import('./PostpartumInfantHome'));
-const VillageTimeCapsule = lazy(() => import('./VillageTimeCapsule'));
+import PostpartumInfantHome from './PostpartumInfantHome';
+import VillageTimeCapsule from './VillageTimeCapsule';
 import PostpartumHomePollModal from './PostpartumHomePollModal';
 
 function AppStatusBar() {
@@ -1853,15 +1853,13 @@ function renderMainTabContent({
             pointerEvents={showInfantHome ? 'auto' : 'none'}
             collapsable={false}
           >
-            <Suspense fallback={null}>
-              <PostpartumInfantHome
-                babyAge={babyAge}
-                mamaName={mamaName}
-                entries={milestoneScrapbook}
-                onSaveEntry={onSaveMilestoneEntry}
-                headerSlot={homeToggle}
-              />
-            </Suspense>
+            <PostpartumInfantHome
+              babyAge={babyAge}
+              mamaName={mamaName}
+              entries={milestoneScrapbook}
+              onSaveEntry={onSaveMilestoneEntry}
+              headerSlot={homeToggle}
+            />
           </View>
           <View
             style={[
@@ -1871,29 +1869,27 @@ function renderMainTabContent({
             pointerEvents={showToddlerHome ? 'auto' : 'none'}
             collapsable={false}
           >
-            <Suspense fallback={null}>
-              <>
-                <ScrollView
-                  style={styles.embeddedTabScroll}
-                  contentContainerStyle={styles.embeddedTabScrollContent}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled
-                >
-                  {homeToggle}
-                  <VillageTimeCapsule
-                    babyAge={babyAge}
-                    entries={timeCapsuleEntries}
-                    onSaveMonth={onSaveTimeCapsuleMonth}
-                    isPro={isSubscribed}
-                    isSubscribed={isSubscribed}
-                    onRequestUpgrade={onReleaseUpgradePrompt}
-                    onOpenSubscription={onOpenSubscription}
-                  />
-                </ScrollView>
-                <PostpartumHomePollModal active={showToddlerHome} babyAge={babyAge} />
-              </>
-            </Suspense>
+            <>
+              <ScrollView
+                style={styles.embeddedTabScroll}
+                contentContainerStyle={styles.embeddedTabScrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
+                {homeToggle}
+                <VillageTimeCapsule
+                  babyAge={babyAge}
+                  entries={timeCapsuleEntries}
+                  onSaveMonth={onSaveTimeCapsuleMonth}
+                  isPro={isSubscribed}
+                  isSubscribed={isSubscribed}
+                  onRequestUpgrade={onReleaseUpgradePrompt}
+                  onOpenSubscription={onOpenSubscription}
+                />
+              </ScrollView>
+              <PostpartumHomePollModal active={showToddlerHome} babyAge={babyAge} />
+            </>
           </View>
         </View>
       );

@@ -268,12 +268,37 @@ function OmbreWashLayers({ style, palette, themeId }) {
   );
 }
 
+/**
+ * Only rewrite the page-level body ombre when the live app owns the viewport.
+ * Marketing landing keeps #calmmama-body-ombre from mobileWebLayout alone.
+ */
+function shouldSyncWebBodyOmbre() {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.matchMedia?.('(display-mode: standalone)')?.matches) return true;
+    if (window.navigator?.standalone === true) return true;
+    const path = String(window.location?.pathname || '');
+    if (path === '/app' || path.startsWith('/app/')) return true;
+    const params = new URLSearchParams(window.location?.search || '');
+    if (params.get('app') === '1' || params.get('welcome') === 'explorer') return true;
+  } catch (_) {
+    /* ignore */
+  }
+  return false;
+}
+
 function WebOmbreBackdrop({ style, palette, themeKey, theme }) {
   useEffect(() => {
     ensureTitleShimmerCss();
+    // Marketing shell already paints #calmmama-body-ombre — don't fight it with Fairy body CSS
+    // (desktop live-app-in-phone would otherwise flash the whole landing page).
+    if (!shouldSyncWebBodyOmbre()) {
+      syncWebBodyFairyOmbre(null);
+      return undefined;
+    }
     syncWebBodyFairyOmbre(theme);
     return () => {
-      if (!theme) syncWebBodyFairyOmbre(null);
+      syncWebBodyFairyOmbre(null);
     };
   }, [palette, themeKey, theme]);
 

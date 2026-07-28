@@ -33,15 +33,25 @@ export function useViewportSize() {
   const [size, setSize] = useState(readWindowSize);
 
   useEffect(() => {
-    const onChange = () => setSize(readWindowSize());
+    let timer = null;
+    const onChange = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setSize(readWindowSize()), 120);
+    };
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.addEventListener('resize', onChange);
-      return () => window.removeEventListener('resize', onChange);
+      return () => {
+        if (timer) clearTimeout(timer);
+        window.removeEventListener('resize', onChange);
+      };
     }
 
     const sub = Dimensions.addEventListener('change', onChange);
-    return () => sub?.remove?.();
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub?.remove?.();
+    };
   }, []);
 
   return size;
@@ -98,6 +108,10 @@ function ensureViewportFitCover() {
  */
 export function injectMobileWebViewport() {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (typeof window !== 'undefined' && window.__calmmamaViewportInjected) {
+    ensureViewportFitCover();
+    return;
+  }
 
   ensureViewportFitCover();
 
@@ -200,6 +214,10 @@ export function injectMobileWebViewport() {
     layer.id = 'calmmama-body-ombre';
     layer.setAttribute('aria-hidden', 'true');
     document.body.insertBefore(layer, document.body.firstChild);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__calmmamaViewportInjected = true;
   }
 }
 
