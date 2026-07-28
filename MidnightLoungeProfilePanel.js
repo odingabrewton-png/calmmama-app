@@ -109,8 +109,15 @@ function MidnightLoungeProfilePanel({
   isVipLifetime = false,
   onToggleVipLifetime,
   onSendTestNewsletter,
+  onSendTestWelcomeEmail,
   onGrantTestPoints,
   onResetTestPoints,
+  onFireTestNotification,
+  onOpenSanctuaryJournalTest,
+  onPreviewPremiumWelcome,
+  onOpenVillageConstellation,
+  onOpenVillageBasket,
+  onRefreshPwaCache,
   currentPoints = 0,
 }) {
   const { rewards } = useVillageRewards();
@@ -233,8 +240,15 @@ function MidnightLoungeProfilePanel({
               isVipLifetime={isVipLifetime}
               onToggleVipLifetime={onToggleVipLifetime}
               onSendTestNewsletter={onSendTestNewsletter}
+              onSendTestWelcomeEmail={onSendTestWelcomeEmail}
               onGrantTestPoints={onGrantTestPoints}
               onResetTestPoints={onResetTestPoints}
+              onFireTestNotification={onFireTestNotification}
+              onOpenSanctuaryJournalTest={onOpenSanctuaryJournalTest}
+              onPreviewPremiumWelcome={onPreviewPremiumWelcome}
+              onOpenVillageConstellation={onOpenVillageConstellation}
+              onOpenVillageBasket={onOpenVillageBasket}
+              onRefreshPwaCache={onRefreshPwaCache}
               currentPoints={currentPoints}
             />
           ) : null}

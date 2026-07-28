@@ -112,8 +112,10 @@ import {
   ADMIN_EMAIL,
   buildAdminUser,
   isAdmin,
+  postAdminApi,
   saveAdminSession,
 } from './adminAccess';
+import { presentVillageWebNotification } from './pwaWebPush';
 import { normalizeJournalStage } from './sanctuaryJournalPrompts';
 import LotusFlowerButton from './LotusFlowerButton';
 
@@ -3049,30 +3051,135 @@ function CalmMamaApp() {
 
   const handleSendTestNewsletter = useCallback(async () => {
     if (!isAdmin(adminUser)) {
-      return { ok: false, error: 'Not authorized' };
+      return { ok: false, error: 'Not authorized — set admin email first' };
     }
     await saveAdminSession({ sandbox: true });
     try {
-      const res = await fetch('/api/admin/test-newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: ADMIN_EMAIL,
-          firstName: mamaName || 'Admin',
-        }),
+      const result = await postAdminApi('/api/admin/test-newsletter', {
+        email: ADMIN_EMAIL,
+        firstName: mamaName || 'Admin',
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        return { ok: false, error: data.error || 'Failed to send test newsletter' };
+      if (!result.ok) {
+        return {
+          ok: false,
+          error: result.error || 'Failed to send test newsletter',
+          hint: result.hint,
+        };
       }
       return {
         ok: true,
-        message: `Test newsletter sent to ${ADMIN_EMAIL} (analytics excluded)`,
+        message: `Test newsletter sent to ${ADMIN_EMAIL} (check inbox / spam)`,
       };
     } catch (err) {
-      return { ok: false, error: err?.message || 'Network error' };
+      return { ok: false, error: err?.message || 'Network error reaching newsletter API' };
     }
   }, [adminUser, mamaName]);
+
+  const handleSendTestWelcomeEmail = useCallback(async () => {
+    if (!isAdmin(adminUser)) {
+      return { ok: false, error: 'Not authorized — set admin email first' };
+    }
+    await saveAdminSession({ sandbox: true });
+    try {
+      const result = await postAdminApi('/api/admin/test-welcome-email', {
+        email: ADMIN_EMAIL,
+        firstName: mamaName || 'Admin',
+      });
+      if (!result.ok) {
+        return {
+          ok: false,
+          error: result.error || 'Failed to send welcome email',
+          hint: result.hint,
+        };
+      }
+      return {
+        ok: true,
+        message: `Test welcome email sent to ${ADMIN_EMAIL}`,
+      };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Network error reaching welcome API' };
+    }
+  }, [adminUser, mamaName]);
+
+  const handleFireTestNotification = useCallback(async () => {
+    if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+    await saveAdminSession({ sandbox: true });
+    const result = await presentVillageWebNotification({
+      title: 'Calm Mama Village · Admin Test',
+      body: 'Sandbox notification — if you see this, village alerts are working.',
+      route: 'midnight_lounge',
+      tag: 'calmmama-admin-test',
+    });
+    if (!result?.ok) {
+      const reason = result?.reason || 'unknown';
+      if (reason === 'denied' || reason === 'unsupported') {
+        return {
+          ok: false,
+          error: 'Notifications not allowed yet',
+          hint: 'Enable Village Alerts / browser notification permission, then retry.',
+        };
+      }
+      return { ok: false, error: `Notification failed (${reason})` };
+    }
+    return { ok: true, message: `Test notification fired via ${result.via}` };
+  }, [adminUser]);
+
+  const handleOpenSanctuaryJournalTest = useCallback(async () => {
+    if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+    await saveAdminSession({ sandbox: true });
+    setSanctuaryJournalPrompt(
+      'Admin test (newsletter CTA): What softness are you giving yourself today?',
+    );
+    setAutoOpenSanctuaryJournal(true);
+    setLoungeFocusTab('home');
+    setLoungeFocusToken((token) => token + 1);
+    return { ok: true, message: 'Opened sanctuary journal with newsletter-style prompt' };
+  }, [adminUser]);
+
+  const handlePreviewPremiumWelcome = useCallback(async () => {
+    if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+    await saveAdminSession({ sandbox: true });
+    setPremiumWelcomeVariant('premium');
+    setPremiumWelcomePlan('Annual · Admin Preview');
+    setPremiumWelcomeOpen(true);
+    return { ok: true, message: 'Premium welcome modal opened' };
+  }, [adminUser]);
+
+  const handleAdminOpenVillageTab = useCallback(
+    async (tab = 'constellation') => {
+      if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+      await saveAdminSession({ sandbox: true });
+      setVillagePortalTab(tab === 'basket' ? 'basket' : 'constellation');
+      setLoungeFocusTab('village');
+      setLoungeFocusToken((token) => token + 1);
+      return {
+        ok: true,
+        message: tab === 'basket' ? 'Opened Village Basket' : 'Opened Village Constellation',
+      };
+    },
+    [adminUser],
+  );
+
+  const handleRefreshPwaCache = useCallback(async () => {
+    if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return { ok: false, error: 'PWA cache refresh is web-only' };
+    }
+    try {
+      if (window.caches?.keys) {
+        const keys = await window.caches.keys();
+        await Promise.all(keys.map((key) => window.caches.delete(key)));
+      }
+      const regs = (await navigator.serviceWorker?.getRegistrations?.()) || [];
+      await Promise.all(regs.map((reg) => reg.update?.() || Promise.resolve()));
+      return {
+        ok: true,
+        message: 'PWA caches cleared — hard refresh the page to load the newest build',
+      };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Could not refresh PWA cache' };
+    }
+  }, [adminUser]);
 
   const handleGrantTestPoints = useCallback(
     async (amount) => {
@@ -5515,8 +5622,15 @@ function CalmMamaApp() {
                     isVipLifetime={isVipLifetime}
                     onToggleVipLifetime={handleToggleVipLifetime}
                     onSendTestNewsletter={handleSendTestNewsletter}
+                    onSendTestWelcomeEmail={handleSendTestWelcomeEmail}
                     onGrantTestPoints={handleGrantTestPoints}
                     onResetTestPoints={handleResetTestPoints}
+                    onFireTestNotification={handleFireTestNotification}
+                    onOpenSanctuaryJournalTest={handleOpenSanctuaryJournalTest}
+                    onPreviewPremiumWelcome={handlePreviewPremiumWelcome}
+                    onOpenVillageConstellation={() => handleAdminOpenVillageTab('constellation')}
+                    onOpenVillageBasket={() => handleAdminOpenVillageTab('basket')}
+                    onRefreshPwaCache={handleRefreshPwaCache}
                     currentPoints={rewards?.points || 0}
                     littleOnes={children}
                     onChildrenChange={handleChildrenChange}

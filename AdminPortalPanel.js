@@ -31,6 +31,36 @@ function EnvBadge({ label }) {
   );
 }
 
+function ActionButton({ label, busyKey, busy, onPress, tone = 'lavender' }) {
+  const isBusy = busy === busyKey;
+  return (
+    <TouchableOpacity
+      style={[
+        styles.actionBtn,
+        tone === 'terracotta' && styles.actionBtnTerracotta,
+        tone === 'sage' && styles.actionBtnSage,
+      ]}
+      activeOpacity={0.88}
+      disabled={Boolean(busy)}
+      onPress={onPress}
+    >
+      {isBusy ? (
+        <ActivityIndicator color={tone === 'terracotta' ? '#FFF8F5' : '#2A2540'} />
+      ) : (
+        <Text
+          style={[
+            styles.actionBtnText,
+            tone === 'terracotta' && styles.actionBtnTextOnDark,
+            SANS,
+          ]}
+        >
+          {label}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 /**
  * Hidden admin tools — only mount when isAdmin === true.
  */
@@ -40,8 +70,15 @@ export default function AdminPortalPanel({
   isVipLifetime = false,
   onToggleVipLifetime,
   onSendTestNewsletter,
+  onSendTestWelcomeEmail,
   onGrantTestPoints,
   onResetTestPoints,
+  onFireTestNotification,
+  onOpenSanctuaryJournalTest,
+  onPreviewPremiumWelcome,
+  onOpenVillageConstellation,
+  onOpenVillageBasket,
+  onRefreshPwaCache,
   currentPoints = 0,
 }) {
   const [busy, setBusy] = useState(null);
@@ -57,7 +94,8 @@ export default function AdminPortalPanel({
     try {
       const result = await fn?.();
       if (result?.ok === false) {
-        setStatus(result.error || 'Action failed');
+        const hint = result.hint ? ` — ${result.hint}` : '';
+        setStatus(`${result.error || 'Action failed'}${hint}`);
       } else {
         setStatus(result?.message || 'Done');
       }
@@ -73,7 +111,8 @@ export default function AdminPortalPanel({
       <Text style={[styles.eyebrow, SANS]}>RESTRICTED</Text>
       <Text style={[styles.title, SANS]}>Admin Portal</Text>
       <Text style={[styles.copy, SANS]}>
-        Sandbox mode — test actions stay on this device and are excluded from public analytics.
+        Sandbox mode — test actions stay on this device / your admin inbox and are excluded from
+        public analytics.
       </Text>
 
       <View style={styles.metaRow}>
@@ -93,20 +132,59 @@ export default function AdminPortalPanel({
         placeholderTextColor={MIDNIGHT.textMuted}
       />
 
-      <TouchableOpacity
-        style={styles.actionBtn}
-        activeOpacity={0.88}
-        disabled={Boolean(busy)}
-        onPress={() =>
-          runAction('newsletter', () => onSendTestNewsletter?.())
-        }
-      >
-        {busy === 'newsletter' ? (
-          <ActivityIndicator color="#2A2540" />
-        ) : (
-          <Text style={[styles.actionBtnText, SANS]}>Send Test Newsletter Email</Text>
-        )}
-      </TouchableOpacity>
+      <Text style={[styles.sectionLabel, SANS]}>Email smoke tests</Text>
+      <ActionButton
+        label="Send Test Newsletter Email"
+        busyKey="newsletter"
+        busy={busy}
+        onPress={() => runAction('newsletter', () => onSendTestNewsletter?.())}
+      />
+      <ActionButton
+        label="Send Test Welcome Email"
+        busyKey="welcome"
+        busy={busy}
+        onPress={() => runAction('welcome', () => onSendTestWelcomeEmail?.())}
+        tone="sage"
+      />
+
+      <Text style={[styles.sectionLabel, SANS]}>In-app smoke tests</Text>
+      <ActionButton
+        label="Fire Test Village Notification"
+        busyKey="notify"
+        busy={busy}
+        onPress={() => runAction('notify', () => onFireTestNotification?.())}
+      />
+      <ActionButton
+        label="Open Sanctuary Journal (newsletter CTA)"
+        busyKey="journal"
+        busy={busy}
+        onPress={() => runAction('journal', () => onOpenSanctuaryJournalTest?.())}
+      />
+      <ActionButton
+        label="Preview Premium Welcome Modal"
+        busyKey="premium"
+        busy={busy}
+        onPress={() => runAction('premium', () => onPreviewPremiumWelcome?.())}
+      />
+      <ActionButton
+        label="Open Village Constellation"
+        busyKey="constellation"
+        busy={busy}
+        onPress={() => runAction('constellation', () => onOpenVillageConstellation?.())}
+      />
+      <ActionButton
+        label="Open Village Basket"
+        busyKey="basket"
+        busy={busy}
+        onPress={() => runAction('basket', () => onOpenVillageBasket?.())}
+      />
+      <ActionButton
+        label="Refresh PWA Cache"
+        busyKey="pwa"
+        busy={busy}
+        onPress={() => runAction('pwa', () => onRefreshPwaCache?.())}
+        tone="terracotta"
+      />
 
       <Text style={[styles.fieldLabel, SANS]}>Grant / Reset Test Points</Text>
       <Text style={[styles.pointsHint, SANS]}>
@@ -230,6 +308,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: MIDNIGHT.lavenderMuted,
+    marginBottom: 8,
+    marginTop: 4,
+  },
   fieldLabel: {
     fontSize: 14,
     fontWeight: '700',
@@ -252,14 +339,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
     minHeight: 46,
     justifyContent: 'center',
+  },
+  actionBtnSage: {
+    backgroundColor: 'rgba(186, 205, 176, 0.92)',
+  },
+  actionBtnTerracotta: {
+    backgroundColor: '#8B4A35',
   },
   actionBtnText: {
     fontSize: 14,
     fontWeight: '800',
     color: '#2A2540',
+  },
+  actionBtnTextOnDark: {
+    color: '#FFF8F5',
   },
   pointsHint: {
     fontSize: 12,
@@ -296,6 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 8,
+    marginTop: 6,
   },
   vipCopy: {
     flex: 1,

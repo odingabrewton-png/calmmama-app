@@ -1,13 +1,11 @@
 /**
- * Admin-only: send a single test weekly newsletter to an allowlisted admin email.
- * Does not iterate the public Resend audience or touch production analytics.
+ * Admin-only: send a single welcome email smoke test to the allowlisted admin.
+ * Skips Resend audience upsert so analytics stay isolated.
  *
  * POST body: { email: string, firstName?: string }
- * Auth: email must be the admin allowlist address.
  */
 
-const { sendAdminTestNewsletter } = require('../../weeklyNewsletter');
-const { resolveResendApiKey } = require('../../welcomeEmail');
+const { sendWelcomeMamaEmail, resolveResendApiKey } = require('../../welcomeEmail');
 
 const ADMIN_EMAIL = 'odingabrewton@gmail.com';
 
@@ -47,38 +45,40 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const apiKey = resolveResendApiKey();
-    if (!apiKey) {
-      res.status(503).json({
+    const result = await sendWelcomeMamaEmail({
+      to: email,
+      firstName: body.firstName || 'Admin',
+      apiKey: resolveResendApiKey(),
+      from: process.env.RESEND_FROM || undefined,
+    });
+
+    if (result.skipped || !result.ok) {
+      res.status(result.skipped ? 503 : 502).json({
         ok: false,
         adminTest: true,
-        error: 'Resend API key not configured',
-        hint: 'Set EXPO_PUBLIC_RESEND_API_KEY or RESEND_API_KEY on Vercel.',
+        isolated: true,
+        analyticsExcluded: true,
+        error: result.error || 'Failed to send welcome email',
+        hint: result.skipped
+          ? 'Set EXPO_PUBLIC_RESEND_API_KEY or RESEND_API_KEY on Vercel.'
+          : undefined,
       });
       return;
     }
 
-    const result = await sendAdminTestNewsletter({
-      to: email,
-      firstName: body.firstName || 'Admin',
-      apiKey,
-      from: process.env.RESEND_FROM || undefined,
-    });
-
-    const status = result.ok ? 200 : 502;
-    res.status(status).json({
-      ...result,
+    res.status(200).json({
+      ok: true,
+      adminTest: true,
       isolated: true,
       analyticsExcluded: true,
-      hint: result.ok
-        ? undefined
-        : result.error || 'Resend rejected the send — check domain/from address.',
+      id: result.id || null,
+      email,
     });
   } catch (err) {
-    console.warn('[CalmMama] admin test newsletter error', err?.message || err);
+    console.warn('[CalmMama] admin test welcome email error', err?.message || err);
     res.status(500).json({
       ok: false,
-      error: 'Unexpected admin newsletter error',
+      error: 'Unexpected admin welcome email error',
       adminTest: true,
     });
   }

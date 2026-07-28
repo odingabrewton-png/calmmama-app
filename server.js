@@ -211,10 +211,22 @@ app.post('/api/admin/test-newsletter', async (req, res) => {
   }
 
   try {
+    const apiKey = resolveResendApiKey(
+      process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY,
+    );
+    if (!apiKey) {
+      res.status(503).json({
+        ok: false,
+        adminTest: true,
+        error: 'Resend API key not configured',
+        hint: 'Set EXPO_PUBLIC_RESEND_API_KEY or RESEND_API_KEY on the server.',
+      });
+      return;
+    }
     const result = await sendAdminTestNewsletter({
       to: email,
       firstName: req.body?.firstName || 'Admin',
-      apiKey: resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY),
+      apiKey,
       from: process.env.RESEND_FROM || undefined,
     });
     const status = result.ok ? 200 : 502;
@@ -228,6 +240,61 @@ app.post('/api/admin/test-newsletter', async (req, res) => {
     res.status(500).json({
       ok: false,
       error: 'Unexpected admin newsletter error',
+      adminTest: true,
+    });
+  }
+});
+
+/** Admin sandbox: welcome email smoke test (no audience upsert). */
+app.post('/api/admin/test-welcome-email', async (req, res) => {
+  const email = String(req.body?.email || '')
+    .trim()
+    .toLowerCase();
+  if (email !== ADMIN_EMAIL) {
+    res.status(403).json({
+      ok: false,
+      error: 'Forbidden — admin allowlist only',
+      adminTest: true,
+    });
+    return;
+  }
+
+  try {
+    const apiKey = resolveResendApiKey(
+      process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY,
+    );
+    const result = await sendWelcomeMamaEmail({
+      to: email,
+      firstName: req.body?.firstName || 'Admin',
+      apiKey,
+      from: process.env.RESEND_FROM || undefined,
+    });
+    if (result.skipped || !result.ok) {
+      res.status(result.skipped ? 503 : 502).json({
+        ok: false,
+        adminTest: true,
+        isolated: true,
+        analyticsExcluded: true,
+        error: result.error || 'Failed to send welcome email',
+        hint: result.skipped
+          ? 'Set EXPO_PUBLIC_RESEND_API_KEY or RESEND_API_KEY on the server.'
+          : undefined,
+      });
+      return;
+    }
+    res.status(200).json({
+      ok: true,
+      adminTest: true,
+      isolated: true,
+      analyticsExcluded: true,
+      id: result.id || null,
+      email,
+    });
+  } catch (err) {
+    console.warn('[CalmMama] admin test welcome email error', err?.message || err);
+    res.status(500).json({
+      ok: false,
+      error: 'Unexpected admin welcome email error',
       adminTest: true,
     });
   }

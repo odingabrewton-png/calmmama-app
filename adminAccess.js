@@ -144,3 +144,42 @@ export function getVercelEnvironmentLabel() {
 
   return __DEV__ ? 'development' : 'production';
 }
+
+/** Absolute origin for admin API calls (avoids relative-path misses on /app). */
+export function getAdminApiOrigin() {
+  if (canUseWebStorage()) {
+    try {
+      return String(window.location?.origin || '').replace(/\/$/, '');
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return 'https://calmmamavillage.com';
+}
+
+export async function postAdminApi(path, body = {}) {
+  const origin = getAdminApiOrigin();
+  const url = `${origin}${path.startsWith('/') ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (_) {
+    data = { error: text?.slice?.(0, 180) || `HTTP ${res.status}` };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      error: data.error || data.hint || `Request failed (${res.status})`,
+      hint: data.hint,
+      data,
+    };
+  }
+  return { ok: true, status: res.status, data };
+}

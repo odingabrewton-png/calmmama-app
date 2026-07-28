@@ -522,8 +522,15 @@ function MidnightLoungeScreen({
   isVipLifetime = false,
   onToggleVipLifetime,
   onSendTestNewsletter,
+  onSendTestWelcomeEmail,
   onGrantTestPoints,
   onResetTestPoints,
+  onFireTestNotification,
+  onOpenSanctuaryJournalTest,
+  onPreviewPremiumWelcome,
+  onOpenVillageConstellation,
+  onOpenVillageBasket,
+  onRefreshPwaCache,
   currentPoints = 0,
   littleOnes = [],
   onChildrenChange,
@@ -1132,8 +1139,15 @@ function MidnightLoungeScreen({
             isVipLifetime={isVipLifetime}
             onToggleVipLifetime={onToggleVipLifetime}
             onSendTestNewsletter={onSendTestNewsletter}
+            onSendTestWelcomeEmail={onSendTestWelcomeEmail}
             onGrantTestPoints={onGrantTestPoints}
             onResetTestPoints={onResetTestPoints}
+            onFireTestNotification={onFireTestNotification}
+            onOpenSanctuaryJournalTest={onOpenSanctuaryJournalTest}
+            onPreviewPremiumWelcome={onPreviewPremiumWelcome}
+            onOpenVillageConstellation={onOpenVillageConstellation}
+            onOpenVillageBasket={onOpenVillageBasket}
+            onRefreshPwaCache={onRefreshPwaCache}
             currentPoints={currentPoints}
           />
         );
