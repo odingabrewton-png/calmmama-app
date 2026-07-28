@@ -116,6 +116,7 @@ import {
   saveAdminSession,
 } from './adminAccess';
 import { presentVillageWebNotification } from './pwaWebPush';
+import { dispatchAdminMamaSignupNotice } from './welcomeEmailClient';
 import { normalizeJournalStage } from './sanctuaryJournalPrompts';
 import LotusFlowerButton from './LotusFlowerButton';
 
@@ -3026,6 +3027,9 @@ function CalmMamaApp() {
     membershipTier === MEMBERSHIP_TIERS.VIP_LIFETIME ||
     membershipTier === MEMBERSHIP_TIERS.FOUNDING_MOTHER;
 
+  const accountEmailNotifyTimerRef = useRef(null);
+  const lastNotifiedMamaEmailRef = useRef(null);
+
   const handleAccountEmailChange = useCallback(async (email) => {
     const user = buildAdminUser({ email });
     setMemberEmail(user.email);
@@ -3039,11 +3043,32 @@ function CalmMamaApp() {
       });
       if (isAdmin(user)) {
         await saveAdminSession({ sandbox: true });
+        return;
       }
     } catch (_) {
       /* non-blocking */
     }
-  }, []);
+
+    // Debounce founder notice — Me/Admin email fields fire on every keystroke.
+    if (accountEmailNotifyTimerRef.current) {
+      clearTimeout(accountEmailNotifyTimerRef.current);
+    }
+    accountEmailNotifyTimerRef.current = setTimeout(() => {
+      const next = String(user.email || '')
+        .trim()
+        .toLowerCase();
+      if (!next || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) return;
+      if (next === String(ADMIN_EMAIL).toLowerCase()) return;
+      if (lastNotifiedMamaEmailRef.current === next) return;
+      lastNotifiedMamaEmailRef.current = next;
+      dispatchAdminMamaSignupNotice({
+        email: next,
+        firstName: mamaName,
+        reason: 'profile_email',
+        source: 'me_profile',
+      }).catch(() => {});
+    }, 1600);
+  }, [mamaName]);
 
   const handleSendTestNewsletter = useCallback(async () => {
     if (!isAdmin(adminUser)) {

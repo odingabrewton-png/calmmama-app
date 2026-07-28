@@ -971,6 +971,8 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
               : signupTier === 'founding40'
                 ? 'founding'
                 : 'signup',
+            tier: signupTier,
+            source: 'landing_waitlist',
           });
         } catch (mailErr) {
           console.warn('[CalmMama] welcome email non-blocking error', mailErr?.message || mailErr);
@@ -981,6 +983,8 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
             email: giftSubmission.recipientEmail,
             firstName: giftSubmission.recipientName,
             reason: 'gift',
+            tier: 'gift',
+            source: 'landing_gift',
           });
         } catch (mailErr) {
           console.warn('[CalmMama] gift welcome email non-blocking error', mailErr?.message || mailErr);

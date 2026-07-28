@@ -6,7 +6,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { sendWelcomeMamaEmail, addResendAudienceContact, resolveResendApiKey } = require('./welcomeEmail');
+const { sendWelcomeMamaEmail, addResendAudienceContact, resolveResendApiKey, sendAdminMamaSignupNotice } = require('./welcomeEmail');
 const { runWeeklyNewsletter, sendAdminTestNewsletter, assertCronAuthorized } = require('./weeklyNewsletter');
 const {
   createSubscriptionCheckoutSession,
@@ -56,19 +56,67 @@ app.post('/api/welcome-email', async (req, res) => {
     const email = String(req.body?.email || req.body?.to || '').trim();
     const firstName = String(req.body?.firstName || req.body?.name || '').trim() || undefined;
     const reason = String(req.body?.reason || 'signup').trim();
+    const tier = String(req.body?.tier || '').trim() || undefined;
+    const source = String(req.body?.source || 'server').trim() || 'server';
+    const notifyOnly =
+      req.body?.notifyOnly === true ||
+      req.body?.notifyOnly === 'true' ||
+      reason === 'profile_email';
 
     const apiKey = resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY);
-    const [result] = await Promise.all([
+    const from = process.env.RESEND_FROM || undefined;
+
+    if (notifyOnly) {
+      const [adminNotice, audience] = await Promise.all([
+        sendAdminMamaSignupNotice({
+          mamaEmail: email,
+          firstName,
+          reason,
+          tier,
+          source,
+          apiKey,
+          from,
+        }),
+        addResendAudienceContact({
+          email,
+          firstName,
+          apiKey,
+        }),
+      ]);
+      res.status(200).json({
+        ok: Boolean(adminNotice.ok || audience.ok),
+        notifyOnly: true,
+        welcome: { ok: true, skipped: true },
+        audience,
+        adminNotice: {
+          ok: Boolean(adminNotice.ok),
+          skipped: Boolean(adminNotice.skipped),
+          id: adminNotice.id || null,
+        },
+      });
+      return;
+    }
+
+    const [result, audience, adminNotice] = await Promise.all([
       sendWelcomeMamaEmail({
         to: email,
         firstName,
         apiKey,
-        from: process.env.RESEND_FROM || undefined,
+        from,
       }),
       addResendAudienceContact({
         email,
         firstName,
         apiKey,
+      }),
+      sendAdminMamaSignupNotice({
+        mamaEmail: email,
+        firstName,
+        reason,
+        tier,
+        source,
+        apiKey,
+        from,
       }),
     ]);
 
@@ -78,17 +126,31 @@ app.post('/api/welcome-email', async (req, res) => {
         skipped: true,
         error: result.error,
         hint: 'Set EXPO_PUBLIC_RESEND_API_KEY on the server.',
+        adminNotice: { ok: Boolean(adminNotice.ok), skipped: Boolean(adminNotice.skipped) },
       });
       return;
     }
 
     if (!result.ok) {
-      res.status(502).json({ ok: false, error: result.error || 'Email send failed' });
+      res.status(502).json({
+        ok: false,
+        error: result.error || 'Email send failed',
+        adminNotice: { ok: Boolean(adminNotice.ok), skipped: Boolean(adminNotice.skipped) },
+      });
       return;
     }
 
     console.log('[CalmMama] welcome email sent', { reason, id: result.id, to: email.slice(0, 3) + '…' });
-    res.status(200).json({ ok: true, id: result.id });
+    res.status(200).json({
+      ok: true,
+      id: result.id,
+      audience,
+      adminNotice: {
+        ok: Boolean(adminNotice.ok),
+        skipped: Boolean(adminNotice.skipped),
+        id: adminNotice.id || null,
+      },
+    });
   } catch (err) {
     console.warn('[CalmMama] welcome email route error', err?.message || err);
     res.status(500).json({ ok: false, error: 'Unexpected email error' });

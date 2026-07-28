@@ -260,14 +260,150 @@ async function addResendAudienceContact({
   }
 }
 
+const ADMIN_SIGNUP_INBOX = 'odingabrewton@gmail.com';
+
+function formatSignupReason(reason) {
+  const key = String(reason || 'signup').trim().toLowerCase();
+  const labels = {
+    signup: 'Village waitlist / signup',
+    free_explorer: 'Free Explorer signup',
+    founding: 'Founding Mother interest',
+    gift: 'Gift a Mama checkout',
+    profile_email: 'In-app account email saved',
+    monthly: 'Monthly Village Access signup',
+    annual: 'Annual / Founding checkout email',
+  };
+  return labels[key] || key.replace(/_/g, ' ');
+}
+
+/**
+ * Notify the founder when a mama shares her email (landing or in-app).
+ * Never blocks signup — failures are logged only.
+ */
+async function sendAdminMamaSignupNotice({
+  mamaEmail,
+  firstName,
+  reason = 'signup',
+  tier,
+  source,
+  apiKey,
+  from = DEFAULT_FROM,
+} = {}) {
+  const mama = String(mamaEmail || '')
+    .trim()
+    .toLowerCase();
+  if (!mama || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mama)) {
+    return { ok: false, skipped: true, error: 'missing mama email' };
+  }
+  // Don't ping yourself for admin sandbox / self-tests.
+  if (mama === ADMIN_SIGNUP_INBOX) {
+    return { ok: true, skipped: true, reason: 'admin-self' };
+  }
+
+  const key = resolveResendApiKey(apiKey);
+  if (!key) {
+    return { ok: false, skipped: true, error: 'Resend API key not configured' };
+  }
+
+  const fetchFn = typeof fetch === 'function' ? fetch : null;
+  if (!fetchFn) {
+    return { ok: false, error: 'fetch unavailable' };
+  }
+
+  const when = new Date().toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  const reasonLabel = formatSignupReason(reason);
+  const nameLine = String(firstName || '').trim();
+  const tierLine = String(tier || '').trim();
+  const sourceLine = String(source || '').trim();
+
+  const subject = `New Calm Mama signup · ${mama}`;
+  const text = [
+    'A mama shared her email with Calm Mama Village.',
+    '',
+    `Email: ${mama}`,
+    nameLine ? `Name: ${nameLine}` : null,
+    `Reason: ${reasonLabel}`,
+    tierLine ? `Tier: ${tierLine}` : null,
+    sourceLine ? `Source: ${sourceLine}` : null,
+    `When: ${when} ET`,
+    '',
+    '— Calm Mama Village admin notice',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const html = `
+<!DOCTYPE html>
+<html><body style="font-family:Georgia,serif;background:#F7F3EE;padding:24px;color:#2A382E;">
+  <div style="max-width:520px;margin:0 auto;background:#FFFCF8;border-radius:16px;padding:24px;border:1px solid #E5DDD2;">
+    <p style="margin:0 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#6B8F78;font-weight:700;">New mama email</p>
+    <h1 style="margin:0 0 16px;font-size:22px;color:#3D5246;">Someone joined the village</h1>
+    <p style="margin:0 0 8px;"><strong>Email:</strong> <a href="mailto:${mama}">${mama}</a></p>
+    ${nameLine ? `<p style="margin:0 0 8px;"><strong>Name:</strong> ${nameLine}</p>` : ''}
+    <p style="margin:0 0 8px;"><strong>Reason:</strong> ${reasonLabel}</p>
+    ${tierLine ? `<p style="margin:0 0 8px;"><strong>Tier:</strong> ${tierLine}</p>` : ''}
+    ${sourceLine ? `<p style="margin:0 0 8px;"><strong>Source:</strong> ${sourceLine}</p>` : ''}
+    <p style="margin:0 0 16px;"><strong>When:</strong> ${when} ET</p>
+    <p style="margin:0;font-size:13px;color:#5A6E58;">This notice is only for you — the mama also received (or will receive) her welcome mail when applicable.</p>
+  </div>
+</body></html>`.trim();
+
+  try {
+    const response = await fetchFn('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: String(from || DEFAULT_FROM),
+        to: ADMIN_SIGNUP_INBOX,
+        subject,
+        html,
+        text,
+        reply_to: mama,
+        tags: [
+          { name: 'admin_notice', value: 'mama_signup' },
+          { name: 'signup_reason', value: String(reason || 'signup').slice(0, 48) },
+        ],
+      }),
+    });
+
+    const raw = await response.text().catch(() => '');
+    let parsed = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      parsed = null;
+    }
+
+    if (!response.ok) {
+      const message = parsed?.message || parsed?.error || raw || `HTTP ${response.status}`;
+      console.warn('[CalmMama] Admin signup notice failed', response.status, message);
+      return { ok: false, error: String(message) };
+    }
+
+    return { ok: true, id: parsed?.id || null };
+  } catch (err) {
+    console.warn('[CalmMama] Admin signup notice network error', err?.message || err);
+    return { ok: false, error: err?.message || 'network error' };
+  }
+}
+
 module.exports = {
   APP_ACCESS_URL,
   DEFAULT_FROM,
   WELCOME_SUBJECT,
+  ADMIN_SIGNUP_INBOX,
   buildWelcomeMamaEmailHtml,
   buildWelcomeMamaEmailText,
   sendWelcomeMamaEmail,
   addResendAudienceContact,
+  sendAdminMamaSignupNotice,
   resolveResendApiKey,
   resolveResendAudienceId,
 };
