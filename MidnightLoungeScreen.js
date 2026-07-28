@@ -1731,6 +1731,11 @@ const styles = StyleSheet.create({
     zIndex: 2,
     flexDirection: 'column',
     backgroundColor: MIDNIGHT.bg,
+    overflow: 'hidden',
+    ...Platform.select({
+      web: { isolation: 'isolate' },
+      default: {},
+    }),
   },
   boutiqueBackBtn: {
     paddingHorizontal: 16,

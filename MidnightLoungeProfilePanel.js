@@ -277,8 +277,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     width: '100%',
+    backgroundColor: MIDNIGHT.bg,
   },
-  scroll: { flex: 1, width: '100%' },
+  scroll: { flex: 1, width: '100%', backgroundColor: 'transparent' },
   scrollContent: {
     flexGrow: 1,
     width: '100%',

@@ -5427,8 +5427,11 @@ function CalmMamaApp() {
         >
           <View style={styles.shellLayout}>
             <View
-              style={[styles.mainShellKeepAlive, inVillagePortal && styles.mainShellDimmed]}
-              pointerEvents={inVillagePortal ? 'none' : 'auto'}
+              style={[
+                styles.mainShellKeepAlive,
+                (inVillagePortal || inMidnightLounge) && styles.mainShellDimmed,
+              ]}
+              pointerEvents={inVillagePortal || inMidnightLounge ? 'none' : 'auto'}
             >
               <MainTabShell
                 activeTab={activeTab}
@@ -5675,9 +5678,7 @@ function CalmMamaApp() {
               <Animated.View
                 style={[
                   styles.midnightLoungeOverlay,
-                  (userJourney === 'postpartum'
-                    ? !postpartumLoungeOverlayActive
-                    : !inMidnightLounge) && styles.midnightLoungeCachedHidden,
+                  !inMidnightLounge && styles.midnightLoungeCachedHidden,
                   {
                     opacity: midnightLoungeOpacity,
                     transform: [
@@ -9074,11 +9075,17 @@ const styles = StyleSheet.create({
   },
   midnightLoungeOverlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10000,
+    zIndex: 10020,
     backgroundColor: '#14121C',
+    overflow: 'hidden',
+    ...Platform.select({
+      web: { isolation: 'isolate' },
+      default: {},
+    }),
   },
   midnightLoungeCachedHidden: {
     zIndex: -1,
+    opacity: 0,
   },
   navItem: {
     alignItems: 'center',

@@ -472,8 +472,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     width: '100%',
+    backgroundColor: MIDNIGHT.bg,
   },
-  scroll: { flex: 1, width: '100%' },
+  scroll: { flex: 1, width: '100%', backgroundColor: 'transparent' },
   scrollContent: {
     flexGrow: 1,
     width: '100%',
@@ -481,11 +482,13 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 48,
     paddingHorizontal: ME_PROFILE_H_PAD,
+    gap: 4,
   },
   contentColumn: {
     width: '100%',
     maxWidth: ME_PROFILE_CONTENT_MAX_WIDTH,
     alignSelf: 'center',
+    gap: 4,
   },
   sectionEyebrow: {
     fontSize: 14,
@@ -548,12 +551,13 @@ const styles = StyleSheet.create({
   /** Matches HybridLittleOnesSection "Little one 1" child card. */
   fieldCard: {
     marginBottom: 12,
-    padding: 12,
+    padding: 14,
     borderRadius: 14,
     width: '100%',
-    backgroundColor: 'rgba(37, 34, 50, 0.45)',
+    backgroundColor: MIDNIGHT.bgCard,
     borderWidth: 1,
-    borderColor: 'rgba(212, 184, 150, 0.22)',
+    borderColor: 'rgba(212, 184, 150, 0.28)',
+    overflow: 'hidden',
   },
   /** Original Midnight Lounge field surface (Calm Mama Me default). */
   fieldCardMidnight: {
@@ -563,8 +567,8 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   fieldCardOnLight: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    borderColor: 'rgba(107, 143, 120, 0.25)',
+    backgroundColor: 'rgba(255, 252, 248, 0.96)',
+    borderColor: 'rgba(107, 143, 120, 0.28)',
   },
   fieldCardLabel: {
     fontSize: 13,
@@ -575,7 +579,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(212, 184, 150, 0.35)',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: MIDNIGHT.bgElevated,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
