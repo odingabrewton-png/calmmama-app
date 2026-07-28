@@ -18,13 +18,80 @@ export const ICEBREAKER_PLACEHOLDER =
   'Share a show, book, pastime, or gentle thought with your village…';
 
 export const BASKET_SHARE_HINTS = [
+  'Give it a short title, then a soft detail — same shape as the village examples below.',
   'Extra newborn clothes your little one outgrew?',
   'Unopened diapers, wipes, or formula to pass along?',
-  'Meals, books, gear, or postpartum supplies another mama might need?',
 ];
 
-export const BASKET_SHARE_PLACEHOLDER =
-  'Describe what you have to offer or what you need — your village will see it here…';
+export const BASKET_SHARE_TITLE_PLACEHOLDER = 'Short title (ex: Size 1 Pampers)';
+
+export const BASKET_SHARE_DETAIL_PLACEHOLDER =
+  'A little more detail (ex: Unopened partial box — smoke-free home)…';
+
+/** @deprecated Prefer title + detail placeholders */
+export const BASKET_SHARE_PLACEHOLDER = BASKET_SHARE_TITLE_PLACEHOLDER;
+
+const DEFAULT_OFFERING_DETAIL =
+  'Happy to share with a nearby mama — coordinate safely in the Village Support Hub.';
+const DEFAULT_SEEKING_DETAIL =
+  'Looking for gentle village help — happy to coordinate safely in the Support Hub.';
+
+/**
+ * Shape a mama's basket draft like the example cards: short title + supporting detail.
+ * Avoids duplicating the same line as both title and detail.
+ */
+export function buildBasketListingFields({ title, detail, mode } = {}) {
+  let resolvedTitle = String(title || '').trim();
+  let resolvedDetail = String(detail || '').trim();
+
+  // Single-box / pasted drafts: first line = title, rest = detail.
+  if (resolvedTitle && !resolvedDetail && /\n/.test(resolvedTitle)) {
+    const lines = resolvedTitle.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    resolvedTitle = lines[0] || '';
+    resolvedDetail = lines.slice(1).join(' ').trim();
+  }
+
+  // Long single sentence: first sentence becomes title, remainder becomes detail.
+  if (resolvedTitle && !resolvedDetail && resolvedTitle.length > 56) {
+    const sentence = resolvedTitle.match(/^(.{12,72}?[.!?])\s+(.+)$/);
+    if (sentence) {
+      resolvedTitle = sentence[1].trim();
+      resolvedDetail = sentence[2].trim();
+    }
+  }
+
+  // "Title — detail" or "Title - detail" pattern (when still one blob).
+  if (resolvedTitle && !resolvedDetail) {
+    const emDash = resolvedTitle.match(/^(.{8,72}?)\s+[—–-]\s+(.+)$/);
+    if (emDash) {
+      resolvedTitle = emDash[1].trim();
+      resolvedDetail = emDash[2].trim();
+    }
+  }
+
+  // Keep a concise title line like the example cards.
+  if (resolvedTitle.length > 64) {
+    resolvedTitle = `${resolvedTitle.slice(0, 61).trim()}…`;
+  }
+
+  if (!resolvedTitle && resolvedDetail) {
+    resolvedTitle =
+      resolvedDetail.length > 52 ? `${resolvedDetail.slice(0, 52).trim()}…` : resolvedDetail;
+    resolvedDetail =
+      mode === 'seeking' ? DEFAULT_SEEKING_DETAIL : DEFAULT_OFFERING_DETAIL;
+  }
+
+  if (resolvedTitle && (!resolvedDetail || resolvedDetail === resolvedTitle)) {
+    resolvedDetail =
+      mode === 'seeking' ? DEFAULT_SEEKING_DETAIL : DEFAULT_OFFERING_DETAIL;
+  }
+
+  return {
+    title: resolvedTitle,
+    detail: resolvedDetail,
+    tag: mode === 'seeking' ? 'Seeking' : 'Offering',
+  };
+}
 
 export const ZONE_TINTS = {
   sage: {

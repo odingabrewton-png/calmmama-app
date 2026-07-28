@@ -247,6 +247,7 @@ import {
   COMMUNITY_POSTS_SEED,
   BASKET_OFFERINGS,
   BASKET_SEEKING,
+  buildBasketListingFields,
 } from './villageCommunityData';
 
 const REGISTRY_ASSET_PLACEHOLDERS = [
@@ -3234,6 +3235,7 @@ function CalmMamaApp() {
   const [basketOfferings, setBasketOfferings] = useState(() => [...BASKET_OFFERINGS]);
   const [basketSeeking, setBasketSeeking] = useState(() => [...BASKET_SEEKING]);
   const [newBasketDraft, setNewBasketDraft] = useState('');
+  const [newBasketDetailDraft, setNewBasketDetailDraft] = useState('');
   const [basketShareMode, setBasketShareMode] = useState('offering');
   const communityReplyIdRef = useRef(100);
   const communityPostIdRef = useRef(10);
@@ -4336,16 +4338,18 @@ function CalmMamaApp() {
   };
 
   const handleAddBasketListing = () => {
-    const detail = newBasketDraft.trim();
-    if (!detail) return;
+    const fields = buildBasketListingFields({
+      title: newBasketDraft,
+      detail: newBasketDetailDraft,
+      mode: basketShareMode,
+    });
+    if (!fields.title) return;
     basketListingIdRef.current += 1;
-    const title =
-      detail.length > 52 ? `${detail.slice(0, 52).trim()}…` : detail;
     const item = {
       id: `b${basketListingIdRef.current}`,
-      title,
-      detail,
-      tag: basketShareMode === 'offering' ? 'Offering' : 'Seeking',
+      title: fields.title,
+      detail: fields.detail,
+      tag: fields.tag,
       sharedBy: mamaName,
     };
     if (basketShareMode === 'offering') {
@@ -4354,6 +4358,7 @@ function CalmMamaApp() {
       setBasketSeeking((prev) => [item, ...prev]);
     }
     setNewBasketDraft('');
+    setNewBasketDetailDraft('');
   };
 
   const handleAddCommunityPost = () => {
@@ -5261,6 +5266,8 @@ function CalmMamaApp() {
                   basketSeeking={basketSeeking}
                   newBasketDraft={newBasketDraft}
                   onNewBasketDraftChange={setNewBasketDraft}
+                  newBasketDetailDraft={newBasketDetailDraft}
+                  onNewBasketDetailDraftChange={setNewBasketDetailDraft}
                   basketShareMode={basketShareMode}
                   onBasketShareModeChange={setBasketShareMode}
                   onAddBasketListing={handleAddBasketListing}
@@ -5552,6 +5559,8 @@ function CalmMamaApp() {
                         basketSeeking={basketSeeking}
                         newBasketDraft={newBasketDraft}
                         onNewBasketDraftChange={setNewBasketDraft}
+                        newBasketDetailDraft={newBasketDetailDraft}
+                        onNewBasketDetailDraftChange={setNewBasketDetailDraft}
                         basketShareMode={basketShareMode}
                         onBasketShareModeChange={setBasketShareMode}
                         onAddBasketListing={handleAddBasketListing}

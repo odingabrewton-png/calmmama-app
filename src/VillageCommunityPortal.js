@@ -29,7 +29,8 @@ import {
   VILLAGE_PRIVACY_TITLE,
   VILLAGE_PRIVACY_DESCRIPTION,
   BASKET_SHARE_HINTS,
-  BASKET_SHARE_PLACEHOLDER,
+  BASKET_SHARE_TITLE_PLACEHOLDER,
+  BASKET_SHARE_DETAIL_PLACEHOLDER,
   ZONE_TINTS,
   MAP_PRIVACY_ZONES,
   NEARBY_MAMA_PROFILES,
@@ -638,6 +639,10 @@ function VillageConstellationPanel({
 }
 
 function BasketListing({ item, onCoordinate, pregnantCosmic = false }) {
+  const showDetail =
+    Boolean(item.detail) &&
+    String(item.detail).trim() !== String(item.title || '').trim();
+
   return (
     <View style={[styles.basketCard, pregnantCosmic && styles.basketCardPregnantCosmic]}>
       <Text style={[styles.basketTag, pregnantCosmic && styles.basketTextOnCosmicMuted]}>{item.tag}</Text>
@@ -647,7 +652,11 @@ function BasketListing({ item, onCoordinate, pregnantCosmic = false }) {
         </Text>
       ) : null}
       <Text style={[styles.basketTitle, pregnantCosmic && styles.basketTextOnCosmic]}>{item.title}</Text>
-      <Text style={[styles.basketDetail, pregnantCosmic && styles.basketTextOnCosmicMuted]}>{item.detail}</Text>
+      {showDetail ? (
+        <Text style={[styles.basketDetail, pregnantCosmic && styles.basketTextOnCosmicMuted]}>
+          {item.detail}
+        </Text>
+      ) : null}
       <TouchableOpacity style={styles.basketBtn} onPress={() => onCoordinate(item.id)} activeOpacity={0.88}>
         <Text style={styles.basketBtnText}>Coordinate Support Hub</Text>
       </TouchableOpacity>
@@ -660,6 +669,8 @@ function VillageBasketPanel({
   basketSeeking,
   newBasketDraft,
   onNewBasketDraftChange,
+  newBasketDetailDraft,
+  onNewBasketDetailDraftChange,
   basketShareMode,
   onBasketShareModeChange,
   onAddBasketListing,
@@ -669,7 +680,7 @@ function VillageBasketPanel({
   const [safetyModalOpen, setSafetyModalOpen] = useState(false);
 
   const requestShare = () => {
-    if (!newBasketDraft?.trim()) return;
+    if (!newBasketDraft?.trim() && !newBasketDetailDraft?.trim()) return;
     setSafetyModalOpen(true);
   };
 
@@ -748,12 +759,30 @@ function VillageBasketPanel({
                 </Text>
               </TouchableOpacity>
             </View>
+            <Text
+              style={[styles.basketFieldLabel, pregnantCosmic && styles.basketTextOnCosmicMuted]}
+            >
+              Title
+            </Text>
             <TextInput
-              style={styles.basketPanelInput}
-              placeholder={BASKET_SHARE_PLACEHOLDER}
+              style={styles.basketPanelTitleInput}
+              placeholder={BASKET_SHARE_TITLE_PLACEHOLDER}
               placeholderTextColor={BASKET_INK_MUTED}
               value={newBasketDraft}
               onChangeText={onNewBasketDraftChange}
+              returnKeyType="next"
+            />
+            <Text
+              style={[styles.basketFieldLabel, pregnantCosmic && styles.basketTextOnCosmicMuted]}
+            >
+              Detail
+            </Text>
+            <TextInput
+              style={styles.basketPanelInput}
+              placeholder={BASKET_SHARE_DETAIL_PLACEHOLDER}
+              placeholderTextColor={BASKET_INK_MUTED}
+              value={newBasketDetailDraft}
+              onChangeText={onNewBasketDetailDraftChange}
               multiline
               onSubmitEditing={requestShare}
             />
@@ -812,6 +841,8 @@ export default function VillageCommunityPortal({
   basketSeeking,
   newBasketDraft,
   onNewBasketDraftChange,
+  newBasketDetailDraft,
+  onNewBasketDetailDraftChange,
   basketShareMode,
   onBasketShareModeChange,
   onAddBasketListing,
@@ -935,6 +966,8 @@ export default function VillageCommunityPortal({
             basketSeeking={basketSeeking}
             newBasketDraft={newBasketDraft}
             onNewBasketDraftChange={onNewBasketDraftChange}
+            newBasketDetailDraft={newBasketDetailDraft}
+            onNewBasketDetailDraftChange={onNewBasketDetailDraftChange}
             basketShareMode={basketShareMode}
             onBasketShareModeChange={onBasketShareModeChange}
             onAddBasketListing={onAddBasketListing}
@@ -1838,6 +1871,27 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 4,
   },
+  basketFieldLabel: {
+    marginTop: 10,
+    marginBottom: 4,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    color: BASKET_INK_MUTED,
+    textTransform: 'uppercase',
+  },
+  basketPanelTitleInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.34)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: '700',
+    color: BASKET_INK,
+    marginBottom: 2,
+  },
   basketPanelInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.34)',
     borderRadius: 14,
@@ -1849,7 +1903,7 @@ const styles = StyleSheet.create({
     color: BASKET_INK,
     minHeight: 80,
     textAlignVertical: 'top',
-    marginTop: 8,
+    marginTop: 0,
     marginBottom: 10,
   },
   basketSharePostBtn: {
