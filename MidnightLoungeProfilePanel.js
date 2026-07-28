@@ -22,6 +22,7 @@ import { isAdmin } from './adminAccess.js';
 import { useVillageRewards } from './VillageRewardsContext';
 import {
   getMeBackgroundById,
+  getMeSurfaceInk,
   ME_PROFILE_CONTENT_MAX_WIDTH,
   ME_PROFILE_H_PAD,
 } from './meProfileBackgrounds';
@@ -121,6 +122,7 @@ function MidnightLoungeProfilePanel({
     () => getMeBackgroundById(rewards.selectedMeBackgroundId),
     [rewards.selectedMeBackgroundId],
   );
+  const ink = useMemo(() => getMeSurfaceInk(background), [background]);
   const activeSticker = rewards.hasCustomSticker
     ? getStickerById(rewards.selectedStickerId)
     : null;
@@ -147,24 +149,10 @@ function MidnightLoungeProfilePanel({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.contentColumn}>
-          <Text
-            style={[
-              styles.sectionEyebrow,
-              background.light || background.passThrough ? styles.sectionEyebrowOnLight : null,
-              SANS,
-            ]}
-          >
+          <Text style={[styles.sectionEyebrow, { color: ink.muted }, SANS]}>
             YOUR LOUNGE IDENTITY
           </Text>
-          <Text
-            style={[
-              styles.sectionTitle,
-              background.light || background.passThrough ? styles.sectionTitleOnLight : null,
-              SANS,
-            ]}
-          >
-            Me
-          </Text>
+          <Text style={[styles.sectionTitle, { color: ink.primary }, SANS]}>Me</Text>
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryAvatarWrap}>
@@ -294,21 +282,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 1.3,
-    color: MIDNIGHT.lavenderMuted,
     textAlign: 'center',
-  },
-  sectionEyebrowOnLight: {
-    color: 'rgba(42, 37, 64, 0.62)',
   },
   sectionTitle: {
     fontSize: 34,
     fontWeight: '700',
-    color: MIDNIGHT.textPrimary,
     textAlign: 'center',
     marginBottom: 18,
-  },
-  sectionTitleOnLight: {
-    color: '#2A2540',
   },
   summaryCard: {
     alignItems: 'center',

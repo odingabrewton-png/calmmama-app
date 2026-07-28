@@ -26,6 +26,7 @@ import HybridLittleOnesSection from './HybridLittleOnesSection.js';
 import { useVillageRewards } from './VillageRewardsContext';
 import {
   getMeBackgroundById,
+  getMeSurfaceInk,
   ME_PROFILE_CONTENT_MAX_WIDTH,
   ME_PROFILE_H_PAD,
 } from './meProfileBackgrounds';
@@ -95,6 +96,7 @@ export default function MidnightLoungeProfileEditPanel({
     () => getMeBackgroundById(rewards.selectedMeBackgroundId),
     [rewards.selectedMeBackgroundId],
   );
+  const ink = useMemo(() => getMeSurfaceInk(background), [background]);
 
   useEffect(() => {
     setNameDraft(mamaName || '');
@@ -138,33 +140,21 @@ export default function MidnightLoungeProfileEditPanel({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.contentColumn}>
-          <Text
-            style={[
-              styles.sectionEyebrow,
-              background.light || background.passThrough ? styles.sectionEyebrowOnLight : null,
-              SANS,
-            ]}
-          >
+          <Text style={[styles.sectionEyebrow, { color: ink.muted }, SANS]}>
             YOUR LOUNGE IDENTITY
           </Text>
-          <Text
-            style={[
-              styles.sectionTitle,
-              background.light || background.passThrough ? styles.sectionTitleOnLight : null,
-              SANS,
-            ]}
-          >
+          <Text style={[styles.sectionTitle, { color: ink.primary }, SANS]}>
             Customize Profile
           </Text>
 
           <TouchableOpacity
-            style={styles.avatarDashed}
+            style={[styles.avatarDashed, ink.onLight && styles.avatarDashedOnLight]}
             onPress={onPickProfilePhoto}
             activeOpacity={0.88}
             accessibilityRole="button"
             accessibilityLabel="Upload profile photo"
           >
-            <View style={styles.avatarInner}>
+            <View style={[styles.avatarInner, ink.onLight && styles.avatarInnerOnLight]}>
               {profilePhotoUri ? (
                 <Image
                   source={{ uri: profilePhotoUri }}
@@ -176,101 +166,202 @@ export default function MidnightLoungeProfileEditPanel({
                 />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarPlus}>+</Text>
-                  <Text style={[styles.avatarHint, SANS]}>Add Photo</Text>
+                  <Text style={[styles.avatarPlus, { color: ink.accent }]}>+</Text>
+                  <Text style={[styles.avatarHint, { color: ink.muted }, SANS]}>Add Photo</Text>
                 </View>
               )}
             </View>
           </TouchableOpacity>
 
-          <Text style={[styles.fieldLabel, SANS]}>Display Name</Text>
-          <TextInput
-            style={[styles.fieldInput, SANS]}
-            value={nameDraft}
-            onChangeText={setNameDraft}
-            placeholder="How should the village greet you?"
-            placeholderTextColor={MIDNIGHT.textMuted}
-          />
+          <View
+            style={[
+              styles.fieldCard,
+              ink.onLight ? styles.fieldCardOnLight : null,
+            ]}
+          >
+            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+              Display Name
+            </Text>
+            <TextInput
+              style={[
+                styles.fieldCardInput,
+                ink.onLight && styles.fieldCardInputOnLight,
+                SANS,
+              ]}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              placeholder="How should the village greet you?"
+              placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+            />
+          </View>
           <CustomTitleBadge title={rewards.customProfileTitle || titleDraft} />
 
           {canEditTitle ? (
-            <>
-              <Text style={[styles.fieldLabel, SANS]}>Custom Profile Title</Text>
+            <View
+              style={[
+                styles.fieldCard,
+                ink.onLight ? styles.fieldCardOnLight : null,
+              ]}
+            >
+              <Text
+                style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}
+              >
+                Custom Profile Title
+              </Text>
               <TextInput
-                style={[styles.fieldInput, SANS]}
+                style={[
+                  styles.fieldCardInput,
+                  ink.onLight && styles.fieldCardInputOnLight,
+                  SANS,
+                ]}
                 value={titleDraft}
                 onChangeText={setTitleDraft}
                 placeholder="e.g. Feature Fairy Godmother"
-                placeholderTextColor={MIDNIGHT.textMuted}
+                placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
                 maxLength={48}
               />
-            </>
+            </View>
           ) : null}
 
-          <Text style={[styles.fieldLabel, SANS]}>Short Bio / Mantra</Text>
-          <TextInput
-            style={[styles.fieldInput, styles.fieldInputMultiline, SANS]}
-            value={bioDraft}
-            onChangeText={setBioDraft}
-            placeholder="A line you carry into the quiet hours…"
-            placeholderTextColor={MIDNIGHT.textMuted}
-            multiline
-            textAlignVertical="top"
-          />
+          <View
+            style={[
+              styles.fieldCard,
+              ink.onLight ? styles.fieldCardOnLight : null,
+            ]}
+          >
+            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+              Short Bio / Mantra
+            </Text>
+            <TextInput
+              style={[
+                styles.fieldCardInput,
+                styles.fieldCardInputMultiline,
+                ink.onLight && styles.fieldCardInputOnLight,
+                SANS,
+              ]}
+              value={bioDraft}
+              onChangeText={setBioDraft}
+              placeholder="A line you carry into the quiet hours…"
+              placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
 
           <MamaBirthdayField
             birthday={mamaBirthday}
             onBirthdayChange={onBirthdayChange}
-            variant="midnight"
+            variant={ink.onLight ? 'hybridLight' : 'hybrid'}
           />
 
-          <Text style={[styles.fieldLabel, SANS]}>Account email</Text>
-          <TextInput
-            style={[styles.fieldInput, SANS]}
-            value={accountEmail || ''}
-            onChangeText={onAccountEmailChange}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            placeholder="Used for membership & village mail"
-            placeholderTextColor={MIDNIGHT.textMuted}
-          />
+          <View
+            style={[
+              styles.fieldCard,
+              ink.onLight ? styles.fieldCardOnLight : null,
+            ]}
+          >
+            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+              Account email
+            </Text>
+            <TextInput
+              style={[
+                styles.fieldCardInput,
+                ink.onLight && styles.fieldCardInputOnLight,
+                SANS,
+              ]}
+              value={accountEmail || ''}
+              onChangeText={onAccountEmailChange}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="Used for membership & village mail"
+              placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+            />
+          </View>
 
-          <Text style={[styles.fieldLabel, SANS]}>Your village stage</Text>
-          <Text style={[styles.stageHint, SANS]}>
-            Pregnant and parenting a little one? Choose Both — then use the Home pills to switch
-            tracks.
-          </Text>
-          <View style={styles.stageRow}>
-            {STAGE_OPTIONS.map((option) => {
-              const selected = activeMode === option.id;
-              return (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[styles.stagePill, selected && styles.stagePillActive]}
-                  onPress={() => onSelectJourneyMode?.(option.id)}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                >
-                  <Text
-                    style={[styles.stagePillLabel, SANS, selected && styles.stagePillLabelActive]}
+          <View
+            style={[
+              styles.fieldCard,
+              ink.onLight ? styles.fieldCardOnLight : null,
+            ]}
+          >
+            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+              Your village stage
+            </Text>
+            <Text
+              style={[
+                styles.stageHint,
+                { color: ink.onLight ? '#5A6E58' : 'rgba(232, 229, 247, 0.72)' },
+                SANS,
+              ]}
+            >
+              Pregnant and parenting a little one? Choose Both — then use the Home pills to switch
+              tracks.
+            </Text>
+            <View style={styles.stageRow}>
+              {STAGE_OPTIONS.map((option) => {
+                const selected = activeMode === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[
+                      styles.stagePill,
+                      ink.onLight && styles.stagePillOnLight,
+                      selected && styles.stagePillActive,
+                      selected && ink.onLight && styles.stagePillActiveOnLight,
+                    ]}
+                    onPress={() => onSelectJourneyMode?.(option.id)}
+                    activeOpacity={0.88}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
                   >
-                    {option.label}
-                  </Text>
-                  <Text
-                    style={[styles.stagePillHint, SANS, selected && styles.stagePillHintActive]}
-                  >
-                    {option.hint}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.stagePillLabel,
+                        {
+                          color: ink.onLight
+                            ? selected
+                              ? '#3F3428'
+                              : '#5A6E58'
+                            : selected
+                              ? '#3F3428'
+                              : 'rgba(232, 229, 247, 0.75)',
+                        },
+                        SANS,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.stagePillHint,
+                        {
+                          color: ink.onLight
+                            ? selected
+                              ? '#5A4E72'
+                              : '#7A8A7E'
+                            : selected
+                              ? '#5A4E72'
+                              : 'rgba(232, 229, 247, 0.55)',
+                        },
+                        SANS,
+                      ]}
+                    >
+                      {option.hint}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
           {activeMode === 'hybrid' ? (
             <>
-              <HybridLittleOnesSection littleOnes={littleOnes} onChildrenChange={onChildrenChange} />
-              <Text style={[styles.hybridReadyNote, SANS]}>
+              <HybridLittleOnesSection
+                littleOnes={littleOnes}
+                onChildrenChange={onChildrenChange}
+                variant={ink.onLight ? 'daily' : 'midnight'}
+              />
+              <Text style={[styles.hybridReadyNote, { color: ink.accent }, SANS]}>
                 Hybrid on — open Home for Pregnancy / Toddler pills.
               </Text>
             </>
@@ -290,8 +381,20 @@ export default function MidnightLoungeProfileEditPanel({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.doneBtn} onPress={onClose} activeOpacity={0.88}>
-            <Text style={[styles.doneBtnText, SANS]}>Done</Text>
+          <TouchableOpacity
+            style={[styles.doneBtn, ink.onLight && styles.doneBtnOnLight]}
+            onPress={onClose}
+            activeOpacity={0.88}
+          >
+            <Text
+              style={[
+                styles.doneBtnText,
+                { color: ink.onLight ? ink.accent : MIDNIGHT.lavenderMuted },
+                SANS,
+              ]}
+            >
+              Done
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -323,21 +426,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 1.3,
-    color: MIDNIGHT.lavenderMuted,
     textAlign: 'center',
-  },
-  sectionEyebrowOnLight: {
-    color: 'rgba(42, 37, 64, 0.62)',
   },
   sectionTitle: {
     fontSize: 30,
     fontWeight: '700',
-    color: MIDNIGHT.textPrimary,
     textAlign: 'center',
     marginBottom: 18,
-  },
-  sectionTitleOnLight: {
-    color: '#2A2540',
   },
   avatarDashed: {
     width: 152,
@@ -353,6 +448,9 @@ const styles = StyleSheet.create({
     padding: 4,
     backgroundColor: 'transparent',
   },
+  avatarDashedOnLight: {
+    borderColor: 'rgba(107, 85, 136, 0.55)',
+  },
   avatarInner: {
     width: 140,
     height: 140,
@@ -361,6 +459,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: MIDNIGHT.lavenderTint,
+  },
+  avatarInnerOnLight: {
+    backgroundColor: 'rgba(255, 252, 248, 0.75)',
   },
   avatarImage: {
     width: 140,
@@ -373,37 +474,54 @@ const styles = StyleSheet.create({
   },
   avatarPlus: {
     fontSize: 40,
-    color: MIDNIGHT.lavender,
     fontWeight: '300',
   },
   avatarHint: {
     fontSize: 15,
-    color: MIDNIGHT.textMuted,
     marginTop: 4,
   },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: MIDNIGHT.textMuted,
-    marginBottom: 8,
-    letterSpacing: 0.4,
-  },
-  fieldInput: {
-    backgroundColor: MIDNIGHT.bgCard,
+  /** Matches HybridLittleOnesSection "Little one 1" child card. */
+  fieldCard: {
+    marginBottom: 12,
+    padding: 12,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: MIDNIGHT.border,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 19,
-    color: MIDNIGHT.textPrimary,
-    marginBottom: 14,
     width: '100%',
+    backgroundColor: 'rgba(37, 34, 50, 0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 150, 0.22)',
+  },
+  fieldCardOnLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: 'rgba(107, 143, 120, 0.25)',
+  },
+  fieldCardLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  fieldCardInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 150, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#F5F0FF',
+  },
+  fieldCardInputOnLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    borderColor: 'rgba(107, 143, 120, 0.28)',
+    color: '#2A382E',
+  },
+  fieldCardInputMultiline: {
+    minHeight: 88,
+    paddingTop: 10,
   },
   titleBadge: {
     alignSelf: 'center',
-    marginTop: -6,
-    marginBottom: 16,
+    marginTop: 2,
+    marginBottom: 12,
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 999,
@@ -447,61 +565,53 @@ const styles = StyleSheet.create({
   titleBadgeSparkleRight: {
     right: 8,
   },
-  fieldInputMultiline: {
-    minHeight: 96,
-    paddingTop: 14,
-  },
   stageHint: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: MIDNIGHT.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
     marginBottom: 10,
-    marginTop: -2,
   },
   stageRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
+    gap: 6,
   },
   stagePill: {
     flexGrow: 1,
     flexBasis: '30%',
     minWidth: 96,
-    borderRadius: 16,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: MIDNIGHT.border,
-    backgroundColor: MIDNIGHT.bgCard,
-    paddingVertical: 12,
+    borderColor: 'rgba(212, 184, 150, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingVertical: 9,
     paddingHorizontal: 10,
     alignItems: 'center',
   },
+  stagePillOnLight: {
+    borderColor: 'rgba(107, 143, 120, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
   stagePillActive: {
-    borderColor: MIDNIGHT.lavender,
-    backgroundColor: MIDNIGHT.lavenderTint,
+    backgroundColor: 'rgba(212, 184, 150, 0.85)',
+    borderColor: 'rgba(212, 184, 150, 0.95)',
+  },
+  stagePillActiveOnLight: {
+    backgroundColor: 'rgba(212, 184, 150, 0.85)',
+    borderColor: 'rgba(212, 184, 150, 0.95)',
   },
   stagePillLabel: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
-    color: MIDNIGHT.textPrimary,
-    marginBottom: 3,
-  },
-  stagePillLabelActive: {
-    color: '#2A2540',
+    marginBottom: 2,
   },
   stagePillHint: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: MIDNIGHT.textMuted,
     textAlign: 'center',
-  },
-  stagePillHintActive: {
-    color: '#5A4E72',
   },
   hybridReadyNote: {
     fontSize: 13,
     fontWeight: '700',
-    color: MIDNIGHT.lavender,
     marginBottom: 14,
     textAlign: 'center',
   },
@@ -525,9 +635,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 8,
   },
+  doneBtnOnLight: {
+    marginBottom: 4,
+  },
   doneBtnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: MIDNIGHT.lavenderMuted,
   },
 });

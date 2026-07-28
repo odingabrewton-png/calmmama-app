@@ -50,3 +50,4 @@ replit.nix
 # generated native folders
 /ios
 /android
+.vercel

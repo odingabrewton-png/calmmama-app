@@ -2,12 +2,13 @@
  * Me-tab background picker — free lounge washes (not Fairy Godmother perk).
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MIDNIGHT } from './midnightLoungeTheme';
 import {
   DEFAULT_ME_BACKGROUND_ID,
+  getMeBackgroundById,
+  getMeSurfaceInk,
   ME_PROFILE_BACKGROUNDS,
   resolveMeBackgroundId,
 } from './meProfileBackgrounds';
@@ -24,11 +25,15 @@ export default function MeProfileBackgroundSwitcher() {
   const selectedId = resolveMeBackgroundId(
     rewards.selectedMeBackgroundId || DEFAULT_ME_BACKGROUND_ID,
   );
+  const ink = useMemo(
+    () => getMeSurfaceInk(getMeBackgroundById(selectedId)),
+    [selectedId],
+  );
 
   return (
-    <View style={styles.wrap}>
-      <Text style={[styles.eyebrow, SANS]}>ME PAGE BACKGROUNDS</Text>
-      <Text style={[styles.hint, SANS]}>
+    <View style={[styles.wrap, ink.onLight && styles.wrapOnLight]}>
+      <Text style={[styles.eyebrow, { color: ink.gold }, SANS]}>ME PAGE BACKGROUNDS</Text>
+      <Text style={[styles.hint, { color: ink.secondary }, SANS]}>
         Soft lounge washes just for your Me space — Calm Mama keeps the village ombre; the others are
         lighter pastel rooms.
       </Text>
@@ -38,7 +43,11 @@ export default function MeProfileBackgroundSwitcher() {
           return (
             <TouchableOpacity
               key={theme.id}
-              style={[styles.swatch, active && styles.swatchActive]}
+              style={[
+                styles.swatch,
+                active && styles.swatchActive,
+                active && ink.onLight && styles.swatchActiveOnLight,
+              ]}
               onPress={() => updateProfileFields({ selectedMeBackgroundId: theme.id })}
               activeOpacity={0.88}
               accessibilityLabel={theme.label}
@@ -49,9 +58,9 @@ export default function MeProfileBackgroundSwitcher() {
                 locations={theme.locations}
                 start={{ x: 0.1, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
-                style={styles.swatchPreview}
+                style={[styles.swatchPreview, ink.onLight && styles.swatchPreviewOnLight]}
               />
-              <Text style={[styles.swatchLabel, SANS]}>
+              <Text style={[styles.swatchLabel, { color: ink.primary }, SANS]}>
                 {theme.emoji} {theme.label}
               </Text>
             </TouchableOpacity>
@@ -73,18 +82,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(212, 184, 150, 0.3)',
   },
+  wrapOnLight: {
+    backgroundColor: 'rgba(255, 252, 248, 0.72)',
+    borderColor: 'rgba(42, 37, 64, 0.14)',
+  },
   eyebrow: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.1,
-    color: MIDNIGHT.accentGold,
     textAlign: 'center',
     marginBottom: 6,
   },
   hint: {
     fontSize: 12,
     lineHeight: 17,
-    color: MIDNIGHT.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -109,6 +120,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(212, 184, 150, 0.75)',
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
   },
+  swatchActiveOnLight: {
+    borderColor: 'rgba(107, 85, 136, 0.55)',
+    backgroundColor: 'rgba(42, 37, 64, 0.06)',
+  },
   swatchPreview: {
     width: '100%',
     height: 34,
@@ -118,11 +133,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.22)',
     marginBottom: 6,
   },
+  swatchPreviewOnLight: {
+    borderColor: 'rgba(42, 37, 64, 0.18)',
+  },
   swatchLabel: {
     fontSize: 11,
-    color: MIDNIGHT.textPrimary,
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '700',
     lineHeight: 14,
   },
 });

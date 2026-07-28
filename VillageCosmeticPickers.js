@@ -2,16 +2,19 @@
  * Customize Profile — sticker pack + themed app icon pickers (unlocked via Crown Points).
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MIDNIGHT } from './midnightLoungeTheme';
 import {
   getAppIconById,
   getStickerById,
   VILLAGE_APP_ICONS,
   VILLAGE_STICKERS,
 } from './villageCosmeticPerks';
+import {
+  getMeBackgroundById,
+  getMeSurfaceInk,
+} from './meProfileBackgrounds';
 import { useVillageRewards } from './VillageRewardsContext';
 
 const SANS = Platform.select({
@@ -20,16 +23,25 @@ const SANS = Platform.select({
   default: { fontFamily: 'sans-serif' },
 });
 
+function useMeInk() {
+  const { rewards } = useVillageRewards();
+  return useMemo(
+    () => getMeSurfaceInk(getMeBackgroundById(rewards.selectedMeBackgroundId)),
+    [rewards.selectedMeBackgroundId],
+  );
+}
+
 export function VillageStickerPicker({ unlocked = false }) {
   const { rewards, updateProfileFields } = useVillageRewards();
+  const ink = useMeInk();
   if (!unlocked) return null;
 
   const selected = getStickerById(rewards.selectedStickerId);
 
   return (
-    <View style={styles.wrap}>
-      <Text style={[styles.eyebrow, SANS]}>CUSTOM STICKER PACK</Text>
-      <Text style={[styles.hint, SANS]}>
+    <View style={[styles.wrap, ink.onLight && styles.wrapOnLight]}>
+      <Text style={[styles.eyebrow, { color: ink.gold }, SANS]}>CUSTOM STICKER PACK</Text>
+      <Text style={[styles.hint, { color: ink.secondary }, SANS]}>
         Your 300-pt sticker perk is active — pin one soft sticker to your Me profile.
       </Text>
       <View style={styles.row}>
@@ -38,14 +50,19 @@ export function VillageStickerPicker({ unlocked = false }) {
           return (
             <TouchableOpacity
               key={sticker.id}
-              style={[styles.stickerChip, active && styles.chipActive]}
+              style={[
+                styles.stickerChip,
+                ink.onLight && styles.chipOnLight,
+                active && styles.chipActive,
+                active && ink.onLight && styles.chipActiveOnLight,
+              ]}
               onPress={() => updateProfileFields({ selectedStickerId: sticker.id })}
               activeOpacity={0.88}
               accessibilityLabel={sticker.label}
               accessibilityState={{ selected: active }}
             >
               <Text style={styles.stickerEmoji}>{sticker.emoji}</Text>
-              <Text style={[styles.chipLabel, SANS]}>{sticker.label}</Text>
+              <Text style={[styles.chipLabel, { color: ink.primary }, SANS]}>{sticker.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -56,14 +73,15 @@ export function VillageStickerPicker({ unlocked = false }) {
 
 export function VillageAppIconPicker({ unlocked = false }) {
   const { rewards, updateProfileFields } = useVillageRewards();
+  const ink = useMeInk();
   if (!unlocked) return null;
 
   const selected = getAppIconById(rewards.selectedAppIconId);
 
   return (
-    <View style={styles.wrap}>
-      <Text style={[styles.eyebrow, SANS]}>THEMED APP ICON</Text>
-      <Text style={[styles.hint, SANS]}>
+    <View style={[styles.wrap, ink.onLight && styles.wrapOnLight]}>
+      <Text style={[styles.eyebrow, { color: ink.gold }, SANS]}>THEMED APP ICON</Text>
+      <Text style={[styles.hint, { color: ink.secondary }, SANS]}>
         Your 500-pt icon swap is unlocked — choose a home-screen vibe for your Me sanctuary.
       </Text>
       <View style={styles.previewRow}>
@@ -76,8 +94,8 @@ export function VillageAppIconPicker({ unlocked = false }) {
           <Text style={styles.iconPreviewEmoji}>{selected.emoji}</Text>
         </LinearGradient>
         <View style={styles.previewCopy}>
-          <Text style={[styles.previewTitle, SANS]}>{selected.label}</Text>
-          <Text style={[styles.previewSub, SANS]}>Active on your Me profile</Text>
+          <Text style={[styles.previewTitle, { color: ink.primary }, SANS]}>{selected.label}</Text>
+          <Text style={[styles.previewSub, { color: ink.muted }, SANS]}>Active on your Me profile</Text>
         </View>
       </View>
       <View style={styles.row}>
@@ -86,7 +104,12 @@ export function VillageAppIconPicker({ unlocked = false }) {
           return (
             <TouchableOpacity
               key={icon.id}
-              style={[styles.iconChip, active && styles.chipActive]}
+              style={[
+                styles.iconChip,
+                ink.onLight && styles.chipOnLight,
+                active && styles.chipActive,
+                active && ink.onLight && styles.chipActiveOnLight,
+              ]}
               onPress={() => updateProfileFields({ selectedAppIconId: icon.id })}
               activeOpacity={0.88}
               accessibilityLabel={icon.label}
@@ -100,7 +123,7 @@ export function VillageAppIconPicker({ unlocked = false }) {
               >
                 <Text style={styles.iconSwatchEmoji}>{icon.emoji}</Text>
               </LinearGradient>
-              <Text style={[styles.chipLabel, SANS]}>{icon.label}</Text>
+              <Text style={[styles.chipLabel, { color: ink.primary }, SANS]}>{icon.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -120,18 +143,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(212, 184, 150, 0.3)',
   },
+  wrapOnLight: {
+    backgroundColor: 'rgba(255, 252, 248, 0.72)',
+    borderColor: 'rgba(42, 37, 64, 0.14)',
+  },
   eyebrow: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.1,
-    color: MIDNIGHT.accentGold,
     textAlign: 'center',
     marginBottom: 6,
   },
   hint: {
     fontSize: 12,
     lineHeight: 17,
-    color: MIDNIGHT.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -165,9 +190,16 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     backgroundColor: 'rgba(37, 34, 50, 0.35)',
   },
+  chipOnLight: {
+    backgroundColor: 'rgba(42, 37, 64, 0.06)',
+  },
   chipActive: {
     borderColor: 'rgba(212, 184, 150, 0.75)',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  chipActiveOnLight: {
+    borderColor: 'rgba(107, 85, 136, 0.55)',
+    backgroundColor: 'rgba(42, 37, 64, 0.08)',
   },
   stickerEmoji: {
     fontSize: 28,
@@ -175,9 +207,8 @@ const styles = StyleSheet.create({
   },
   chipLabel: {
     fontSize: 11,
-    color: MIDNIGHT.textPrimary,
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '700',
     lineHeight: 14,
   },
   previewRow: {
@@ -205,12 +236,10 @@ const styles = StyleSheet.create({
   previewTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: MIDNIGHT.textPrimary,
   },
   previewSub: {
     marginTop: 2,
     fontSize: 12,
-    color: MIDNIGHT.textMuted,
   },
   iconSwatch: {
     width: 44,

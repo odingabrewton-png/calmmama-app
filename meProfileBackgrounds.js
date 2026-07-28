@@ -103,3 +103,36 @@ export function resolveMeBackgroundId(themeId) {
 export function meBackgroundUsesLightText(theme) {
   return !theme?.light && !theme?.passThrough;
 }
+
+/** Dark ink for readable copy on light / pass-through Me washes. */
+export const ME_INK_ON_LIGHT = Object.freeze({
+  primary: '#2A2540',
+  secondary: 'rgba(42, 37, 64, 0.78)',
+  muted: 'rgba(42, 37, 64, 0.55)',
+  accent: '#6B5588',
+  gold: '#8A6A3C',
+  placeholder: 'rgba(42, 37, 64, 0.42)',
+});
+
+export function getMeSurfaceInk(theme) {
+  if (theme?.light || theme?.passThrough) {
+    return {
+      onLight: true,
+      primary: ME_INK_ON_LIGHT.primary,
+      secondary: ME_INK_ON_LIGHT.secondary,
+      muted: ME_INK_ON_LIGHT.muted,
+      accent: ME_INK_ON_LIGHT.accent,
+      gold: ME_INK_ON_LIGHT.gold,
+      placeholder: ME_INK_ON_LIGHT.placeholder,
+    };
+  }
+  return {
+    onLight: false,
+    primary: '#F4F2FA',
+    secondary: 'rgba(232, 229, 247, 0.72)',
+    muted: 'rgba(232, 229, 247, 0.48)',
+    accent: '#C4B8E8',
+    gold: '#D4B896',
+    placeholder: 'rgba(232, 229, 247, 0.48)',
+  };
+}

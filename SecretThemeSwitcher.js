@@ -1,13 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MIDNIGHT } from './midnightLoungeTheme';
 import {
   DEFAULT_FAIRY_OMBRE_ID,
   FAIRY_VILLAGE_DEFAULT_ID,
   SECRET_FAIRY_THEMES,
 } from './secretFairyThemes';
 import { CALM_MAMA_PASTEL } from './calmMamaPastelPalette';
+import {
+  getMeBackgroundById,
+  getMeSurfaceInk,
+} from './meProfileBackgrounds';
 import { useVillageRewards } from './VillageRewardsContext';
 
 const SANS = Platform.select({
@@ -42,6 +45,10 @@ function ensureSwatchAnimCss() {
  */
 export default function SecretThemeSwitcher({ unlocked = false }) {
   const { rewards, updateProfileFields } = useVillageRewards();
+  const ink = useMemo(
+    () => getMeSurfaceInk(getMeBackgroundById(rewards.selectedMeBackgroundId)),
+    [rewards.selectedMeBackgroundId],
+  );
 
   useEffect(() => {
     if (Platform.OS === 'web') ensureSwatchAnimCss();
@@ -66,9 +73,9 @@ export default function SecretThemeSwitcher({ unlocked = false }) {
   ];
 
   return (
-    <View style={styles.wrap}>
-      <Text style={[styles.eyebrow, SANS]}>FAIRY GODMOTHER OMBRE BLENDS</Text>
-      <Text style={[styles.hint, SANS]}>
+    <View style={[styles.wrap, ink.onLight && styles.wrapOnLight]}>
+      <Text style={[styles.eyebrow, { color: ink.gold }, SANS]}>FAIRY GODMOTHER OMBRE BLENDS</Text>
+      <Text style={[styles.hint, { color: ink.secondary }, SANS]}>
         Your 4,000-pt Fairy Godmother perk is active — choose an animated ombre wash for the whole
         village, or return to the classic Calm Mama blend.
       </Text>
@@ -78,7 +85,11 @@ export default function SecretThemeSwitcher({ unlocked = false }) {
           return (
             <TouchableOpacity
               key={theme.id}
-              style={[styles.swatch, active && styles.swatchActive]}
+              style={[
+                styles.swatch,
+                active && styles.swatchActive,
+                active && ink.onLight && styles.swatchActiveOnLight,
+              ]}
               onPress={() => updateProfileFields({ selectedSecretThemeId: theme.id })}
               activeOpacity={0.88}
               accessibilityLabel={theme.label}
@@ -89,6 +100,7 @@ export default function SecretThemeSwitcher({ unlocked = false }) {
                   className="calmmama-fairy-swatch-preview"
                   style={[
                     styles.swatchPreview,
+                    ink.onLight && styles.swatchPreviewOnLight,
                     {
                       backgroundImage: `linear-gradient(135deg, ${theme.colors[0]}, ${theme.colors[1]}, ${theme.colors[2]}, ${theme.colors[0]})`,
                       backgroundSize: '220% 220%',
@@ -100,10 +112,17 @@ export default function SecretThemeSwitcher({ unlocked = false }) {
                   colors={[...theme.colors, theme.colors[0]]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.swatchPreview}
+                  style={[styles.swatchPreview, ink.onLight && styles.swatchPreviewOnLight]}
                 />
               )}
-              <Text style={[styles.swatchLabel, SANS]}>
+              <Text
+                style={[
+                  styles.swatchLabel,
+                  { color: ink.onLight ? ink.primary : '#FFFFFF' },
+                  !ink.onLight && styles.swatchLabelShadow,
+                  SANS,
+                ]}
+              >
                 {theme.emoji} {theme.label}
               </Text>
             </TouchableOpacity>
@@ -124,18 +143,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(212, 184, 150, 0.35)',
   },
+  wrapOnLight: {
+    backgroundColor: 'rgba(255, 252, 248, 0.72)',
+    borderColor: 'rgba(42, 37, 64, 0.14)',
+  },
   eyebrow: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.1,
-    color: MIDNIGHT.accentGold,
     textAlign: 'center',
     marginBottom: 6,
   },
   hint: {
     fontSize: 12,
     lineHeight: 17,
-    color: MIDNIGHT.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -160,6 +181,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(212, 184, 150, 0.7)',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
+  swatchActiveOnLight: {
+    borderColor: 'rgba(107, 85, 136, 0.55)',
+    backgroundColor: 'rgba(42, 37, 64, 0.06)',
+  },
   swatchPreview: {
     width: '100%',
     height: 34,
@@ -169,12 +194,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.28)',
     marginBottom: 6,
   },
+  swatchPreviewOnLight: {
+    borderColor: 'rgba(42, 37, 64, 0.18)',
+  },
   swatchLabel: {
     fontSize: 11,
     textAlign: 'center',
     fontWeight: '700',
     lineHeight: 14,
-    color: '#FFFFFF',
+  },
+  swatchLabelShadow: {
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,

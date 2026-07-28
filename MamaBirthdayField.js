@@ -25,6 +25,7 @@ const PALETTES = {
     eyebrow: { color: MIDNIGHT.lavenderMuted },
     dateText: { color: MIDNIGHT.textPrimary },
     chevron: { color: MIDNIGHT.lavenderMuted },
+    hint: { color: MIDNIGHT.textMuted },
     pickerBorder: { borderTopColor: MIDNIGHT.border },
     pickerLabel: { color: MIDNIGHT.lavenderMuted },
     chip: {
@@ -51,6 +52,7 @@ const PALETTES = {
     eyebrow: { color: '#6B5588' },
     dateText: { color: '#2A382E' },
     chevron: { color: '#6B5588' },
+    hint: { color: 'rgba(42, 56, 46, 0.62)' },
     pickerBorder: { borderTopColor: 'rgba(154, 122, 184, 0.18)' },
     pickerLabel: { color: '#6B5588' },
     chip: {
@@ -69,7 +71,67 @@ const PALETTES = {
       text: { color: '#5E4878' },
     },
   },
+  /** Match HybridLittleOnesSection "Little one 1" child card (midnight). */
+  hybrid: {
+    field: {
+      backgroundColor: 'rgba(37, 34, 50, 0.45)',
+      borderColor: 'rgba(212, 184, 150, 0.22)',
+      borderRadius: 14,
+    },
+    eyebrow: { color: 'rgba(232, 229, 247, 0.8)' },
+    dateText: { color: '#F5F0FF' },
+    chevron: { color: 'rgba(232, 229, 247, 0.7)' },
+    hint: { color: 'rgba(232, 229, 247, 0.72)' },
+    pickerBorder: { borderTopColor: 'rgba(212, 184, 150, 0.28)' },
+    pickerLabel: { color: 'rgba(232, 229, 247, 0.8)' },
+    chip: {
+      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+      borderColor: 'rgba(212, 184, 150, 0.28)',
+      text: { color: 'rgba(232, 229, 247, 0.75)' },
+    },
+    chipActive: {
+      backgroundColor: 'rgba(212, 184, 150, 0.85)',
+      borderColor: 'rgba(212, 184, 150, 0.95)',
+      text: { color: '#3F3428' },
+    },
+    zodiacBadge: {
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      borderColor: 'rgba(212, 184, 150, 0.35)',
+      text: { color: '#D4B896' },
+    },
+  },
+  /** Match HybridLittleOnesSection "Little one 1" child card (light Me). */
+  hybridLight: {
+    field: {
+      backgroundColor: 'rgba(255, 255, 255, 0.35)',
+      borderColor: 'rgba(107, 143, 120, 0.25)',
+      borderRadius: 14,
+    },
+    eyebrow: { color: '#3D5246' },
+    dateText: { color: '#2A382E' },
+    chevron: { color: '#5A6E58' },
+    hint: { color: '#5A6E58' },
+    pickerBorder: { borderTopColor: 'rgba(107, 143, 120, 0.28)' },
+    pickerLabel: { color: '#5A6E58' },
+    chip: {
+      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+      borderColor: 'rgba(107, 143, 120, 0.28)',
+      text: { color: '#5A6E58' },
+    },
+    chipActive: {
+      backgroundColor: 'rgba(212, 184, 150, 0.85)',
+      borderColor: 'rgba(212, 184, 150, 0.95)',
+      text: { color: '#3F3428' },
+    },
+    zodiacBadge: {
+      backgroundColor: 'rgba(255, 255, 255, 0.55)',
+      borderColor: 'rgba(107, 143, 120, 0.28)',
+      text: { color: '#3D5246' },
+    },
+  },
 };
+
+PALETTES.meLight = PALETTES.hybridLight;
 
 export default function MamaBirthdayField({ birthday, onBirthdayChange, variant = 'midnight' }) {
   const [expanded, setExpanded] = useState(false);
@@ -114,7 +176,7 @@ export default function MamaBirthdayField({ birthday, onBirthdayChange, variant 
               </View>
             ) : null}
           </View>
-          <Text style={[styles.hint, SANS]}>
+          <Text style={[styles.hint, palette.hint, SANS]}>
             We&apos;ll celebrate you with a special village gift on your day.
           </Text>
         </View>
@@ -202,9 +264,9 @@ export default function MamaBirthdayField({ birthday, onBirthdayChange, variant 
 const styles = StyleSheet.create({
   field: {
     width: '100%',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
   },
   headerRow: {
@@ -235,7 +297,6 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 15,
     lineHeight: 22,
-    color: MIDNIGHT.textMuted,
     marginTop: 6,
     fontStyle: 'italic',
   },
