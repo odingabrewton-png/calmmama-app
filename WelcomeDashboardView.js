@@ -165,7 +165,7 @@ export default function WelcomeDashboardView({
           end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-        <SafeAreaView style={styles.welcomeFullBleedSafe} edges={['left', 'right']}>
+        <SafeAreaView style={styles.welcomeFullBleedSafe} edges={['top', 'left', 'right']}>
           {content}
         </SafeAreaView>
       </View>

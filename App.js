@@ -5829,7 +5829,7 @@ function CalmMamaApp() {
           <View style={styles.onboardingOverlayShell}>
             <SafeAreaView
               style={styles.screenForeground}
-              edges={['left', 'right']}
+              edges={['top', 'left', 'right']}
             >
               <View style={styles.onboardingSceneStack}>
                 {onboardingStep === 'intake' ? (
@@ -5912,9 +5912,11 @@ const styles = StyleSheet.create({
   onboardingSceneLayer: {
     flex: 1,
     width: '100%',
+    overflow: 'hidden',
   },
   onboardingSceneLayerStacked: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    width: '100%',
   },
   onboardingBackdropStack: {
     ...StyleSheet.absoluteFillObject,
@@ -9086,8 +9088,8 @@ const styles = StyleSheet.create({
   navLotusCenterSlot: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: -22,
+    justifyContent: 'center',
+    marginTop: 0,
     transform: [{ scale: 0.48 }],
   },
   navIcon: {

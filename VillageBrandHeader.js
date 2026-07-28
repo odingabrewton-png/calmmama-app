@@ -4,8 +4,8 @@ import { BrandLogoStack, LOGO_HEART_BLEED } from './brandLogoShine';
 import { DESKTOP_BREAKPOINT, DESKTOP_PHONE } from './mobileWebLayout';
 
 const LOGO_ASPECT = 323 / 1024;
-const ONBOARDING_LOGO_RATIO = 0.55;
-const ONBOARDING_LOGO_MAX = 210;
+const ONBOARDING_LOGO_RATIO = 0.42;
+const ONBOARDING_LOGO_MAX = 148;
 
 /** Content width inside the app surface — never the desktop marketing viewport. */
 function getAppContentWidth() {
@@ -173,8 +173,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    marginBottom: 0,
+    marginBottom: 4,
     paddingBottom: 0,
+    overflow: 'visible',
   },
   wrapNotchSafe: {
     paddingTop: 36,

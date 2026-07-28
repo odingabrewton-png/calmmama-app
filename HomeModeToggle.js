@@ -36,6 +36,9 @@ export default function HomeModeToggle({
             SANS,
             homeTrack === HOME_TRACKS.PREGNANT && styles.pillTextActive,
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
         >
           {formatPregnancyPillLabel(weeksPregnant)}
         </Text>
@@ -56,6 +59,9 @@ export default function HomeModeToggle({
             SANS,
             homeTrack === HOME_TRACKS.TODDLER && styles.pillTextActive,
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
         >
           {formatToddlerPillLabel(babyAge)}
         </Text>
@@ -67,30 +73,36 @@ export default function HomeModeToggle({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
+    flexWrap: 'nowrap',
+    gap: 8,
     marginBottom: 16,
     marginTop: 4,
     paddingHorizontal: 8,
+    width: '100%',
   },
   pill: {
-    paddingHorizontal: 16,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 12,
     paddingVertical: 11,
     borderRadius: 999,
     backgroundColor: 'rgba(255, 252, 248, 0.88)',
     borderWidth: 1.5,
     borderColor: 'rgba(138, 99, 190, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pillActive: {
     backgroundColor: 'rgba(232, 223, 245, 0.98)',
     borderColor: 'rgba(138, 99, 190, 0.7)',
   },
   pillText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: '#7D6B91',
+    textAlign: 'center',
   },
   pillTextActive: {
     color: '#4A3B5C',
@@ -99,5 +111,7 @@ const styles = StyleSheet.create({
     color: 'rgba(125, 107, 145, 0.45)',
     fontSize: 14,
     fontWeight: '600',
+    alignSelf: 'center',
+    paddingHorizontal: 2,
   },
 });

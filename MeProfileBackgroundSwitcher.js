@@ -37,7 +37,7 @@ export default function MeProfileBackgroundSwitcher() {
         Soft lounge washes just for your Me space — Calm Mama keeps the village ombre; the others are
         lighter pastel rooms.
       </Text>
-      <View style={styles.row}>
+      <View style={styles.grid}>
         {ME_PROFILE_BACKGROUNDS.map((theme) => {
           const active = selectedId === theme.id;
           return (
@@ -45,6 +45,7 @@ export default function MeProfileBackgroundSwitcher() {
               key={theme.id}
               style={[
                 styles.swatch,
+                ink.onLight && styles.swatchOnLight,
                 active && styles.swatchActive,
                 active && ink.onLight && styles.swatchActiveOnLight,
               ]}
@@ -60,7 +61,10 @@ export default function MeProfileBackgroundSwitcher() {
                 end={{ x: 0.9, y: 1 }}
                 style={[styles.swatchPreview, ink.onLight && styles.swatchPreviewOnLight]}
               />
-              <Text style={[styles.swatchLabel, { color: ink.primary }, SANS]}>
+              <Text
+                style={[styles.swatchLabel, { color: ink.primary }, SANS]}
+                numberOfLines={2}
+              >
                 {theme.emoji} {theme.label}
               </Text>
             </TouchableOpacity>
@@ -73,9 +77,9 @@ export default function MeProfileBackgroundSwitcher() {
 
 const styles = StyleSheet.create({
   wrap: {
-    marginTop: 14,
-    marginBottom: 8,
-    padding: 14,
+    marginTop: 16,
+    marginBottom: 12,
+    padding: 16,
     borderRadius: 18,
     width: '100%',
     backgroundColor: 'rgba(196, 184, 232, 0.12)',
@@ -91,47 +95,54 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.1,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   hint: {
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  row: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
+    gap: 12,
+    justifyContent: 'space-between',
+    width: '100%',
   },
   swatch: {
     width: '47%',
-    maxWidth: 180,
-    flexGrow: 1,
+    maxWidth: '47%',
+    flexGrow: 0,
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(212, 184, 150, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    minHeight: 92,
+  },
+  swatchOnLight: {
+    borderColor: 'rgba(42, 37, 64, 0.14)',
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
   },
   swatchActive: {
-    borderColor: 'rgba(212, 184, 150, 0.75)',
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: 'rgba(212, 184, 150, 0.85)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   swatchActiveOnLight: {
-    borderColor: 'rgba(107, 85, 136, 0.55)',
-    backgroundColor: 'rgba(42, 37, 64, 0.06)',
+    borderColor: 'rgba(107, 85, 136, 0.6)',
+    backgroundColor: 'rgba(42, 37, 64, 0.07)',
   },
   swatchPreview: {
     width: '100%',
-    height: 34,
+    height: 36,
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   swatchPreviewOnLight: {
     borderColor: 'rgba(42, 37, 64, 0.18)',
@@ -140,6 +151,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 15,
   },
 });

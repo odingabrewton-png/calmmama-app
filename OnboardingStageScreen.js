@@ -53,70 +53,86 @@ export default function OnboardingStageScreen({
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.brandBlock}>
-        <VillageBrandHeader logoUri={logoUri} pulseAnim={pulseAnim} variant="onboarding" />
+        <VillageBrandHeader logoUri={logoUri} pulseAnim={null} variant="onboarding" />
         <Text style={[styles.welcomeTitle, ONBOARDING_WELCOME_FONT]}>Welcome, beautiful mama</Text>
         <Text style={[styles.welcomeSub, ONBOARDING_SERIF]}>
           Tell us a little about you — we&apos;ll tailor your village journey from the very first step.
         </Text>
       </View>
 
-      <Text style={[styles.sectionLabel, ONBOARDING_SERIF]}>Where are you in your journey?</Text>
-      <View style={styles.personaRow}>
-        <TouchableOpacity
-          style={[styles.personaCard, userJourney === 'pregnant' && styles.personaCardActive]}
-          onPress={() => onSelectJourney('pregnant')}
-          activeOpacity={0.9}
-        >
-          <View style={styles.personaOrb}>
-            <Text style={styles.personaEmoji}>🤰</Text>
-          </View>
-          <Text style={[styles.personaLabel, userJourney === 'pregnant' && styles.personaLabelActive]}>
-            Pregnant Mama
-          </Text>
-          <Text
-            style={[styles.personaHint, userJourney === 'pregnant' && styles.personaHintActive]}
+      <View style={styles.journeyBlock}>
+        <Text style={[styles.sectionLabel, ONBOARDING_SERIF]}>Where are you in your journey?</Text>
+        <View style={styles.personaRow}>
+          <TouchableOpacity
+            style={[styles.personaCard, userJourney === 'pregnant' && styles.personaCardActive]}
+            onPress={() => onSelectJourney('pregnant')}
+            activeOpacity={0.9}
           >
-            Bloom week by week
-          </Text>
-        </TouchableOpacity>
+            <View style={styles.personaOrb}>
+              <Text style={styles.personaEmoji}>🤰</Text>
+            </View>
+            <Text
+              style={[styles.personaLabel, userJourney === 'pregnant' && styles.personaLabelActive]}
+              numberOfLines={2}
+            >
+              Pregnant Mama
+            </Text>
+            <Text
+              style={[styles.personaHint, userJourney === 'pregnant' && styles.personaHintActive]}
+              numberOfLines={2}
+            >
+              Bloom week by week
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.personaCard, userJourney === 'postpartum' && styles.personaCardActive]}
+            onPress={() => onSelectJourney('postpartum')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.personaOrb}>
+              <Text style={styles.personaEmoji}>👶</Text>
+            </View>
+            <Text
+              style={[styles.personaLabel, userJourney === 'postpartum' && styles.personaLabelActive]}
+              numberOfLines={2}
+            >
+              Postpartum Mama
+            </Text>
+            <Text
+              style={[styles.personaHint, userJourney === 'postpartum' && styles.personaHintActive]}
+              numberOfLines={2}
+            >
+              Cloud nursery & recovery
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
-          style={[styles.personaCard, userJourney === 'postpartum' && styles.personaCardActive]}
-          onPress={() => onSelectJourney('postpartum')}
+          style={[
+            styles.hybridCard,
+            userJourney === 'hybrid' && styles.personaCardActive,
+          ]}
+          onPress={() => onSelectJourney('hybrid')}
           activeOpacity={0.9}
         >
-          <View style={styles.personaOrb}>
-            <Text style={styles.personaEmoji}>👶</Text>
+          <Text style={styles.hybridEmoji}>🤰🧸</Text>
+          <View style={styles.hybridCopy}>
+            <Text
+              style={[styles.personaLabel, userJourney === 'hybrid' && styles.personaLabelActive]}
+              numberOfLines={2}
+            >
+              Both — Pregnant & Parenting
+            </Text>
+            <Text
+              style={[styles.personaHint, userJourney === 'hybrid' && styles.personaHintActive]}
+              numberOfLines={3}
+            >
+              Growing a baby while caring for a little one — toggle Home anytime
+            </Text>
           </View>
-          <Text style={[styles.personaLabel, userJourney === 'postpartum' && styles.personaLabelActive]}>
-            Postpartum Mama
-          </Text>
-          <Text
-            style={[styles.personaHint, userJourney === 'postpartum' && styles.personaHintActive]}
-          >
-            Cloud nursery & recovery
-          </Text>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={[
-          styles.hybridCard,
-          userJourney === 'hybrid' && styles.personaCardActive,
-        ]}
-        onPress={() => onSelectJourney('hybrid')}
-        activeOpacity={0.9}
-      >
-        <Text style={styles.hybridEmoji}>🤰🧸</Text>
-        <View style={styles.hybridCopy}>
-          <Text style={[styles.personaLabel, userJourney === 'hybrid' && styles.personaLabelActive]}>
-            Both — Pregnant & Parenting
-          </Text>
-          <Text style={[styles.personaHint, userJourney === 'hybrid' && styles.personaHintActive]}>
-            Growing a baby while caring for a little one — toggle Home anytime
-          </Text>
-        </View>
-      </TouchableOpacity>
 
       <View style={styles.formGroup}>
         <Text style={[styles.formTitle, ONBOARDING_SERIF]}>Your village profile</Text>
@@ -214,44 +230,54 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: {
-    paddingHorizontal: 28,
-    paddingTop: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 48,
     flexGrow: 1,
+    gap: 4,
   },
   brandBlock: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 10,
+    gap: 4,
   },
   welcomeTitle: {
-    marginTop: 10,
+    marginTop: 6,
     paddingHorizontal: 8,
+    fontSize: 28,
+    lineHeight: 34,
   },
   welcomeSub: {
     fontSize: 14,
     color: '#4A5C50',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
     fontStyle: 'italic',
     maxWidth: 300,
-    marginTop: 8,
+    marginTop: 4,
     paddingHorizontal: 6,
+  },
+  journeyBlock: {
+    width: '100%',
+    marginBottom: 8,
+    gap: 12,
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: '600',
     fontStyle: 'italic',
     color: '#3D5246',
-    marginBottom: 14,
-    marginTop: 8,
+    marginBottom: 0,
+    marginTop: 0,
     textAlign: 'center',
   },
   personaRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    width: '100%',
   },
   hybridCard: {
     flexDirection: 'row',
@@ -263,21 +289,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.55)',
-    marginBottom: 20,
+    marginBottom: 0,
+    width: '100%',
   },
   hybridEmoji: {
     fontSize: 28,
   },
   hybridCopy: {
     flex: 1,
+    minWidth: 0,
   },
   personaCard: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.42)',
     borderRadius: 22,
-    paddingVertical: 18,
+    paddingVertical: 16,
     paddingHorizontal: 10,
     alignItems: 'center',
+    justifyContent: 'flex-start',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.55)',
     ...Platform.select({
