@@ -1,9 +1,11 @@
 /**
  * VillageOmbreBackdrop — sage / lavender / peach ombre by default.
- * Fairy Godmother perk explicitly applies a custom animated ombre overlay.
+ * Fairy Godmother perk swaps the same animated wash to a custom 3-color cycle.
  *
  * Web: CSS gradient + body `#calmmama-body-ombre` sync (full-bleed DOM).
- * Native: Reanimated wash layers + translucent overlay blend.
+ * Native: Reanimated opacity crossfade across three wash layers.
+ *
+ * Fairy themes use the exact same animation model as Calm Mama (no static overlay).
  */
 import React, { useEffect, useMemo } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
@@ -25,7 +27,22 @@ const WEB_OMBRE_STYLE_ID = 'calmmama-ombre-backdrop-css';
 const WEB_TITLE_SHIMMER_ID = 'calmmama-title-shimmer-css';
 const WEB_FAIRY_BODY_STYLE_ID = 'calmmama-fairy-body-ombre-css';
 const WEB_FAIRY_TEXT_STYLE_ID = 'calmmama-fairy-text-contrast-css';
-const FAIRY_CYCLE_MS = Math.round(CALM_MAMA_PASTEL_CYCLE_MS * 0.85);
+const WEB_OMBRE_KEYFRAMES_ID = 'calmmama-ombre-keyframes-css';
+
+function ensureOmbreKeyframesCss() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(WEB_OMBRE_KEYFRAMES_ID)) return;
+  const style = document.createElement('style');
+  style.id = WEB_OMBRE_KEYFRAMES_ID;
+  style.textContent = `
+    @keyframes calmmamaOmbreShift {
+      0% { background-position: 0% 40%; }
+      50% { background-position: 100% 60%; }
+      100% { background-position: 0% 40%; }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function ensureTitleShimmerCss() {
   if (typeof document === 'undefined') return;
@@ -55,6 +72,21 @@ function paletteFromTheme(theme) {
   return { a: theme.colors.a, b: theme.colors.b, c: theme.colors.c };
 }
 
+/** Same living wash recipe Calm Mama uses — one cycling gradient, not a static overlay. */
+function cyclingOmbreCss(palette, cycleMs = CALM_MAMA_PASTEL_CYCLE_MS) {
+  return `
+    background: linear-gradient(
+      155deg,
+      ${palette.a} 0%,
+      ${palette.b} 35%,
+      ${palette.c} 70%,
+      ${palette.a} 100%
+    );
+    background-size: 300% 300%;
+    animation: calmmamaOmbreShift ${cycleMs}ms ease-in-out infinite;
+  `;
+}
+
 /** Soften village ink to white when Fairy Godmother wash needs light copy (web). */
 function syncWebFairyTextContrast(theme) {
   if (typeof document === 'undefined') return;
@@ -78,7 +110,6 @@ function syncWebFairyTextContrast(theme) {
       --village-ink: #FFFFFF;
       --village-ink-soft: rgba(255, 255, 255, 0.82);
     }
-    /* Force readable white copy over deeper Fairy Godmother washes (RN Web text classes) */
     html[data-fairy-ui-text="white"] #root [class*="css-text"],
     html[data-fairy-ui-text="white"] #root [class^="r-"][class*="color"] {
       color: #FFFFFF !important;
@@ -89,9 +120,19 @@ function syncWebFairyTextContrast(theme) {
   `;
 }
 
+function restartCssAnimation(node) {
+  if (!node) return;
+  const prev = node.style.animation;
+  node.style.animation = 'none';
+  // Force reflow so the browser restarts the infinite ombre shift.
+  void node.offsetWidth;
+  node.style.animation = prev || '';
+}
+
 /** Sync Fairy Godmother wash onto the fixed body ombre DOM node (web). */
 function syncWebBodyFairyOmbre(theme) {
   if (typeof document === 'undefined') return;
+  ensureOmbreKeyframesCss();
 
   let style = document.getElementById(WEB_FAIRY_BODY_STYLE_ID);
   if (!style) {
@@ -109,34 +150,36 @@ function syncWebBodyFairyOmbre(theme) {
       layer.style.removeProperty('background');
       layer.style.removeProperty('background-size');
       layer.style.removeProperty('animation');
+      restartCssAnimation(layer);
     }
     return;
   }
 
-  const { a, b, c } = theme.colors;
-  const overlay = theme.overlay || {};
-  const from = overlay.from || a;
-  const via = overlay.via || b;
-  const to = overlay.to || c;
-
+  const palette = paletteFromTheme(theme);
   style.textContent = `
     #calmmama-body-ombre[data-fairy-theme="${theme.id}"],
     .calmmama-ombre-backdrop[data-theme="${theme.id}"] {
-      background:
-        linear-gradient(165deg, ${from} 0%, ${via} 48%, ${to} 100%),
-        linear-gradient(145deg, ${a} 0%, ${b} 32%, ${c} 64%, ${a} 100%) !important;
-      background-size: 320% 320%, 360% 360% !important;
-      animation: calmmamaOmbreShift ${FAIRY_CYCLE_MS}ms ease-in-out infinite !important;
+      background: linear-gradient(
+        155deg,
+        ${palette.a} 0%,
+        ${palette.b} 35%,
+        ${palette.c} 70%,
+        ${palette.a} 100%
+      ) !important;
+      background-size: 300% 300% !important;
+      animation: calmmamaOmbreShift ${CALM_MAMA_PASTEL_CYCLE_MS}ms ease-in-out infinite !important;
     }
   `;
 
   if (layer) {
     layer.setAttribute('data-fairy-theme', theme.id);
+    restartCssAnimation(layer);
   }
 }
 
-function ensureWebOmbreCss(palette, themeKey, theme) {
+function ensureWebOmbreCss(palette, themeKey) {
   if (typeof document === 'undefined') return;
+  ensureOmbreKeyframesCss();
   const styleId = `${WEB_OMBRE_STYLE_ID}-${themeKey}`;
   let style = document.getElementById(styleId);
   if (!style) {
@@ -144,26 +187,6 @@ function ensureWebOmbreCss(palette, themeKey, theme) {
     style.id = styleId;
     document.head.appendChild(style);
   }
-
-  const overlay = theme?.overlay;
-  const cycleMs = overlay ? FAIRY_CYCLE_MS : CALM_MAMA_PASTEL_CYCLE_MS;
-  const layered = overlay
-    ? `
-      background:
-        linear-gradient(165deg, ${overlay.from} 0%, ${overlay.via} 48%, ${overlay.to} 100%),
-        linear-gradient(145deg, ${palette.a} 0%, ${palette.b} 32%, ${palette.c} 64%, ${palette.a} 100%);
-      background-size: 320% 320%, 360% 360%;
-    `
-    : `
-      background: linear-gradient(
-        155deg,
-        ${palette.a} 0%,
-        ${palette.b} 35%,
-        ${palette.c} 70%,
-        ${palette.a} 100%
-      );
-      background-size: 300% 300%;
-    `;
 
   style.textContent = `
     .calmmama-ombre-backdrop[data-theme="${themeKey}"] {
@@ -173,13 +196,7 @@ function ensureWebOmbreCss(palette, themeKey, theme) {
       height: 100%;
       pointer-events: none;
       overflow: hidden;
-      ${layered}
-      animation: calmmamaOmbreShift ${cycleMs}ms ease-in-out infinite;
-    }
-    @keyframes calmmamaOmbreShift {
-      0% { background-position: 0% 40%, 0% 40%; }
-      50% { background-position: 100% 60%, 100% 60%; }
-      100% { background-position: 0% 40%, 0% 40%; }
+      ${cyclingOmbreCss(palette)}
     }
   `;
 }
@@ -187,10 +204,15 @@ function ensureWebOmbreCss(palette, themeKey, theme) {
 function WebOmbreBackdrop({ style, palette, themeKey, theme }) {
   useEffect(() => {
     ensureTitleShimmerCss();
-    ensureWebOmbreCss(palette, themeKey, theme);
+    ensureOmbreKeyframesCss();
+    ensureWebOmbreCss(palette, themeKey);
     syncWebBodyFairyOmbre(theme);
     return () => {
-      if (!theme) syncWebBodyFairyOmbre(null);
+      if (theme) {
+        // Keep fairy wash until a new theme syncs; clear only when leaving fairy mode.
+      } else {
+        syncWebBodyFairyOmbre(null);
+      }
     };
   }, [palette, themeKey, theme]);
 
@@ -208,9 +230,12 @@ function WebOmbreBackdrop({ style, palette, themeKey, theme }) {
 
 function NativeOmbreBackdrop({ style, palette, theme }) {
   const phase = useSharedValue(0);
+  const themeId = theme?.id || 'default';
 
   useEffect(() => {
     let active = true;
+    cancelAnimation(phase);
+    phase.value = 0;
 
     const startLoop = () => {
       if (!active) return;
@@ -218,7 +243,7 @@ function NativeOmbreBackdrop({ style, palette, theme }) {
         phase,
         withRepeat(
           withTiming(1, {
-            duration: theme?.overlay ? FAIRY_CYCLE_MS : CALM_MAMA_PASTEL_CYCLE_MS,
+            duration: CALM_MAMA_PASTEL_CYCLE_MS,
             easing: Easing.linear,
           }),
           -1,
@@ -240,79 +265,35 @@ function NativeOmbreBackdrop({ style, palette, theme }) {
       cancelAnimation(phase);
       sub.remove();
     };
-  }, [phase, theme]);
+  }, [phase, themeId]);
 
-  const sageWash = useAnimatedStyle(() => ({
+  // Same opacity crossfade recipe as Calm Mama — fairy only swaps the three wash colors.
+  const washA = useAnimatedStyle(() => ({
     opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [1, 0.15, 0.1, 0.2, 1]),
   }));
 
-  const lavenderWash = useAnimatedStyle(() => ({
+  const washB = useAnimatedStyle(() => ({
     opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [0.12, 0.85, 0.2, 0.15, 0.12]),
   }));
 
-  const peachWash = useAnimatedStyle(() => ({
+  const washC = useAnimatedStyle(() => ({
     opacity: interpolate(phase.value, [0, 0.28, 0.55, 0.82, 1], [0.1, 0.15, 0.9, 0.2, 0.1]),
-  }));
-
-  const overlayPulse = useAnimatedStyle(() => ({
-    opacity: interpolate(phase.value, [0, 0.35, 0.7, 1], [0.55, 0.72, 0.48, 0.55]),
   }));
 
   return (
     <View style={[styles.root, style]} pointerEvents="none" collapsable={false}>
       <Animated.View
-        style={[styles.fill, { backgroundColor: palette.a }, sageWash]}
+        style={[styles.fill, { backgroundColor: palette.a }, washA]}
         collapsable={false}
       />
       <Animated.View
-        style={[styles.fill, { backgroundColor: palette.b }, lavenderWash]}
+        style={[styles.fill, { backgroundColor: palette.b }, washB]}
         collapsable={false}
       />
       <Animated.View
-        style={[styles.fill, { backgroundColor: palette.c }, peachWash]}
+        style={[styles.fill, { backgroundColor: palette.c }, washC]}
         collapsable={false}
       />
-      {theme?.overlay ? (
-        <Animated.View
-          pointerEvents="none"
-          collapsable={false}
-          style={[
-            styles.fill,
-            overlayPulse,
-            {
-              backgroundColor: 'transparent',
-              // RN can't do multi-stop CSS gradients natively — layered translucent fills approximate the blend.
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.fill,
-              { backgroundColor: theme.overlay.from, opacity: 0.85 },
-            ]}
-          />
-          <View
-            style={[
-              styles.fill,
-              {
-                backgroundColor: theme.overlay.via,
-                opacity: 0.7,
-                top: '28%',
-              },
-            ]}
-          />
-          <View
-            style={[
-              styles.fill,
-              {
-                backgroundColor: theme.overlay.to,
-                opacity: 0.75,
-                top: '55%',
-              },
-            ]}
-          />
-        </Animated.View>
-      ) : null}
     </View>
   );
 }
