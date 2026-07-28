@@ -130,6 +130,7 @@ export const REWARD_POINT_VALUES = {
   subscriptionUpgrade: 250,
   vipPromo: 500,
   adminTestGrant: 500,
+  adminManualGrant: 0,
 };
 
 export const WEEKLY_JOURNAL_BONUS_THRESHOLD = 5;
@@ -143,6 +144,7 @@ export const KITCHEN_COOKED_TOAST = "Mama's Kitchen — nourishment logged! +15 
 export const SUBSCRIPTION_UPGRADE_TOAST = 'Premium welcome bonus unlocked! +250 pts';
 export const VIP_PROMO_TOAST = 'VIP welcome bonus unlocked! +500 pts';
 export const ADMIN_TEST_POINTS_TOAST = 'Admin sandbox points updated';
+export const ADMIN_MANUAL_POINTS_TOAST = 'Village recovery points added';
 
 function mapLegacyTierId(id) {
   return LEGACY_TIER_ID_MAP[id] || id;
@@ -713,6 +715,10 @@ export function applyAddPoints(rewards, amount, actionKey) {
   } else if (key === 'adminTestGrant') {
     return finishAward(current, actions, awardAmount, {
       toastMessage: `Admin test +${awardAmount} pts`,
+    });
+  } else if (key === 'adminManualGrant') {
+    return finishAward(current, actions, awardAmount, {
+      toastMessage: `${ADMIN_MANUAL_POINTS_TOAST} +${awardAmount} pts`,
     });
   } else if (key === 'nurseryChecklistItem') {
     if (actions.nurseryChecklistDate !== today) {

@@ -118,6 +118,7 @@ import {
 import { presentVillageWebNotification } from './pwaWebPush';
 import { dispatchAdminMamaSignupNotice } from './welcomeEmailClient';
 import { syncMamaProfileWithEmail, upsertMamaCloudProfile } from './mamaProfileSync';
+import { claimMamaManualPoints, grantMamaManualPoints } from './mamaPointsSync';
 import { normalizeJournalStage } from './sanctuaryJournalPrompts';
 import LotusFlowerButton from './LotusFlowerButton';
 
@@ -2843,7 +2844,8 @@ export default function App() {
 }
 
 function CalmMamaApp() {
-  const { resetRewards, addPoints, grantTestPoints, rewards, notify } = useVillageRewards();
+  const { resetRewards, addPoints, grantTestPoints, rewards, notify, hydrated: rewardsHydrated } =
+    useVillageRewards();
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [bootHydrated, setBootHydrated] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState('intake');
@@ -3253,6 +3255,66 @@ function CalmMamaApp() {
     await resetRewards();
     return { ok: true, message: 'Test points reset (sandbox)' };
   }, [adminUser, resetRewards]);
+
+  const handleGrantManualPointsToMama = useCallback(
+    async ({ recipientEmail, amount, note }) => {
+      if (!isAdmin(adminUser)) return { ok: false, error: 'Not authorized' };
+      const normalizedRecipient = String(recipientEmail || '')
+        .trim()
+        .toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipient)) {
+        return { ok: false, error: 'Enter a valid mama email' };
+      }
+      const grantAmount = Math.max(0, Math.floor(Number(amount) || 0));
+      if (!grantAmount) {
+        return { ok: false, error: 'Enter a point amount greater than 0' };
+      }
+
+      const result = await grantMamaManualPoints({
+        adminEmail: adminUser.email,
+        recipientEmail: normalizedRecipient,
+        amount: grantAmount,
+        note,
+      });
+      if (!result.ok) {
+        return {
+          ok: false,
+          error: result.error || 'Could not queue manual points',
+          hint: result.hint,
+        };
+      }
+      return {
+        ok: true,
+        message:
+          result.message ||
+          `Queued ${grantAmount.toLocaleString()} pts for ${normalizedRecipient}`,
+      };
+    },
+    [adminUser],
+  );
+
+  const claimPendingManualPoints = useCallback(
+    async (email) => {
+      const normalized = String(email || '')
+        .trim()
+        .toLowerCase();
+      if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return;
+      const claim = await claimMamaManualPoints({ email: normalized });
+      if (claim.ok && Number(claim.amount) > 0) {
+        await addPoints(Number(claim.amount), 'adminManualGrant');
+      }
+    },
+    [addPoints],
+  );
+
+  useEffect(() => {
+    if (!isOnboarded || !rewardsHydrated) return;
+    const email = String(memberEmail || '')
+      .trim()
+      .toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    void claimPendingManualPoints(email);
+  }, [isOnboarded, rewardsHydrated, memberEmail, claimPendingManualPoints]);
 
   const handleToggleVipLifetime = useCallback(
     async (enabled) => {
@@ -5724,6 +5786,7 @@ function CalmMamaApp() {
                     onSendTestWelcomeEmail={handleSendTestWelcomeEmail}
                     onGrantTestPoints={handleGrantTestPoints}
                     onResetTestPoints={handleResetTestPoints}
+                    onGrantManualPoints={handleGrantManualPointsToMama}
                     onFireTestNotification={handleFireTestNotification}
                     onOpenSanctuaryJournalTest={handleOpenSanctuaryJournalTest}
                     onPreviewPremiumWelcome={handlePreviewPremiumWelcome}

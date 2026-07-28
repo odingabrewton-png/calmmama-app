@@ -428,6 +428,22 @@ app.post('/api/admin/test-welcome-email', async (req, res) => {
   }
 });
 
+app.post('/api/admin/manual-points', express.json({ limit: '32kb' }), async (req, res) => {
+  const manualPointsAdminHandler = require('./api/admin/manual-points');
+  return manualPointsAdminHandler(req, res);
+});
+
+app.options('/api/manual-points', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+app.post('/api/manual-points', express.json({ limit: '32kb' }), async (req, res) => {
+  const manualPointsClaimHandler = require('./api/manual-points');
+  return manualPointsClaimHandler(req, res);
+});
+
 const HTML_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 const HASHED_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 

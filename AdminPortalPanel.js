@@ -73,6 +73,7 @@ export default function AdminPortalPanel({
   onSendTestWelcomeEmail,
   onGrantTestPoints,
   onResetTestPoints,
+  onGrantManualPoints,
   onFireTestNotification,
   onOpenSanctuaryJournalTest,
   onPreviewPremiumWelcome,
@@ -84,6 +85,9 @@ export default function AdminPortalPanel({
   const [busy, setBusy] = useState(null);
   const [status, setStatus] = useState('');
   const [grantAmount, setGrantAmount] = useState('500');
+  const [manualRecipientEmail, setManualRecipientEmail] = useState('');
+  const [manualGrantAmount, setManualGrantAmount] = useState('100');
+  const [manualGrantNote, setManualGrantNote] = useState('');
   const version = useMemo(() => getAppVersionLabel(), []);
   const envLabel = useMemo(() => getVercelEnvironmentLabel(), []);
 
@@ -186,7 +190,72 @@ export default function AdminPortalPanel({
         tone="terracotta"
       />
 
-      <Text style={[styles.fieldLabel, SANS]}>Grant / Reset Test Points</Text>
+      <Text style={[styles.sectionLabel, SANS]}>Manual points recovery</Text>
+      <Text style={[styles.copy, styles.sectionCopy, SANS]}>
+        Queue Crown Points for a mama by email when a glitch kept her from earning them. She
+        receives them the next time she opens the app with that email saved.
+      </Text>
+      <Text style={[styles.fieldLabel, SANS]}>Mama email</Text>
+      <TextInput
+        style={[styles.input, SANS]}
+        value={manualRecipientEmail}
+        onChangeText={setManualRecipientEmail}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        placeholder="mama@email.com"
+        placeholderTextColor={MIDNIGHT.textMuted}
+      />
+      <Text style={[styles.fieldLabel, SANS]}>Points to grant</Text>
+      <View style={styles.quickGrantRow}>
+        {['25', '50', '100', '250', '500'].map((preset) => (
+          <TouchableOpacity
+            key={preset}
+            style={[
+              styles.quickGrantChip,
+              manualGrantAmount === preset && styles.quickGrantChipActive,
+            ]}
+            onPress={() => setManualGrantAmount(preset)}
+            activeOpacity={0.88}
+          >
+            <Text style={[styles.quickGrantChipText, SANS]}>{preset}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TextInput
+        style={[styles.input, SANS]}
+        value={manualGrantAmount}
+        onChangeText={setManualGrantAmount}
+        keyboardType="number-pad"
+        placeholder="100"
+        placeholderTextColor={MIDNIGHT.textMuted}
+      />
+      <Text style={[styles.fieldLabel, SANS]}>Note (optional)</Text>
+      <TextInput
+        style={[styles.input, styles.noteInput, SANS]}
+        value={manualGrantNote}
+        onChangeText={setManualGrantNote}
+        placeholder="Missed poll points after feed glitch"
+        placeholderTextColor={MIDNIGHT.textMuted}
+        multiline
+      />
+      <ActionButton
+        label="Grant manual points to mama"
+        busyKey="manual-grant"
+        busy={busy}
+        tone="sage"
+        onPress={() =>
+          runAction('manual-grant', () =>
+            onGrantManualPoints?.({
+              recipientEmail: manualRecipientEmail,
+              amount: Math.max(0, parseInt(manualGrantAmount, 10) || 0),
+              note: manualGrantNote,
+            }),
+          )
+        }
+      />
+
+      <Text style={[styles.fieldLabel, SANS]}>Device test points (this phone only)</Text>
       <Text style={[styles.pointsHint, SANS]}>
         Current balance: {Number(currentPoints || 0).toLocaleString()} pts
       </Text>
@@ -317,6 +386,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
+  sectionCopy: {
+    marginTop: -2,
+    marginBottom: 10,
+  },
   fieldLabel: {
     fontSize: 14,
     fontWeight: '700',
@@ -362,6 +435,33 @@ const styles = StyleSheet.create({
     color: MIDNIGHT.textMuted,
     marginBottom: 8,
     marginTop: -4,
+  },
+  quickGrantRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  quickGrantChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: MIDNIGHT.border,
+    backgroundColor: MIDNIGHT.bgCard,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  quickGrantChipActive: {
+    borderColor: MIDNIGHT.lavender,
+    backgroundColor: 'rgba(196, 168, 216, 0.35)',
+  },
+  quickGrantChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: MIDNIGHT.textPrimary,
+  },
+  noteInput: {
+    minHeight: 72,
+    textAlignVertical: 'top',
   },
   pointsRow: {
     flexDirection: 'row',

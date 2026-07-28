@@ -753,6 +753,7 @@ function MidnightLoungeScreen({
   onSendTestWelcomeEmail,
   onGrantTestPoints,
   onResetTestPoints,
+  onGrantManualPoints,
   onFireTestNotification,
   onOpenSanctuaryJournalTest,
   onPreviewPremiumWelcome,
@@ -1488,6 +1489,7 @@ function MidnightLoungeScreen({
             onSendTestWelcomeEmail={onSendTestWelcomeEmail}
             onGrantTestPoints={onGrantTestPoints}
             onResetTestPoints={onResetTestPoints}
+            onGrantManualPoints={onGrantManualPoints}
             onFireTestNotification={onFireTestNotification}
             onOpenSanctuaryJournalTest={onOpenSanctuaryJournalTest}
             onPreviewPremiumWelcome={onPreviewPremiumWelcome}
