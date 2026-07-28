@@ -1691,10 +1691,11 @@ const KeptAliveTab = React.memo(
     flowAnim,
   }) {
     const isKitchen = tabId === 'kitchen';
-    // Pregnant journey: no shared flow animation on any tab — show/hide only.
-    // Animated tab fades were blanking the stack and flashing Home.
+    const isHybrid = mainTabContentProps?.activeMode === 'hybrid';
+    // Pregnant / hybrid: no shared flow animation on any tab — show/hide only.
+    // Animated tab fades were blanking the stack and flashing Home (worse on hybrid pill swaps).
     const tabFlowAnim =
-      userJourney === 'pregnant'
+      userJourney === 'pregnant' || isHybrid
         ? null
         : userJourney === 'postpartum' && (tabId === 'home' || isKitchen)
           ? flowAnim
@@ -1823,6 +1824,77 @@ function renderMainTabContent({
   ) : null;
 
   if (tabId === 'home') {
+    // Hybrid: keep both Home panes mounted so Pregnancy ↔ Little One pills don't remount/flash.
+    if (activeMode === 'hybrid') {
+      const showPregnantHome = homePhase === 'pregnant';
+      const showInfantHome = homePhase === 'infant';
+      const showToddlerHome = homePhase === 'toddler';
+      return (
+        <View style={styles.hybridHomeStack} collapsable={false}>
+          <View
+            style={[
+              styles.hybridHomePane,
+              showPregnantHome ? styles.hybridHomePaneVisible : styles.hybridHomePaneHidden,
+            ]}
+            pointerEvents={showPregnantHome ? 'auto' : 'none'}
+            collapsable={false}
+          >
+            <HomeScreen headerSlot={homeToggle} />
+          </View>
+          <View
+            style={[
+              styles.hybridHomePane,
+              showInfantHome ? styles.hybridHomePaneVisible : styles.hybridHomePaneHidden,
+            ]}
+            pointerEvents={showInfantHome ? 'auto' : 'none'}
+            collapsable={false}
+          >
+            <Suspense fallback={null}>
+              <PostpartumInfantHome
+                babyAge={babyAge}
+                mamaName={mamaName}
+                entries={milestoneScrapbook}
+                onSaveEntry={onSaveMilestoneEntry}
+                headerSlot={homeToggle}
+              />
+            </Suspense>
+          </View>
+          <View
+            style={[
+              styles.hybridHomePane,
+              showToddlerHome ? styles.hybridHomePaneVisible : styles.hybridHomePaneHidden,
+            ]}
+            pointerEvents={showToddlerHome ? 'auto' : 'none'}
+            collapsable={false}
+          >
+            <Suspense fallback={null}>
+              <>
+                <ScrollView
+                  style={styles.embeddedTabScroll}
+                  contentContainerStyle={styles.embeddedTabScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                >
+                  {homeToggle}
+                  <VillageTimeCapsule
+                    babyAge={babyAge}
+                    entries={timeCapsuleEntries}
+                    onSaveMonth={onSaveTimeCapsuleMonth}
+                    isPro={isSubscribed}
+                    isSubscribed={isSubscribed}
+                    onRequestUpgrade={onReleaseUpgradePrompt}
+                    onOpenSubscription={onOpenSubscription}
+                  />
+                </ScrollView>
+                <PostpartumHomePollModal active={showToddlerHome} babyAge={babyAge} />
+              </>
+            </Suspense>
+          </View>
+        </View>
+      );
+    }
+
     if (homePhase === 'pregnant') {
       return <HomeScreen headerSlot={homeToggle} />;
     }
@@ -2143,24 +2215,38 @@ const AppBottomTabBar = React.memo(function AppBottomTabBar({
 const MainTabShell = React.memo(function MainTabShell({
   activeTab,
   userJourney,
+  activeMode,
   mainTabContentProps,
   flowAnim,
   pulseAnim,
   tabSceneOpacity,
 }) {
   const { babyAge } = mainTabContentProps;
+  const isHybrid = activeMode === 'hybrid';
   const journeyTab = userJourney === 'pregnant' ? 'tracker' : 'nursery';
   const tabIds = useMemo(
     () => ['home', 'kitchen', 'daily', journeyTab],
     [journeyTab]
   );
   // Keep Bloom (tracker) warm for pregnant mamas so the video never cold-mounts on tab enter.
+  // Hybrid also warms Nursery so Pregnancy ↔ Toddler pill swaps don't cold-flash the shell.
   const [visitedTabs, setVisitedTabs] = useState(() => {
     const seed = new Set(['home', activeTab]);
-    if (userJourney === 'pregnant') seed.add('tracker');
+    if (userJourney === 'pregnant' || isHybrid) seed.add('tracker');
+    if (isHybrid) seed.add('nursery');
     return seed;
   });
   useEffect(() => {
+    if (isHybrid) {
+      setVisitedTabs((prev) => {
+        const next = new Set(prev);
+        next.add('tracker');
+        next.add('nursery');
+        next.add(activeTab);
+        return next;
+      });
+      return;
+    }
     if (userJourney === 'pregnant') {
       setVisitedTabs((prev) => {
         if (prev.has('tracker') && prev.has(activeTab)) return prev;
@@ -2177,7 +2263,7 @@ const MainTabShell = React.memo(function MainTabShell({
       next.add(activeTab);
       return next;
     });
-  }, [activeTab, userJourney]);
+  }, [activeTab, userJourney, isHybrid]);
 
   const mountedTabIds = useMemo(() => {
     return tabIds.filter((id) => id === activeTab || visitedTabs.has(id));
@@ -2186,9 +2272,10 @@ const MainTabShell = React.memo(function MainTabShell({
   const sharedHeader = useMemo(
     () =>
       renderSplitAppHeader(pulseAnim, {
-        notchInsetExtra: userJourney === 'pregnant' ? 18 : 0,
+        // Keep notch inset stable for hybrid so pill swaps don't jump the header.
+        notchInsetExtra: userJourney === 'pregnant' || isHybrid ? 18 : 0,
       }),
-    [pulseAnim, userJourney],
+    [pulseAnim, userJourney, isHybrid],
   );
 
   return (
@@ -3268,6 +3355,8 @@ function CalmMamaApp() {
   const shellBootSettledRef = useRef(false);
   const skipInitialFlowRef = useRef(true);
   const skipJourneyFlowAfterOnboardingRef = useRef(false);
+  /** Hybrid Pregnancy/Toddler pill swaps must not re-run journey enter fades. */
+  const skipHybridHomeTrackFlowRef = useRef(false);
 
   const pendingSanctuaryDeepLinkRef = useRef(null);
 
@@ -3464,6 +3553,13 @@ function CalmMamaApp() {
   // Journey context — fade-in only (tab presses use runVillageTabTransition)
   useEffect(() => {
     if (!isOnboarded) return;
+    if (skipHybridHomeTrackFlowRef.current) {
+      skipHybridHomeTrackFlowRef.current = false;
+      flowAnim.setValue(1);
+      flowReady.current = true;
+      tabSceneOpacity.setValue(1);
+      return;
+    }
     if (skipJourneyFlowAfterOnboardingRef.current) {
       skipJourneyFlowAfterOnboardingRef.current = false;
       flowAnim.setValue(1);
@@ -3477,7 +3573,7 @@ function CalmMamaApp() {
       return;
     }
     animateVillageTabFlow(flowAnim, flowReady);
-  }, [userJourney, isOnboarded, flowAnim]);
+  }, [userJourney, isOnboarded, flowAnim, tabSceneOpacity]);
 
   useEffect(() => {
     if (!isOnboarded) return;
@@ -4811,8 +4907,15 @@ function CalmMamaApp() {
   }, [weeksPregnant, dueDate, babyAge]);
 
   const handleHomeTrackChange = useCallback((track) => {
+    // Pill swap only changes Home content — don't re-trigger journey shell fades / layout pops.
+    skipHybridHomeTrackFlowRef.current = true;
+    suppressVillageLayoutAnimation();
+    flowAnim.stopAnimation();
+    flowAnim.setValue(1);
+    flowReady.current = true;
+    tabSceneOpacity.setValue(1);
     setHomeTrack(track);
-  }, []);
+  }, [flowAnim, tabSceneOpacity]);
 
   const handleGraduationSwitch = () => {
     setBirthPromptOpen(false);
@@ -5078,8 +5181,9 @@ function CalmMamaApp() {
   const edgeToEdgePregnantShell =
     !inVillagePortal &&
     !inMidnightLounge &&
-    effectiveJourney === 'pregnant' &&
-    isOnboarded;
+    isOnboarded &&
+    // Hybrid keeps SafeArea stable while Pregnancy/Toddler pills swap tracks.
+    (effectiveJourney === 'pregnant' || activeMode === ACTIVE_MODES.HYBRID);
 
   return (
     <AppLayout>
@@ -5107,6 +5211,7 @@ function CalmMamaApp() {
               <MainTabShell
                 activeTab={activeTab}
                 userJourney={effectiveJourney}
+                activeMode={activeMode}
                 mainTabContentProps={mainTabContentProps}
                 flowAnim={flowAnim}
                 pulseAnim={pulseAnim}
@@ -5659,6 +5764,25 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 120,
     backgroundColor: 'transparent',
+  },
+  hybridHomeStack: {
+    flex: 1,
+    minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
+  hybridHomePane: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  hybridHomePaneVisible: {
+    opacity: 1,
+    zIndex: 2,
+  },
+  hybridHomePaneHidden: {
+    opacity: 0,
+    zIndex: 0,
   },
   tabPane: {
     flex: 1,

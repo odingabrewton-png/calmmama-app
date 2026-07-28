@@ -97,6 +97,14 @@ export default function MidnightLoungeProfileEditPanel({
     [rewards.selectedMeBackgroundId],
   );
   const ink = useMemo(() => getMeSurfaceInk(background), [background]);
+  /** Calm Mama pass-through → original midnight lounge boxes; pastel Me washes → soft hybrid cards. */
+  const cardMode = background.passThrough
+    ? 'midnight'
+    : background.light
+      ? 'hybridLight'
+      : 'hybrid';
+  const lightCards = cardMode === 'hybridLight';
+  const midnightCards = cardMode === 'midnight';
 
   useEffect(() => {
     setNameDraft(mamaName || '');
@@ -176,22 +184,32 @@ export default function MidnightLoungeProfileEditPanel({
           <View
             style={[
               styles.fieldCard,
-              ink.onLight ? styles.fieldCardOnLight : null,
+              midnightCards && styles.fieldCardMidnight,
+              lightCards && styles.fieldCardOnLight,
             ]}
           >
-            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+            <Text
+              style={[
+                styles.fieldCardLabel,
+                { color: lightCards ? '#3D5246' : MIDNIGHT.textPrimary },
+                SANS,
+              ]}
+            >
               Display Name
             </Text>
             <TextInput
               style={[
                 styles.fieldCardInput,
-                ink.onLight && styles.fieldCardInputOnLight,
+                midnightCards && styles.fieldCardInputMidnight,
+                lightCards && styles.fieldCardInputOnLight,
                 SANS,
               ]}
               value={nameDraft}
               onChangeText={setNameDraft}
               placeholder="How should the village greet you?"
-              placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+              placeholderTextColor={
+                lightCards ? '#9AA89A' : midnightCards ? MIDNIGHT.textMuted : 'rgba(232,229,247,0.45)'
+              }
             />
           </View>
           <CustomTitleBadge title={rewards.customProfileTitle || titleDraft} />
@@ -200,24 +218,32 @@ export default function MidnightLoungeProfileEditPanel({
             <View
               style={[
                 styles.fieldCard,
-                ink.onLight ? styles.fieldCardOnLight : null,
+                midnightCards && styles.fieldCardMidnight,
+                lightCards && styles.fieldCardOnLight,
               ]}
             >
               <Text
-                style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}
+                style={[
+                  styles.fieldCardLabel,
+                  { color: lightCards ? '#3D5246' : MIDNIGHT.textPrimary },
+                  SANS,
+                ]}
               >
                 Custom Profile Title
               </Text>
               <TextInput
                 style={[
                   styles.fieldCardInput,
-                  ink.onLight && styles.fieldCardInputOnLight,
+                  midnightCards && styles.fieldCardInputMidnight,
+                  lightCards && styles.fieldCardInputOnLight,
                   SANS,
                 ]}
                 value={titleDraft}
                 onChangeText={setTitleDraft}
                 placeholder="e.g. Feature Fairy Godmother"
-                placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+                placeholderTextColor={
+                  lightCards ? '#9AA89A' : midnightCards ? MIDNIGHT.textMuted : 'rgba(232,229,247,0.45)'
+                }
                 maxLength={48}
               />
             </View>
@@ -226,23 +252,33 @@ export default function MidnightLoungeProfileEditPanel({
           <View
             style={[
               styles.fieldCard,
-              ink.onLight ? styles.fieldCardOnLight : null,
+              midnightCards && styles.fieldCardMidnight,
+              lightCards && styles.fieldCardOnLight,
             ]}
           >
-            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+            <Text
+              style={[
+                styles.fieldCardLabel,
+                { color: lightCards ? '#3D5246' : MIDNIGHT.textPrimary },
+                SANS,
+              ]}
+            >
               Short Bio / Mantra
             </Text>
             <TextInput
               style={[
                 styles.fieldCardInput,
                 styles.fieldCardInputMultiline,
-                ink.onLight && styles.fieldCardInputOnLight,
+                midnightCards && styles.fieldCardInputMidnight,
+                lightCards && styles.fieldCardInputOnLight,
                 SANS,
               ]}
               value={bioDraft}
               onChangeText={setBioDraft}
               placeholder="A line you carry into the quiet hours…"
-              placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+              placeholderTextColor={
+                lightCards ? '#9AA89A' : midnightCards ? MIDNIGHT.textMuted : 'rgba(232,229,247,0.45)'
+              }
               multiline
               textAlignVertical="top"
             />
@@ -251,22 +287,32 @@ export default function MidnightLoungeProfileEditPanel({
           <MamaBirthdayField
             birthday={mamaBirthday}
             onBirthdayChange={onBirthdayChange}
-            variant={ink.onLight ? 'hybridLight' : 'hybrid'}
+            variant={
+              midnightCards ? 'midnight' : lightCards ? 'hybridLight' : 'hybrid'
+            }
           />
 
           <View
             style={[
               styles.fieldCard,
-              ink.onLight ? styles.fieldCardOnLight : null,
+              midnightCards && styles.fieldCardMidnight,
+              lightCards && styles.fieldCardOnLight,
             ]}
           >
-            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+            <Text
+              style={[
+                styles.fieldCardLabel,
+                { color: lightCards ? '#3D5246' : MIDNIGHT.textPrimary },
+                SANS,
+              ]}
+            >
               Account email
             </Text>
             <TextInput
               style={[
                 styles.fieldCardInput,
-                ink.onLight && styles.fieldCardInputOnLight,
+                midnightCards && styles.fieldCardInputMidnight,
+                lightCards && styles.fieldCardInputOnLight,
                 SANS,
               ]}
               value={accountEmail || ''}
@@ -275,23 +321,38 @@ export default function MidnightLoungeProfileEditPanel({
               autoCorrect={false}
               keyboardType="email-address"
               placeholder="Used for membership & village mail"
-              placeholderTextColor={ink.onLight ? '#9AA89A' : 'rgba(232,229,247,0.45)'}
+              placeholderTextColor={
+                lightCards ? '#9AA89A' : midnightCards ? MIDNIGHT.textMuted : 'rgba(232,229,247,0.45)'
+              }
             />
           </View>
 
           <View
             style={[
               styles.fieldCard,
-              ink.onLight ? styles.fieldCardOnLight : null,
+              midnightCards && styles.fieldCardMidnight,
+              lightCards && styles.fieldCardOnLight,
             ]}
           >
-            <Text style={[styles.fieldCardLabel, { color: ink.onLight ? '#3D5246' : '#F5F0FF' }, SANS]}>
+            <Text
+              style={[
+                styles.fieldCardLabel,
+                { color: lightCards ? '#3D5246' : MIDNIGHT.textPrimary },
+                SANS,
+              ]}
+            >
               Your village stage
             </Text>
             <Text
               style={[
                 styles.stageHint,
-                { color: ink.onLight ? '#5A6E58' : 'rgba(232, 229, 247, 0.72)' },
+                {
+                  color: lightCards
+                    ? '#5A6E58'
+                    : midnightCards
+                      ? MIDNIGHT.textMuted
+                      : 'rgba(232, 229, 247, 0.72)',
+                },
                 SANS,
               ]}
             >
@@ -306,9 +367,11 @@ export default function MidnightLoungeProfileEditPanel({
                     key={option.id}
                     style={[
                       styles.stagePill,
-                      ink.onLight && styles.stagePillOnLight,
+                      midnightCards && styles.stagePillMidnight,
+                      lightCards && styles.stagePillOnLight,
                       selected && styles.stagePillActive,
-                      selected && ink.onLight && styles.stagePillActiveOnLight,
+                      selected && midnightCards && styles.stagePillActiveMidnight,
+                      selected && lightCards && styles.stagePillActiveOnLight,
                     ]}
                     onPress={() => onSelectJourneyMode?.(option.id)}
                     activeOpacity={0.88}
@@ -319,13 +382,15 @@ export default function MidnightLoungeProfileEditPanel({
                       style={[
                         styles.stagePillLabel,
                         {
-                          color: ink.onLight
+                          color: lightCards
                             ? selected
                               ? '#3F3428'
                               : '#5A6E58'
                             : selected
-                              ? '#3F3428'
-                              : 'rgba(232, 229, 247, 0.75)',
+                              ? midnightCards
+                                ? '#2A2540'
+                                : '#3F3428'
+                              : MIDNIGHT.textPrimary,
                         },
                         SANS,
                       ]}
@@ -336,13 +401,13 @@ export default function MidnightLoungeProfileEditPanel({
                       style={[
                         styles.stagePillHint,
                         {
-                          color: ink.onLight
+                          color: lightCards
                             ? selected
                               ? '#5A4E72'
                               : '#7A8A7E'
                             : selected
                               ? '#5A4E72'
-                              : 'rgba(232, 229, 247, 0.55)',
+                              : MIDNIGHT.textMuted,
                         },
                         SANS,
                       ]}
@@ -359,7 +424,7 @@ export default function MidnightLoungeProfileEditPanel({
               <HybridLittleOnesSection
                 littleOnes={littleOnes}
                 onChildrenChange={onChildrenChange}
-                variant={ink.onLight ? 'daily' : 'midnight'}
+                variant={midnightCards || !lightCards ? 'midnight' : 'daily'}
               />
               <Text style={[styles.hybridReadyNote, { color: ink.accent }, SANS]}>
                 Hybrid on — open Home for Pregnancy / Toddler pills.
@@ -490,6 +555,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(212, 184, 150, 0.22)',
   },
+  /** Original Midnight Lounge field surface (Calm Mama Me default). */
+  fieldCardMidnight: {
+    backgroundColor: MIDNIGHT.bgCard,
+    borderColor: MIDNIGHT.border,
+    borderRadius: 14,
+    padding: 14,
+  },
   fieldCardOnLight: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
     borderColor: 'rgba(107, 143, 120, 0.25)',
@@ -508,6 +580,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     color: '#F5F0FF',
+  },
+  fieldCardInputMidnight: {
+    backgroundColor: MIDNIGHT.bgElevated,
+    borderColor: MIDNIGHT.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 19,
+    color: MIDNIGHT.textPrimary,
   },
   fieldCardInputOnLight: {
     backgroundColor: 'rgba(255, 255, 255, 0.55)',
@@ -587,6 +668,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: 'center',
   },
+  stagePillMidnight: {
+    borderRadius: 16,
+    borderColor: MIDNIGHT.border,
+    backgroundColor: MIDNIGHT.bgElevated,
+    paddingVertical: 12,
+  },
   stagePillOnLight: {
     borderColor: 'rgba(107, 143, 120, 0.28)',
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
@@ -594,6 +681,10 @@ const styles = StyleSheet.create({
   stagePillActive: {
     backgroundColor: 'rgba(212, 184, 150, 0.85)',
     borderColor: 'rgba(212, 184, 150, 0.95)',
+  },
+  stagePillActiveMidnight: {
+    borderColor: MIDNIGHT.lavender,
+    backgroundColor: MIDNIGHT.lavenderTint,
   },
   stagePillActiveOnLight: {
     backgroundColor: 'rgba(212, 184, 150, 0.85)',
