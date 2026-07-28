@@ -41,6 +41,7 @@ import { DEFAULT_NURSERY_SURVIVAL_TASKS } from './NurserySwipeChecklist';
 import NurserySwipeChecklist from './NurserySwipeChecklist';
 import SubscriptionScreen from './SubscriptionScreen';
 import VillageCommunityPortal from './src/VillageCommunityPortal';
+import { getUsStateByCode } from './usStates';
 import MamasKitchenScreen from './MamasKitchenScreen';
 import HomeScreen from './HomeScreen';
 import HomeModeToggle from './HomeModeToggle';
@@ -2886,8 +2887,8 @@ function CalmMamaApp() {
   const [mamaBirthday, setMamaBirthday] = useState(null);
   const [approximateCity, setApproximateCity] = useState('Greater Austin area');
   const [usState, setUsState] = useState('TX');
-  const [villageLatitude] = useState(30.2672);
-  const [villageLongitude] = useState(-97.7431);
+  const [villageLatitude, setVillageLatitude] = useState(30.2672);
+  const [villageLongitude, setVillageLongitude] = useState(-97.7431);
   const [profilePhotoUri, setProfilePhotoUri] = useState(null);
   const [mamaDiscovery, setMamaDiscovery] = useState(DEFAULT_MAMA_DISCOVERY);
   const [registryDeck, setRegistryDeck] = useState(() => REGISTRY_INVENTORY.map((item) => ({ ...item })));
@@ -3204,6 +3205,25 @@ function CalmMamaApp() {
   const [inVillagePortal, setInVillagePortal] = useState(false);
   const [villagePortalTab, setVillagePortalTab] = useState('constellation');
   const [selectedVillageMamaId, setSelectedVillageMamaId] = useState(null);
+
+  const handleVillageStateChange = useCallback((code) => {
+    const state = getUsStateByCode(code);
+    if (!state) return;
+    setUsState(state.code);
+    setApproximateCity(state.cityHint);
+    setVillageLatitude(state.lat);
+    setVillageLongitude(state.lng);
+    setSelectedVillageMamaId(null);
+  }, []);
+
+  // Keep coarse village coords aligned with saved/selected US state (Village Shield — no street pin).
+  useEffect(() => {
+    const state = getUsStateByCode(usState);
+    if (!state) return;
+    setVillageLatitude(state.lat);
+    setVillageLongitude(state.lng);
+  }, [usState]);
+
   const [communityPosts, setCommunityPosts] = useState(() =>
     COMMUNITY_POSTS_SEED.map((post) => ({ ...post, replies: [...(post.replies || [])] }))
   );
@@ -5256,6 +5276,8 @@ function CalmMamaApp() {
                   villageUserState={usState}
                   villageUserLatitude={villageLatitude}
                   villageUserLongitude={villageLongitude}
+                  approximateCity={approximateCity}
+                  onUsStateChange={handleVillageStateChange}
                   userJourney={userJourney}
                 />
               </View>
@@ -5545,6 +5567,8 @@ function CalmMamaApp() {
                         villageUserState={usState}
                         villageUserLatitude={villageLatitude}
                         villageUserLongitude={villageLongitude}
+                        approximateCity={approximateCity}
+                        onUsStateChange={handleVillageStateChange}
                         userJourney={userJourney}
                       />
                     )}

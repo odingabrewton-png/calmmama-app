@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import CosmicNebulaBackdrop from '../CosmicNebulaBackdrop';
@@ -35,6 +36,12 @@ import {
 } from '../villageCommunityData';
 import FoundingGiftsClaimModal from '../FoundingGiftsClaimModal';
 import { FOUNDING_GIFTS_CAP } from '../foundingGiftsConfig';
+import MamaStatePicker from '../MamaStatePicker';
+import {
+  buildVillageAreaMapsQuery,
+  getUsStateByCode,
+  getVillageAreaMapsUrl,
+} from '../usStates';
 
 const BASKET_COSMIC_HERO_HEIGHT = Math.round(
   Math.min(540, Math.max(340, Dimensions.get('window').height * 0.52)),
@@ -367,6 +374,8 @@ function VillageConstellationPanel({
   villageUserState,
   villageUserLatitude,
   villageUserLongitude,
+  approximateCity,
+  onUsStateChange,
   pregnantCosmic = false,
 }) {
   const constellationNodes = useMemo(
@@ -381,6 +390,15 @@ function VillageConstellationPanel({
 
   const isConstellationEmpty = constellationNodes.length === 0;
   const layoutSlots = CONSTELLATION_NODE_LAYOUT.nodes.slice(0, constellationNodes.length);
+  const stateMeta = useMemo(() => getUsStateByCode(villageUserState), [villageUserState]);
+  const preferAppleMaps =
+    Platform.OS === 'ios' ||
+    (typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
+  const mapsLabel = preferAppleMaps ? 'Apple Maps' : 'Google Maps';
+  const areaQuery = buildVillageAreaMapsQuery({
+    approximateCity,
+    usState: villageUserState,
+  });
 
   const phaseAnim = useRef(new Animated.Value(0)).current;
   const nodePulseCount = Math.max(constellationNodes.length, 1);
@@ -446,6 +464,15 @@ function VillageConstellationPanel({
   const centerX = mapSize.width * CONSTELLATION_NODE_LAYOUT.center.left;
   const centerY = mapSize.height * CONSTELLATION_NODE_LAYOUT.center.top;
 
+  const openVillageAreaMaps = () => {
+    const url = getVillageAreaMapsUrl({
+      approximateCity,
+      usState: villageUserState,
+      preferApple: preferAppleMaps,
+    });
+    Linking.openURL(url).catch(() => {});
+  };
+
   return (
     <ScrollView
       style={styles.portalScroll}
@@ -453,6 +480,37 @@ function VillageConstellationPanel({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      <View style={[styles.constellationStateCard, pregnantCosmic && styles.constellationCardPopPregnant]}>
+        <Text style={[styles.constellationStateTitle, retroSoft]}>
+          {stateMeta ? `${stateMeta.name} village` : 'Your state village'}
+        </Text>
+        <Text style={styles.constellationStateSubtitle}>
+          Choose your state so constellation only shows mamas nearby in that state.
+        </Text>
+        <MamaStatePicker
+          usState={villageUserState}
+          onSelectState={onUsStateChange}
+          label="I live in"
+          hint="Your exact address stays private — we only organize by state."
+          tone="cosmic"
+          compact
+        />
+        <TouchableOpacity
+          style={styles.constellationMapsBtn}
+          onPress={openVillageAreaMaps}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel={`Open your village area in ${mapsLabel}`}
+        >
+          <Text style={styles.constellationMapsBtnText}>
+            Open area in {mapsLabel}
+          </Text>
+          <Text style={styles.constellationMapsBtnHint} numberOfLines={2}>
+            {areaQuery} · approximate only
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <View
         style={[styles.constellationViewport, pregnantCosmic && styles.constellationViewportPregnantPop]}
         onLayout={(event) => {
@@ -769,6 +827,8 @@ export default function VillageCommunityPortal({
   villageUserState = 'TX',
   villageUserLatitude,
   villageUserLongitude,
+  approximateCity,
+  onUsStateChange,
   userJourney = 'postpartum',
 }) {
   const [foundingGiftsModalOpen, setFoundingGiftsModalOpen] = useState(false);
@@ -864,6 +924,8 @@ export default function VillageCommunityPortal({
             villageUserState={villageUserState}
             villageUserLatitude={villageUserLatitude}
             villageUserLongitude={villageUserLongitude}
+            approximateCity={approximateCity}
+            onUsStateChange={onUsStateChange}
             pregnantCosmic={pregnantCosmic}
           />
         ) : null}
@@ -1179,6 +1241,47 @@ const styles = StyleSheet.create({
   constellationScrollContent: {
     paddingBottom: 28,
     gap: 14,
+  },
+  constellationStateCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(255, 252, 248, 0.78)',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+  },
+  constellationStateTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#4A3B5C',
+    marginBottom: 4,
+  },
+  constellationStateSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#7D6B91',
+    marginBottom: 10,
+  },
+  constellationMapsBtn: {
+    marginTop: 2,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(138, 99, 190, 0.28)',
+    backgroundColor: 'rgba(232, 223, 245, 0.72)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  constellationMapsBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#5A3F7A',
+    marginBottom: 3,
+  },
+  constellationMapsBtnHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#7D6B91',
   },
   constellationViewport: {
     height: 320,
