@@ -164,6 +164,7 @@ export async function postAdminApi(path, body = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
+    redirect: 'follow',
   });
   const text = await res.text();
   let data = {};
@@ -177,6 +178,16 @@ export async function postAdminApi(path, body = {}) {
       ok: false,
       status: res.status,
       error: data.error || data.hint || `Request failed (${res.status})`,
+      hint: data.hint,
+      data,
+    };
+  }
+  // Some gateways return 200 HTML/"Redirecting..." — treat missing ok as failure.
+  if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'ok') && !data.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      error: data.error || data.hint || 'Request failed',
       hint: data.hint,
       data,
     };

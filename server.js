@@ -304,10 +304,18 @@ app.post('/api/admin/test-newsletter', async (req, res) => {
       from: process.env.RESEND_FROM || undefined,
     });
     const status = result.ok ? 200 : 502;
+    const invalidKey = /api key is invalid|invalid api key|unauthorized/i.test(
+      String(result.error || ''),
+    );
     res.status(status).json({
       ...result,
       isolated: true,
       analyticsExcluded: true,
+      hint: result.ok
+        ? undefined
+        : invalidKey
+          ? 'Create a new key in Resend → API Keys, then set RESEND_API_KEY on Vercel Production and Redeploy.'
+          : result.error || 'Resend rejected the send.',
     });
   } catch (err) {
     console.warn('[CalmMama] admin test newsletter error', err?.message || err);

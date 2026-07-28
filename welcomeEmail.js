@@ -7,16 +7,36 @@ const APP_ACCESS_URL = 'https://calmmamavillage.com/app';
 const DEFAULT_FROM = 'Calm Mama Village <onboarding@calmmamavillage.com>';
 const WELCOME_SUBJECT = 'Welcome home, beautiful mama 🌸';
 
-function resolveResendApiKey(explicitKey) {
-  const fromArg = String(explicitKey || '').trim();
-  if (fromArg) return fromArg;
-  try {
-    return String(
-      process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY || '',
-    ).trim();
-  } catch (_) {
-    return '';
+/** Strip paste accidents: quotes, Bearer prefix, whitespace. */
+function sanitizeResendSecret(value) {
+  let key = String(value || '').trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
   }
+  if (/^bearer\s+/i.test(key)) {
+    key = key.replace(/^bearer\s+/i, '').trim();
+  }
+  return key;
+}
+
+/**
+ * Prefer server-only RESEND_API_KEY (Vercel runtime) over EXPO_PUBLIC_*.
+ * Expo public keys can be stale in old bundles; server env is authoritative for APIs.
+ */
+function resolveResendApiKey(explicitKey) {
+  const candidates = [
+    explicitKey,
+    typeof process !== 'undefined' ? process.env.RESEND_API_KEY : '',
+    typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_RESEND_API_KEY : '',
+  ];
+  for (const candidate of candidates) {
+    const key = sanitizeResendSecret(candidate);
+    if (key) return key;
+  }
+  return '';
 }
 
 function resolveResendAudienceId(explicitId) {

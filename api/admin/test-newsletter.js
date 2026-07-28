@@ -66,13 +66,18 @@ module.exports = async function handler(req, res) {
     });
 
     const status = result.ok ? 200 : 502;
+    const invalidKey = /api key is invalid|invalid api key|unauthorized/i.test(
+      String(result.error || ''),
+    );
     res.status(status).json({
       ...result,
       isolated: true,
       analyticsExcluded: true,
       hint: result.ok
         ? undefined
-        : result.error || 'Resend rejected the send — check domain/from address.',
+        : invalidKey
+          ? 'Create a new key in Resend → API Keys, then set RESEND_API_KEY (and EXPO_PUBLIC_RESEND_API_KEY) on Vercel Production and Redeploy.'
+          : result.error || 'Resend rejected the send — verify domain + RESEND_FROM.',
     });
   } catch (err) {
     console.warn('[CalmMama] admin test newsletter error', err?.message || err);
