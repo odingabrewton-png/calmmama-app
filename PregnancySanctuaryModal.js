@@ -16,36 +16,9 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumGateOverlay from './PremiumGateOverlay';
+import { getRotatingDoulaTips } from './pregnancyDoulaTips';
 
 const BIRTH_PLAN_KEY = '@calmmama/birth_plan_v1';
-
-const DOULA_TIPS_BY_TRIMESTER = {
-  1: [
-    { title: 'First trimester soft landing', body: 'Nausea and fatigue are not laziness — they are construction. Rest without apology and keep water + crackers nearby.' },
-    { title: 'Partner check-in', body: 'Ask for one concrete help each day: dishes, grocery run, or a 20-minute quiet block for you.' },
-    { title: 'Early nesting without overwhelm', body: 'Pick one tiny nesting task this week. Done is enough; perfection is not required.' },
-  ],
-  2: [
-    { title: 'Mid-pregnancy energy windows', body: 'Use your clearer days for birth education, not marathon to-do lists. One class or one article is a win.' },
-    { title: 'Pelvic floor & breath', body: 'Practice soft belly breathing while seated. Imagine the inhale opening space; exhale releasing the jaw.' },
-    { title: 'Birth preferences draft', body: 'Start naming preferences, not rules — lighting, who is present, pain tools you want offered first.' },
-  ],
-  3: [
-    { title: 'Third trimester pacing', body: 'Shrink the day. Rest is productive. Pack the bag in layers so one evening is enough.' },
-    { title: 'Labor rehearsal', body: 'Practice your preferred comfort tools while calm: counter-pressure, shower, rocking, breath counts.' },
-    { title: 'Postpartum village map', body: 'Write three people who can bring food, hold baby, or sit with you in week one — then ask them now.' },
-  ],
-};
-
-const WEEKLY_DOULA_ROTATION = [
-  'Your body is already a sanctuary — today’s only job is to notice one kind sensation.',
-  'If the mind spirals into “what if,” gently return to “what is true right now.”',
-  'Doula wisdom: labor progresses best when the jaw, hands, and pelvic floor soften together.',
-  'Ask for help before you are depleted — early asks protect your nervous system.',
-  'You do not need to earn rest. Rest is part of growing a human.',
-  'Write one sentence of preference for birth: how you want to feel, not just what you want to do.',
-  'Practice receiving compliments and care without deflecting — it trains postpartum receiving.',
-];
 
 const DEFAULT_BIRTH_PLAN = {
   atmosphere: '',
@@ -62,13 +35,6 @@ function formatClock(ms) {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function getTrimester(weeksPregnant) {
-  const week = parseInt(String(weeksPregnant), 10);
-  if (Number.isNaN(week) || week < 14) return 1;
-  if (week < 28) return 2;
-  return 3;
 }
 
 function ModuleTab({ id, label, active, onPress, locked = false }) {
@@ -100,22 +66,46 @@ function PremiumModuleGate({ title, body, onUpgrade }) {
 }
 
 function DoulaTipsPanel({ weeksPregnant }) {
-  const trimester = getTrimester(weeksPregnant);
-  const tips = DOULA_TIPS_BY_TRIMESTER[trimester] || DOULA_TIPS_BY_TRIMESTER[1];
-  const weekly = WEEKLY_DOULA_ROTATION[new Date().getDay()];
+  const [rotationOffset, setRotationOffset] = useState(0);
+
+  const { trimester, week, weeklyNote, tips, totalAvailable } = useMemo(
+    () =>
+      getRotatingDoulaTips({
+        weeksPregnant,
+        rotationOffset,
+        count: 4,
+      }),
+    [weeksPregnant, rotationOffset],
+  );
+
+  const showAnotherSet = () => {
+    setRotationOffset((prev) => prev + 1);
+  };
 
   return (
     <View>
-      <Text style={styles.panelEyebrow}>WEEKLY DOULA NOTE · T{trimester}</Text>
+      <Text style={styles.panelEyebrow}>
+        DOULA NOTES · WEEK {week || '—'} · T{trimester}
+      </Text>
+      <Text style={styles.panelLead}>
+        Soft wisdom that rotates daily — tap below anytime for a fresh set so these pages keep
+        feeling new.
+      </Text>
       <View style={styles.highlightCard}>
-        <Text style={styles.highlightText}>{weekly}</Text>
+        <Text style={styles.highlightLabel}>Today’s doula whisper</Text>
+        <Text style={styles.highlightText}>{weeklyNote}</Text>
       </View>
       {tips.map((tip) => (
-        <View key={tip.title} style={styles.tipCard}>
+        <View key={`${tip.id}-${rotationOffset}`} style={styles.tipCard}>
           <Text style={styles.tipTitle}>{tip.title}</Text>
           <Text style={styles.tipBody}>{tip.body}</Text>
         </View>
       ))}
+      <TouchableOpacity style={styles.secondaryBtn} onPress={showAnotherSet} activeOpacity={0.9}>
+        <Text style={styles.secondaryBtnText}>
+          Show another set · {totalAvailable} tips in your trimester library
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -487,6 +477,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(143,179,154,0.45)',
     marginBottom: 12,
   },
+  highlightLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: '#6B8F78',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
   highlightText: {
     fontSize: 15,
     lineHeight: 22,
@@ -511,6 +509,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: '#5A6E58',
+  },
+  secondaryBtn: {
+    marginTop: 4,
+    marginBottom: 8,
+    borderRadius: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(107,143,120,0.35)',
+    backgroundColor: 'rgba(255,252,248,0.55)',
+  },
+  secondaryBtnText: {
+    color: '#3D5246',
+    fontWeight: '700',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   fieldBlock: { marginBottom: 12 },
   fieldLabel: {
