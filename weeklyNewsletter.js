@@ -578,31 +578,38 @@ async function runWeeklyNewsletter({
 }
 
 /**
- * Send a single admin smoke-test newsletter.
- * Never touches the public audience list / analytics.
+ * Send one weekly-style newsletter to a single mama (signup or admin test).
  */
-async function sendAdminTestNewsletter({
+async function sendSingleNewsletterEmail({
   to,
-  firstName = 'Admin',
+  firstName = 'Mama',
   apiKey,
   from,
+  subject,
+  tags = [],
+  refIdPrefix = 'newsletter',
+  journey,
+  weeksPregnant,
+  babyAge,
+  points = 0,
+  meta = {},
 } = {}) {
   const email = String(to || '')
     .trim()
     .toLowerCase();
   if (!email) {
-    return { ok: false, error: 'missing recipient email', adminTest: true };
+    return { ok: false, error: 'missing recipient email', ...meta };
+  }
+
+  const key = resolveResendApiKey(apiKey);
+  if (!key) {
+    return { ok: false, error: 'Resend API key not configured', ...meta };
   }
 
   const reflection = pickEmailWeeklyPrompt(
-    inferNewsletterStage({ email, journey: 'pregnant' }),
+    inferNewsletterStage({ email, journey: journey || 'pregnant' }),
     new Date(),
   );
-  const key = resolveResendApiKey(apiKey);
-  if (!key) {
-    return { ok: false, error: 'Resend API key not configured', adminTest: true };
-  }
-
   const journalUrl = buildJournalDeepLink({
     appUrl: APP_URL,
     prompt: reflection.prompt,
@@ -611,28 +618,29 @@ async function sendAdminTestNewsletter({
   });
   const stageBlocks = buildStageContentBlocks({
     stage: reflection.stage,
-    weeksPregnant: '24',
-    babyAge: '12-24 months',
+    weeksPregnant: weeksPregnant || '24',
+    babyAge: babyAge || '12-24 months',
     weekSeed: isoWeekNumber(new Date()),
   });
+  const displayName = String(firstName || '').trim() || 'Mama';
 
   const html = buildWeeklyNewsletterHtml({
-    firstName: firstName || 'Admin',
+    firstName: displayName,
     affirmation: reflection.affirmation,
     prompt: reflection.prompt,
     stage: reflection.stage,
     journalUrl,
     stageBlocks,
-    points: 240,
+    points: Number(points) || 0,
   });
   const text = buildWeeklyNewsletterText({
-    firstName: firstName || 'Admin',
+    firstName: displayName,
     affirmation: reflection.affirmation,
     prompt: reflection.prompt,
     stage: reflection.stage,
     journalUrl,
     stageBlocks,
-    points: 240,
+    points: Number(points) || 0,
   });
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -644,15 +652,12 @@ async function sendAdminTestNewsletter({
     body: JSON.stringify({
       from: String(from || DEFAULT_FROM),
       to: email,
-      subject: `[ADMIN TEST] ${WEEKLY_SUBJECT}`,
+      subject: String(subject || WEEKLY_SUBJECT),
       html,
       text,
-      tags: [
-        { name: 'admin_test', value: 'true' },
-        { name: 'isolate_analytics', value: 'true' },
-      ],
+      tags: Array.isArray(tags) ? tags : [],
       headers: {
-        'X-Entity-Ref-ID': `admin-test-${Date.now()}`,
+        'X-Entity-Ref-ID': `${refIdPrefix}-${Date.now()}`,
       },
     }),
   });
@@ -661,21 +666,74 @@ async function sendAdminTestNewsletter({
   if (!response.ok) {
     return {
       ok: false,
-      adminTest: true,
       email,
       error: parsed?.message || raw || `HTTP ${response.status}`,
       reflection,
+      ...meta,
     };
   }
 
   return {
     ok: true,
-    adminTest: true,
     email,
     id: parsed?.id || null,
     reflection,
-    isolated: true,
+    ...meta,
   };
+}
+
+/**
+ * First Village newsletter right after signup (welcome companion).
+ * Non-blocking for the signup path — callers should not fail signup on this.
+ */
+async function sendFirstNewsletterOnSignup({
+  to,
+  firstName = 'Mama',
+  apiKey,
+  from,
+  journey,
+} = {}) {
+  return sendSingleNewsletterEmail({
+    to,
+    firstName,
+    apiKey,
+    from,
+    journey,
+    subject: `Welcome · ${WEEKLY_SUBJECT}`,
+    tags: [
+      { name: 'signup_first_newsletter', value: 'true' },
+      { name: 'source', value: 'signup' },
+    ],
+    refIdPrefix: 'signup-first-nl',
+    points: 0,
+    meta: { signupFirst: true },
+  });
+}
+
+/**
+ * Send a single admin smoke-test newsletter.
+ * Never touches the public audience list / analytics.
+ */
+async function sendAdminTestNewsletter({
+  to,
+  firstName = 'Admin',
+  apiKey,
+  from,
+} = {}) {
+  return sendSingleNewsletterEmail({
+    to,
+    firstName,
+    apiKey,
+    from,
+    subject: `[ADMIN TEST] ${WEEKLY_SUBJECT}`,
+    tags: [
+      { name: 'admin_test', value: 'true' },
+      { name: 'isolate_analytics', value: 'true' },
+    ],
+    refIdPrefix: 'admin-test',
+    points: 240,
+    meta: { adminTest: true, isolated: true },
+  });
 }
 
 /**
@@ -706,6 +764,8 @@ module.exports = {
   fetchNewsletterRecipients,
   runWeeklyNewsletter,
   sendAdminTestNewsletter,
+  sendFirstNewsletterOnSignup,
+  sendSingleNewsletterEmail,
   assertCronAuthorized,
   isoWeekNumber,
 };

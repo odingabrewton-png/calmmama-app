@@ -1,7 +1,7 @@
 /**
- * Welcome email + audience upsert + founder signup notice.
+ * Welcome email + first newsletter + audience upsert + founder signup notice.
  * POST /api/welcome-email
- * Body: { email, firstName?, reason?, tier?, source? }
+ * Body: { email, firstName?, reason?, tier?, source?, notifyOnly? }
  */
 
 const {
@@ -10,6 +10,7 @@ const {
   sendAdminMamaSignupNotice,
   resolveResendApiKey,
 } = require('../welcomeEmail');
+const { sendFirstNewsletterOnSignup } = require('../weeklyNewsletter');
 
 function parseBody(req) {
   if (typeof req.body === 'string') {
@@ -20,6 +21,22 @@ function parseBody(req) {
     }
   }
   return req.body || {};
+}
+
+function shouldSendFirstNewsletter(reason, notifyOnly) {
+  if (notifyOnly) return false;
+  const key = String(reason || 'signup')
+    .trim()
+    .toLowerCase();
+  // Landing Free Explorer / waitlist / paid interest / gift recipient welcome.
+  return (
+    key === 'signup' ||
+    key === 'free_explorer' ||
+    key === 'founding' ||
+    key === 'gift' ||
+    key === 'monthly' ||
+    key === 'annual'
+  );
 }
 
 module.exports = async function handler(req, res) {
@@ -70,6 +87,7 @@ module.exports = async function handler(req, res) {
         ok: Boolean(adminNotice.ok || audience.ok),
         notifyOnly: true,
         welcome: { ok: true, skipped: true },
+        firstNewsletter: { ok: true, skipped: true },
         audience,
         adminNotice: {
           ok: Boolean(adminNotice.ok),
@@ -80,7 +98,8 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const [result, audience, adminNotice] = await Promise.all([
+    const sendFirst = shouldSendFirstNewsletter(reason, notifyOnly);
+    const [result, audience, adminNotice, firstNewsletter] = await Promise.all([
       sendWelcomeMamaEmail({
         to: email,
         firstName,
@@ -101,21 +120,42 @@ module.exports = async function handler(req, res) {
         apiKey,
         from,
       }),
+      sendFirst
+        ? sendFirstNewsletterOnSignup({
+            to: email,
+            firstName,
+            apiKey,
+            from,
+          })
+        : Promise.resolve({ ok: true, skipped: true }),
     ]);
 
-    if (result.skipped && !adminNotice.ok && !audience.ok) {
+    if (result.skipped && !adminNotice.ok && !audience.ok && !firstNewsletter.ok) {
       res.status(503).json({
         ok: false,
         skipped: true,
         error: result.error || adminNotice.error || 'Resend not configured',
-        hint: 'Set EXPO_PUBLIC_RESEND_API_KEY or RESEND_API_KEY on Vercel.',
+        hint: 'Set RESEND_API_KEY or EXPO_PUBLIC_RESEND_API_KEY on Vercel.',
       });
       return;
     }
 
+    if (firstNewsletter && !firstNewsletter.ok && !firstNewsletter.skipped) {
+      console.warn(
+        '[CalmMama] signup first newsletter failed (non-blocking)',
+        firstNewsletter.error,
+      );
+    }
+
     res.status(200).json({
-      ok: Boolean(result.ok || adminNotice.ok || audience.ok),
+      ok: Boolean(result.ok || adminNotice.ok || audience.ok || firstNewsletter.ok),
       welcome: result,
+      firstNewsletter: {
+        ok: Boolean(firstNewsletter.ok),
+        skipped: Boolean(firstNewsletter.skipped),
+        id: firstNewsletter.id || null,
+        error: firstNewsletter.error || undefined,
+      },
       audience,
       adminNotice: {
         ok: Boolean(adminNotice.ok),
@@ -130,5 +170,5 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.config = {
-  maxDuration: 20,
+  maxDuration: 30,
 };

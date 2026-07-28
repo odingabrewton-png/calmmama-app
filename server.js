@@ -7,7 +7,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { sendWelcomeMamaEmail, addResendAudienceContact, resolveResendApiKey, sendAdminMamaSignupNotice } = require('./welcomeEmail');
-const { runWeeklyNewsletter, sendAdminTestNewsletter, assertCronAuthorized } = require('./weeklyNewsletter');
+const { runWeeklyNewsletter, sendAdminTestNewsletter, sendFirstNewsletterOnSignup, assertCronAuthorized } = require('./weeklyNewsletter');
 const {
   createSubscriptionCheckoutSession,
   resolveAppOrigin,
@@ -75,7 +75,9 @@ app.post('/api/welcome-email', async (req, res) => {
       req.body?.notifyOnly === 'true' ||
       reason === 'profile_email';
 
-    const apiKey = resolveResendApiKey(process.env.EXPO_PUBLIC_RESEND_API_KEY || process.env.RESEND_API_KEY);
+    const apiKey = resolveResendApiKey(
+      process.env.RESEND_API_KEY || process.env.EXPO_PUBLIC_RESEND_API_KEY,
+    );
     const from = process.env.RESEND_FROM || undefined;
 
     if (notifyOnly) {
@@ -99,6 +101,7 @@ app.post('/api/welcome-email', async (req, res) => {
         ok: Boolean(adminNotice.ok || audience.ok),
         notifyOnly: true,
         welcome: { ok: true, skipped: true },
+        firstNewsletter: { ok: true, skipped: true },
         audience,
         adminNotice: {
           ok: Boolean(adminNotice.ok),
@@ -109,7 +112,15 @@ app.post('/api/welcome-email', async (req, res) => {
       return;
     }
 
-    const [result, audience, adminNotice] = await Promise.all([
+    const sendFirst =
+      reason === 'signup' ||
+      reason === 'free_explorer' ||
+      reason === 'founding' ||
+      reason === 'gift' ||
+      reason === 'monthly' ||
+      reason === 'annual';
+
+    const [result, audience, adminNotice, firstNewsletter] = await Promise.all([
       sendWelcomeMamaEmail({
         to: email,
         firstName,
@@ -130,6 +141,14 @@ app.post('/api/welcome-email', async (req, res) => {
         apiKey,
         from,
       }),
+      sendFirst
+        ? sendFirstNewsletterOnSignup({
+            to: email,
+            firstName,
+            apiKey,
+            from,
+          })
+        : Promise.resolve({ ok: true, skipped: true }),
     ]);
 
     if (result.skipped) {
@@ -137,8 +156,12 @@ app.post('/api/welcome-email', async (req, res) => {
         ok: false,
         skipped: true,
         error: result.error,
-        hint: 'Set EXPO_PUBLIC_RESEND_API_KEY on the server.',
+        hint: 'Set RESEND_API_KEY on the server.',
         adminNotice: { ok: Boolean(adminNotice.ok), skipped: Boolean(adminNotice.skipped) },
+        firstNewsletter: {
+          ok: Boolean(firstNewsletter.ok),
+          skipped: Boolean(firstNewsletter.skipped),
+        },
       });
       return;
     }
@@ -148,15 +171,38 @@ app.post('/api/welcome-email', async (req, res) => {
         ok: false,
         error: result.error || 'Email send failed',
         adminNotice: { ok: Boolean(adminNotice.ok), skipped: Boolean(adminNotice.skipped) },
+        firstNewsletter: {
+          ok: Boolean(firstNewsletter.ok),
+          skipped: Boolean(firstNewsletter.skipped),
+          error: firstNewsletter.error,
+        },
       });
       return;
     }
 
-    console.log('[CalmMama] welcome email sent', { reason, id: result.id, to: email.slice(0, 3) + '…' });
+    if (firstNewsletter && !firstNewsletter.ok && !firstNewsletter.skipped) {
+      console.warn(
+        '[CalmMama] signup first newsletter failed (non-blocking)',
+        firstNewsletter.error,
+      );
+    }
+
+    console.log('[CalmMama] welcome email sent', {
+      reason,
+      id: result.id,
+      firstNewsletterId: firstNewsletter?.id || null,
+      to: email.slice(0, 3) + '…',
+    });
     res.status(200).json({
       ok: true,
       id: result.id,
       audience,
+      firstNewsletter: {
+        ok: Boolean(firstNewsletter.ok),
+        skipped: Boolean(firstNewsletter.skipped),
+        id: firstNewsletter.id || null,
+        error: firstNewsletter.error || undefined,
+      },
       adminNotice: {
         ok: Boolean(adminNotice.ok),
         skipped: Boolean(adminNotice.skipped),
