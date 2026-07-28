@@ -1,6 +1,6 @@
 /**
  * Vercel Cron endpoint — weekly Village newsletter.
- * Schedule: Mondays 9:00 AM EST (13:00 UTC) via vercel.json crons.
+ * Schedule: Tuesdays 9:00 AM EST (13:00 UTC) via vercel.json crons.
  *
  * Security: requires Authorization: Bearer ${CRON_SECRET}
  * Vercel Cron injects this header automatically when CRON_SECRET is set.

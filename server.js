@@ -216,7 +216,7 @@ app.post('/api/welcome-email', async (req, res) => {
 });
 
 /**
- * Weekly newsletter — same handler used by Vercel Cron.
+ * Weekly newsletter — same handler used by Vercel Cron (Tuesdays 9:00 AM ET).
  * Auth: Authorization: Bearer ${CRON_SECRET}
  */
 app.get('/api/weekly-newsletter', async (req, res) => {

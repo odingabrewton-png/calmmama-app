@@ -44,7 +44,7 @@
   "crons": [
     {
       "path": "/api/weekly-newsletter",
-      "schedule": "0 13 * * 1"
+      "schedule": "0 13 * * 2"
     },
     {
       "path": "/api/web-push/dispatch",

@@ -19,6 +19,7 @@ const {
   buildStageContentBlocks,
   getNextTierProgress,
 } = require('./newsletterStageContent');
+const { getFeaturedNewsletterPiece } = require('./newsletterFeaturedPieces');
 
 const WEEKLY_SUBJECT = 'Your Weekly Village Reflection & Affirmation 🌸';
 const APP_URL = APP_ACCESS_URL || 'https://calmmamavillage.com/app';
@@ -74,6 +75,99 @@ function buildAppDeepLink(extraParams = {}) {
   } catch (_) {
     return APP_URL;
   }
+}
+
+function buildFeaturedPieceHtml(piece, appUrl = APP_URL) {
+  if (!piece) return '';
+  const paragraphs = (piece.paragraphs || [])
+    .map(
+      (p) => `
+                    <p style="color: #7D6B91; font-size: 14px; line-height: 1.7; margin: 0 0 12px 0; text-align: left;">
+                      ${escapeHtml(p)}
+                    </p>`,
+    )
+    .join('');
+  const bullets = (piece.bullets || [])
+    .map(
+      (item) => `
+                      <li style="color: #7D6B91; font-size: 14px; line-height: 1.6; margin: 0 0 10px 0; text-align: left;">
+                        ${escapeHtml(item)}
+                      </li>`,
+    )
+    .join('');
+  const bulletsHtml = bullets
+    ? `<ul style="margin: 4px 0 14px 0; padding-left: 18px;">${bullets}</ul>`
+    : '';
+  const closing = piece.closing
+    ? `<p style="color: #4A3B5C; font-size: 14px; line-height: 1.7; margin: 0 0 14px 0; text-align: left; font-weight: 600;">
+                      ${escapeHtml(piece.closing)}
+                    </p>`
+    : '';
+  const ctaHref = String(
+    piece.ctaUrl ||
+      (piece.ctaPath
+        ? `${String(appUrl).replace(/\/app\/?$/, '')}${piece.ctaPath.startsWith('/') ? piece.ctaPath : `/${piece.ctaPath}`}`
+        : appUrl),
+  ).replace(/"/g, '&quot;');
+  const cta = piece.ctaLabel
+    ? `<p style="margin: 8px 0 0 0; text-align: center;">
+              <a href="${ctaHref}" target="_blank" style="color: #8A63BE; font-weight: 700; font-size: 14px; text-decoration: underline;">
+                ${escapeHtml(piece.ctaLabel)}
+              </a>
+            </p>`
+    : '';
+
+  return `
+          <tr>
+            <td align="left" style="padding-top: 18px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#FFF7FB" style="background-color: #FFF7FB; border-radius: 18px; border: 1px solid #F0E0EE;">
+                <tr>
+                  <td style="padding: 20px 18px 18px 18px;">
+                    <p style="color: #A493B8; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px 0; text-align: center;">
+                      ${escapeHtml(piece.eyebrow || 'Village Essay')}
+                    </p>
+                    <p style="color: #4A3B5C; font-size: 18px; font-weight: 700; margin: 0 0 14px 0; text-align: center; line-height: 1.35;">
+                      ${escapeHtml(piece.title)}
+                    </p>
+                    ${paragraphs}
+                    ${bulletsHtml}
+                    ${closing}
+                    ${cta}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+}
+
+function buildFeaturedPieceText(piece, appUrl = APP_URL) {
+  if (!piece) return [];
+  const lines = [
+    '',
+    `${piece.eyebrow || 'Village Essay'}: ${piece.title}`,
+    ...(piece.paragraphs || []),
+  ];
+  if (piece.bullets?.length) {
+    lines.push('');
+    piece.bullets.forEach((item) => lines.push(`• ${item}`));
+  }
+  if (piece.closing) lines.push('', piece.closing);
+  if (piece.ctaLabel) {
+    const href =
+      piece.ctaUrl ||
+      (piece.ctaPath
+        ? `${String(appUrl).replace(/\/app\/?$/, '')}${piece.ctaPath.startsWith('/') ? piece.ctaPath : `/${piece.ctaPath}`}`
+        : appUrl);
+    lines.push(`${piece.ctaLabel}: ${href}`);
+  }
+  return lines;
+}
+
+function resolveWeeklySubject(featuredPiece) {
+  if (featuredPiece?.title) {
+    return `${featuredPiece.title} 🌸`;
+  }
+  return WEEKLY_SUBJECT;
 }
 
 function buildStageSectionsHtml(blocks = []) {
@@ -168,6 +262,7 @@ function buildWeeklyNewsletterHtml({
   appUrl = APP_URL,
   journalUrl,
   stageBlocks = [],
+  featuredPiece = null,
   points = 0,
 } = {}) {
   const name = escapeHtml(String(firstName || '').trim() || 'Mama');
@@ -175,8 +270,10 @@ function buildWeeklyNewsletterHtml({
   const safePrompt = escapeHtml(prompt);
   const safeStage = escapeHtml(stageLabel(stage));
   const ctaUrl = String(journalUrl || appUrl || APP_URL).replace(/"/g, '&quot;');
+  const featuredHtml = buildFeaturedPieceHtml(featuredPiece, appUrl);
   const stageHtml = buildStageSectionsHtml(stageBlocks);
   const rewardsHtml = buildRewardsFooterHtml({ points, appUrl });
+  const subject = resolveWeeklySubject(featuredPiece);
 
   return `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -184,7 +281,7 @@ function buildWeeklyNewsletterHtml({
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>${WEEKLY_SUBJECT}</title>
+  <title>${escapeHtml(subject)}</title>
   <style type="text/css">
     body, table, td {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
@@ -225,6 +322,7 @@ function buildWeeklyNewsletterHtml({
               </p>
             </td>
           </tr>
+          ${featuredHtml}
           <tr>
             <td align="left" bgcolor="#F8F4FC" style="background-color: #F8F4FC; border-radius: 18px; padding: 20px 18px;">
               <p style="color: #A493B8; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px 0; text-align: center;">Email Reflection Prompt of the Week</p>
@@ -268,11 +366,13 @@ function buildWeeklyNewsletterText({
   appUrl = APP_URL,
   journalUrl,
   stageBlocks = [],
+  featuredPiece = null,
   points = 0,
 } = {}) {
   const name = String(firstName || '').trim() || 'Mama';
   const link = journalUrl || appUrl;
   const progress = getNextTierProgress(points);
+  const featuredLines = buildFeaturedPieceText(featuredPiece, appUrl);
   const stageLines = (stageBlocks || []).flatMap((block) => [
     '',
     `${block.eyebrow}: ${block.title}`,
@@ -294,6 +394,7 @@ function buildWeeklyNewsletterText({
     `Hello, ${name}`,
     '',
     `Your weekly affirmation: "${affirmation}"`,
+    ...featuredLines,
     '',
     `Email Reflection Prompt of the Week (${stageLabel(stage)} · exclusive):`,
     prompt,
@@ -436,6 +537,8 @@ async function sendWeeklyEmailToRecipient({
     weekSeed,
   });
   const points = Math.max(0, Number(recipient.points) || 0);
+  const featuredPiece = getFeaturedNewsletterPiece(new Date());
+  const subject = resolveWeeklySubject(featuredPiece);
 
   const html = buildWeeklyNewsletterHtml({
     firstName: recipient.firstName,
@@ -444,6 +547,7 @@ async function sendWeeklyEmailToRecipient({
     stage: weekly.stage,
     journalUrl,
     stageBlocks,
+    featuredPiece,
     points,
   });
   const text = buildWeeklyNewsletterText({
@@ -453,6 +557,7 @@ async function sendWeeklyEmailToRecipient({
     stage: weekly.stage,
     journalUrl,
     stageBlocks,
+    featuredPiece,
     points,
   });
 
@@ -465,13 +570,16 @@ async function sendWeeklyEmailToRecipient({
     body: JSON.stringify({
       from: String(from || DEFAULT_FROM),
       to: email,
-      subject: WEEKLY_SUBJECT,
+      subject,
       html,
       text,
       tags: [
         { name: 'newsletter', value: 'weekly' },
         { name: 'mama_stage', value: weekly.stage },
         { name: 'prompt_id', value: String(weekly.id || '').slice(0, 48) },
+        ...(featuredPiece?.id
+          ? [{ name: 'featured_piece', value: String(featuredPiece.id).slice(0, 48) }]
+          : []),
       ],
     }),
   });
@@ -519,6 +627,7 @@ async function runWeeklyNewsletter({
   }
 
   if (dryRun) {
+    const featuredPiece = getFeaturedNewsletterPiece(new Date());
     const sample = recipients.slice(0, 3).map((r) => {
       const stage = inferNewsletterStage(r);
       const weekly = pickEmailWeeklyPrompt(stage, new Date());
@@ -531,12 +640,16 @@ async function runWeeklyNewsletter({
       failed: 0,
       total: recipients.length,
       sample,
+      featuredPieceId: featuredPiece?.id || null,
+      featuredPieceTitle: featuredPiece?.title || null,
+      subject: resolveWeeklySubject(featuredPiece),
     };
   }
 
   let sent = 0;
   let failed = 0;
   const errors = [];
+  const featuredPiece = getFeaturedNewsletterPiece(new Date());
 
   for (let i = 0; i < recipients.length; i += 1) {
     const recipient = recipients[i];
@@ -574,6 +687,8 @@ async function runWeeklyNewsletter({
     failed,
     total: recipients.length,
     errors: errors.length ? errors : undefined,
+    featuredPieceId: getFeaturedNewsletterPiece(new Date())?.id || null,
+    subject: resolveWeeklySubject(getFeaturedNewsletterPiece(new Date())),
   };
 }
 
@@ -623,6 +738,7 @@ async function sendSingleNewsletterEmail({
     weekSeed: isoWeekNumber(new Date()),
   });
   const displayName = String(firstName || '').trim() || 'Mama';
+  const featuredPiece = getFeaturedNewsletterPiece(new Date());
 
   const html = buildWeeklyNewsletterHtml({
     firstName: displayName,
@@ -631,6 +747,7 @@ async function sendSingleNewsletterEmail({
     stage: reflection.stage,
     journalUrl,
     stageBlocks,
+    featuredPiece,
     points: Number(points) || 0,
   });
   const text = buildWeeklyNewsletterText({
@@ -640,6 +757,7 @@ async function sendSingleNewsletterEmail({
     stage: reflection.stage,
     journalUrl,
     stageBlocks,
+    featuredPiece,
     points: Number(points) || 0,
   });
 
@@ -652,7 +770,7 @@ async function sendSingleNewsletterEmail({
     body: JSON.stringify({
       from: String(from || DEFAULT_FROM),
       to: email,
-      subject: String(subject || WEEKLY_SUBJECT),
+      subject: String(subject || resolveWeeklySubject(featuredPiece)),
       html,
       text,
       tags: Array.isArray(tags) ? tags : [],
@@ -768,4 +886,6 @@ module.exports = {
   sendSingleNewsletterEmail,
   assertCronAuthorized,
   isoWeekNumber,
+  resolveWeeklySubject,
+  getFeaturedNewsletterPiece,
 };
