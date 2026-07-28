@@ -48,6 +48,18 @@ function assertProductionDist() {
 assertProductionDist();
 
 app.disable('x-powered-by');
+
+/** Mama profile cloud backup/restore — larger body for optional photo snapshots. */
+const mamaProfileHandler = require('./api/mama-profile');
+app.options('/api/mama-profile', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+app.get('/api/mama-profile', express.json({ limit: '1mb' }), mamaProfileHandler);
+app.post('/api/mama-profile', express.json({ limit: '1mb' }), mamaProfileHandler);
+
 app.use(express.json({ limit: '32kb' }));
 
 /** Welcome email for Free Explorer + completed signup (styled HTML via Resend). */

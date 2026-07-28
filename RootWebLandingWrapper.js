@@ -34,6 +34,7 @@ import {
 } from './membershipAccess';
 import PremiumUpgradeWelcomeModal from './PremiumUpgradeWelcomeModal';
 import { dispatchWelcomeMamaEmail } from './welcomeEmailClient';
+import { syncMamaProfileWithEmail } from './mamaProfileSync';
 
 const CHARCOAL = '#3d443a';
 const SAGE_TEXT = '#6e7e65';
@@ -995,7 +996,7 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
         setContactInfo('');
       }
 
-      // Free Explorer → save profile + enter live app immediately.
+      // Free Explorer → save email, restore any prior cloud profile, enter live app.
       if (isFreeExplorer) {
         await saveMembershipProfile({
           tier: MEMBERSHIP_TIERS.FREE_EXPLORER,
@@ -1003,6 +1004,15 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
           planId: null,
           isSubscribed: false,
         });
+        try {
+          await syncMamaProfileWithEmail({
+            email: value,
+            preferRestore: true,
+            source: 'landing_free_explorer',
+          });
+        } catch (_) {
+          /* enter app even if cloud restore is unavailable */
+        }
         enterLiveApp({ welcome: 'explorer' });
         return;
       }
@@ -1050,6 +1060,15 @@ function RootWebLandingWrapper({ children, showNotch = true }) {
             planId: null,
             isSubscribed: false,
           });
+          try {
+            await syncMamaProfileWithEmail({
+              email: value,
+              preferRestore: true,
+              source: 'landing_free_explorer',
+            });
+          } catch (_) {
+            /* ignore */
+          }
           enterLiveApp({ welcome: 'explorer' });
           return;
         } catch (_) {

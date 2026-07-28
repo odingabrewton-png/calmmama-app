@@ -117,6 +117,7 @@ import {
 } from './adminAccess';
 import { presentVillageWebNotification } from './pwaWebPush';
 import { dispatchAdminMamaSignupNotice } from './welcomeEmailClient';
+import { syncMamaProfileWithEmail, upsertMamaCloudProfile } from './mamaProfileSync';
 import { normalizeJournalStage } from './sanctuaryJournalPrompts';
 import LotusFlowerButton from './LotusFlowerButton';
 
@@ -3043,13 +3044,12 @@ function CalmMamaApp() {
       });
       if (isAdmin(user)) {
         await saveAdminSession({ sandbox: true });
-        return;
       }
     } catch (_) {
       /* non-blocking */
     }
 
-    // Debounce founder notice — Me/Admin email fields fire on every keystroke.
+    // Debounce cloud restore/backup + founder notice — Me email fires on every keystroke.
     if (accountEmailNotifyTimerRef.current) {
       clearTimeout(accountEmailNotifyTimerRef.current);
     }
@@ -3058,6 +3058,37 @@ function CalmMamaApp() {
         .trim()
         .toLowerCase();
       if (!next || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) return;
+
+      syncMamaProfileWithEmail({
+        email: next,
+        preferRestore: true,
+        source: 'me_profile',
+      })
+        .then((result) => {
+          if (!result?.restored || !result.profile) return;
+          applyProfileSnapshot(result.profile, {
+            setMamaName,
+            setUserJourney,
+            setWeeksPregnant,
+            setDueDate,
+            setBabyAge,
+            setCurrentPregnancy,
+            setChildren,
+            setActiveMode,
+            setHomeTrack,
+            setMamaBirthday,
+            setApproximateCity,
+            setUsState,
+            setMamaDiscovery,
+            setProfilePhotoUri,
+            setTimeCapsuleEntries: (entries) =>
+              setTimeCapsuleEntries(normalizeTimeCapsuleEntries(entries)),
+          });
+          setIsOnboarded(true);
+        })
+        .catch(() => {});
+
+      if (isAdmin(user)) return;
       if (next === String(ADMIN_EMAIL).toLowerCase()) return;
       if (lastNotifiedMamaEmailRef.current === next) return;
       lastNotifiedMamaEmailRef.current = next;
@@ -3519,8 +3550,61 @@ function CalmMamaApp() {
 
         pendingSanctuaryDeepLinkRef.current = consumeSanctuaryJournalDeepLink();
 
-        if (boot.profile) {
-          applyProfileSnapshot(boot.profile, {
+        let profile = boot.profile;
+        let hasCompletedOnboarding = boot.hasCompletedOnboarding;
+
+        // Membership: Stripe success return (?upgraded=1&plan=monthly|annual) unlocks Pro.
+        const upgraded = await consumeStripeUpgradeReturn();
+        let membership = null;
+        if (upgraded) {
+          applyMembership(upgraded);
+          membership = upgraded;
+          // Stripe return should land in the live app, not re-run onboarding.
+          setIsOnboarded(true);
+          setHasCompletedOnboarding(true).catch(() => {});
+          setPremiumWelcomePlan(
+            upgraded.planId === 'yearly' || upgraded.planId === 'annual'
+              ? 'Founding / Annual plan'
+              : upgraded.planId === 'gift'
+                ? 'Gift membership'
+                : 'Village Access · Monthly',
+          );
+          setPremiumWelcomeVariant('premium');
+          setPremiumWelcomeOpen(true);
+          // Soft delay so rewards hydrate before the upgrade bonus lands.
+          setTimeout(() => {
+            addPoints(250, 'subscriptionUpgrade');
+          }, 400);
+        } else {
+          membership = await loadMembershipProfile();
+          if (membership) applyMembership(membership);
+        }
+
+        // Same email after Home Screen delete → restore cloud profile snapshot.
+        const memberEmailBoot = String(membership?.email || '')
+          .trim()
+          .toLowerCase();
+        if (memberEmailBoot && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberEmailBoot)) {
+          try {
+            const sync = await syncMamaProfileWithEmail({
+              email: memberEmailBoot,
+              profile,
+              preferRestore: true,
+              source: 'app_boot',
+            });
+            if (sync?.restored && sync.profile) {
+              profile = sync.profile;
+              hasCompletedOnboarding = true;
+            }
+          } catch (syncErr) {
+            if (__DEV__ && typeof console !== 'undefined') {
+              console.warn('[CalmMama Village] Profile cloud sync skipped:', syncErr);
+            }
+          }
+        }
+
+        if (profile) {
+          applyProfileSnapshot(profile, {
             setMamaName,
             setUserJourney,
             setWeeksPregnant,
@@ -3540,31 +3624,6 @@ function CalmMamaApp() {
           });
         }
 
-        // Membership: Stripe success return (?upgraded=1&plan=monthly|annual) unlocks Pro.
-        const upgraded = await consumeStripeUpgradeReturn();
-        if (upgraded) {
-          applyMembership(upgraded);
-          // Stripe return should land in the live app, not re-run onboarding.
-          setIsOnboarded(true);
-          setHasCompletedOnboarding(true).catch(() => {});
-          setPremiumWelcomePlan(
-            upgraded.planId === 'yearly' || upgraded.planId === 'annual'
-              ? 'Founding / Annual plan'
-              : upgraded.planId === 'gift'
-                ? 'Gift membership'
-                : 'Village Access · Monthly',
-          );
-          setPremiumWelcomeVariant('premium');
-          setPremiumWelcomeOpen(true);
-          // Soft delay so rewards hydrate before the upgrade bonus lands.
-          setTimeout(() => {
-            addPoints(250, 'subscriptionUpgrade');
-          }, 400);
-        } else {
-          const membership = await loadMembershipProfile();
-          if (membership) applyMembership(membership);
-        }
-
         if (FORCE_ONBOARDING_LAYOUT_AUDIT) {
           await setHasCompletedOnboarding(false).catch(() => {});
           setOnboardingStep('intake');
@@ -3572,7 +3631,7 @@ function CalmMamaApp() {
           if (__DEV__ && typeof console !== 'undefined') {
             console.info('[CalmMama Village] FORCE_ONBOARDING_LAYOUT_AUDIT — onboarding intake');
           }
-        } else if (upgraded || boot.hasCompletedOnboarding) {
+        } else if (upgraded || hasCompletedOnboarding) {
           setIsOnboarded(true);
         } else {
           setOnboardingStep('intake');
@@ -3611,27 +3670,36 @@ function CalmMamaApp() {
 
   useEffect(() => {
     if (!isOnboarded) return;
+    const snapshot = buildProfileSnapshot({
+      mamaName,
+      userJourney: activeMode === ACTIVE_MODES.HYBRID ? ACTIVE_MODES.HYBRID : userJourney,
+      weeksPregnant,
+      dueDate,
+      babyAge,
+      currentPregnancy,
+      children,
+      activeMode,
+      homeTrack,
+      mamaBirthday,
+      approximateCity,
+      usState,
+      mamaDiscovery,
+      profilePhotoUri,
+      timeCapsuleEntries,
+    });
     const timer = setTimeout(() => {
-      saveVillageProfile(
-        buildProfileSnapshot({
-          mamaName,
-          userJourney: activeMode === ACTIVE_MODES.HYBRID ? ACTIVE_MODES.HYBRID : userJourney,
-          weeksPregnant,
-          dueDate,
-          babyAge,
-          currentPregnancy,
-          children,
-          activeMode,
-          homeTrack,
-          mamaBirthday,
-          approximateCity,
-          usState,
-          mamaDiscovery,
-          profilePhotoUri,
-          timeCapsuleEntries,
-        })
-      ).catch(() => {});
-    }, 500);
+      saveVillageProfile(snapshot).catch(() => {});
+      const email = String(memberEmail || '')
+        .trim()
+        .toLowerCase();
+      if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        upsertMamaCloudProfile({
+          email,
+          profile: snapshot,
+          source: 'autosave',
+        }).catch(() => {});
+      }
+    }, 700);
     return () => clearTimeout(timer);
   }, [
     isOnboarded,
@@ -3650,6 +3718,7 @@ function CalmMamaApp() {
     mamaDiscovery,
     profilePhotoUri,
     timeCapsuleEntries,
+    memberEmail,
   ]);
 
   useEffect(() => {
