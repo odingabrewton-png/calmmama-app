@@ -1260,6 +1260,26 @@ function MidnightLoungeScreen({
     [enterLoungeSubView, isPostpartumJourney],
   );
 
+  const handleOpenOracleFromJournal = useCallback(
+    (target) => {
+      if (target === 'baby-oracle') {
+        if (isPostpartumJourney) {
+          void warmPostpartumBabyOracle().then(() => enterLoungeSubView('baby-oracle'));
+          return;
+        }
+        enterLoungeSubView('baby-oracle');
+        return;
+      }
+      if (target === 'pregnancy-oracle') {
+        if (userJourney === 'pregnant' || activeMode === 'hybrid') {
+          warmPregnancyOracle();
+        }
+        enterLoungeSubView('pregnancy-oracle');
+      }
+    },
+    [enterLoungeSubView, isPostpartumJourney, userJourney, activeMode],
+  );
+
   const feedListHeader = useMemo(
     () => (
       <FeedListHeader
@@ -1391,6 +1411,7 @@ function MidnightLoungeScreen({
             journeyContext={journeyContext}
             journeyStage={activeMode === 'hybrid' ? 'hybrid' : userJourney}
             initialJournalPrompt={initialJournalPrompt}
+            onOpenOracle={handleOpenOracleFromJournal}
           />
         );
       }
@@ -1410,6 +1431,7 @@ function MidnightLoungeScreen({
             journeyContext={journeyContext}
             journeyStage={activeMode === 'hybrid' ? 'hybrid' : userJourney}
             initialJournalPrompt={initialJournalPrompt}
+            onOpenOracle={handleOpenOracleFromJournal}
           />
         </Suspense>
       );

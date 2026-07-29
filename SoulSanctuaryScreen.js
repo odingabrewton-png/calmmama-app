@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import {
   pickPremiumTeaserPrompt,
   shuffleInAppPromptBatch,
 } from './sanctuaryJournalPrompts';
+import { recommendOracleFromJournal } from './sanctuaryOracleRecommend';
 import { hasSanctuaryPremiumAccess } from './villageRewardsEngine';
 
 const JOURNAL_SPRING = VILLAGE_SNAPPY_REANIMATED;
@@ -193,6 +194,8 @@ export default function SoulSanctuaryScreen({
   journeyStage = 'pregnant',
   /** Prefill from email deep link / newsletter CTA */
   initialJournalPrompt = '',
+  /** Open Midnight Lounge oracle from a journal recommendation */
+  onOpenOracle,
 }) {
   const { addPoints, rewards } = useVillageRewards();
   const hasPremiumPrompts = hasSanctuaryPremiumAccess({
@@ -419,6 +422,15 @@ export default function SoulSanctuaryScreen({
     (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
   );
 
+  const oracleRecommendation = useMemo(
+    () =>
+      recommendOracleFromJournal({
+        text: journalText,
+        stage,
+      }),
+    [journalText, stage],
+  );
+
   return (
     <KeyboardAvoidingView
       style={[styles.flex, loungeSubView && styles.loungeFlex]}
@@ -535,6 +547,25 @@ export default function SoulSanctuaryScreen({
                     tint="rgba(232, 224, 242, 0.95)"
                   />
                 </View>
+
+                {oracleRecommendation && onOpenOracle ? (
+                  <TouchableOpacity
+                    style={styles.oracleRecommendCard}
+                    onPress={() => onOpenOracle(oracleRecommendation.target)}
+                    activeOpacity={0.9}
+                    disabled={releasing}
+                    accessibilityRole="button"
+                    accessibilityLabel={oracleRecommendation.ctaLabel}
+                  >
+                    <Text style={styles.oracleRecommendEyebrow}>
+                      {oracleRecommendation.emoji} MIDNIGHT SUPPORT
+                    </Text>
+                    <Text style={styles.oracleRecommendTitle}>{oracleRecommendation.title}</Text>
+                    <Text style={styles.oracleRecommendBody}>{oracleRecommendation.body}</Text>
+                    <Text style={styles.oracleRecommendCta}>{oracleRecommendation.ctaLabel}</Text>
+                  </TouchableOpacity>
+                ) : null}
+
                 <TouchableOpacity
                   style={[styles.releaseBtn, releasing && styles.releaseBtnDisabled]}
                   onPress={handleDoneEmpty}
@@ -871,6 +902,42 @@ const styles = StyleSheet.create({
     color: 'rgba(220, 210, 235, 0.72)',
     fontStyle: 'italic',
     ...SANCTUARY_ZEN,
+  },
+  oracleRecommendCard: {
+    marginHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(196, 168, 216, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 214, 255, 0.45)',
+  },
+  oracleRecommendEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: 'rgba(232, 214, 255, 0.9)',
+    marginBottom: 6,
+  },
+  oracleRecommendTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFF9FC',
+    marginBottom: 6,
+  },
+  oracleRecommendBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: 'rgba(245, 238, 255, 0.88)',
+    marginBottom: 10,
+    ...SANCTUARY_ZEN,
+  },
+  oracleRecommendCta: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#E8D6FF',
   },
   diaryInput: {
     minHeight: 140,
