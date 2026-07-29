@@ -3784,19 +3784,11 @@ function CalmMamaApp() {
   ]);
 
   useEffect(() => {
-    if (!isOnboarded) {
-      pulseLoopRef.current?.stop();
-      pulseLoopRef.current = null;
-      pulseAnim.setValue(1);
-      return undefined;
-    }
-
     startLogoPulseLoop(pulseAnim, pulseLoopRef);
 
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       try {
         const onVisible = () => {
-          if (!isOnboarded) return;
           if (document.visibilityState === 'visible') {
             startLogoPulseLoop(pulseAnim, pulseLoopRef);
           }
@@ -3816,7 +3808,7 @@ function CalmMamaApp() {
       pulseLoopRef.current?.stop();
       pulseLoopRef.current = null;
     };
-  }, [pulseAnim, isOnboarded]);
+  }, [pulseAnim]);
 
   // Skip enter springs on cold boot — only animate after the shell has settled once.
   useEffect(() => {
@@ -5177,6 +5169,7 @@ function CalmMamaApp() {
   };
 
   const handleSelectOnboardingJourney = useCallback((journey) => {
+    suppressVillageLayoutAnimation();
     if (journey === 'hybrid') {
       setActiveMode(ACTIVE_MODES.HYBRID);
       setUserJourney(ACTIVE_MODES.HYBRID);
@@ -5455,7 +5448,7 @@ function CalmMamaApp() {
     return (
       <AppLayout>
         <AppStatusBar />
-        <VillageOmbreBackdrop paused />
+        <VillageOmbreBackdrop />
         <SafeAreaView style={styles.screenForeground} />
       </AppLayout>
     );
@@ -5481,7 +5474,7 @@ function CalmMamaApp() {
     <AppLayout>
         <AppStatusBar />
         {/* Isolated sage/lavender/peach ombre — lives in VillageOmbreBackdrop.js only */}
-        <VillageOmbreBackdrop paused={showOnboarding} />
+        <VillageOmbreBackdrop />
         {Platform.OS === 'web' && isOnboarded ? <PWAVillageAlertsPrompt /> : null}
 
         {/* Single hardware-accelerated canvas — opacity fades only, then swap the child */}
@@ -5908,7 +5901,7 @@ function CalmMamaApp() {
                   <View style={styles.onboardingSceneLayer}>
                     <OnboardingStageScreen
                       logoUri={CALMMAMA_VILLAGE_BADGE}
-                      pulseAnim={null}
+                      pulseAnim={pulseAnim}
                       userJourney={userJourney}
                       onSelectJourney={handleSelectOnboardingJourney}
                       mamaName={mamaName}

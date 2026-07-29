@@ -10,46 +10,46 @@ const JOURNAL_STAGES = Object.freeze(['pregnant', 'postpartum', 'hybrid']);
 /** In-app Inspiration pills — soft, short, tap-to-fill. */
 const IN_APP_PROMPTS = Object.freeze({
   pregnant: [
-    { id: 'p-ia-1', text: 'What is my body asking me to slow down for today?' },
-    { id: 'p-ia-2', text: 'One fear I can name without needing to fix it yet…' },
-    { id: 'p-ia-3', text: 'Where did I feel connected to baby this week?' },
-    { id: 'p-ia-4', text: 'What would “enough” look like for me before bed tonight?' },
-    { id: 'p-ia-5', text: 'A tender truth about this trimester I rarely say out loud…' },
-    { id: 'p-ia-6', text: 'Who or what made me feel held recently?' },
-    { id: 'p-ia-7', text: 'What am I grieving a little as my body changes?' },
-    { id: 'p-ia-8', text: 'If I could gift my future self one sentence of courage…' },
-    { id: 'p-ia-9', text: 'What part of pregnancy still feels surprising?' },
-    { id: 'p-ia-10', text: 'A tiny joy from today that my nervous system needed…' },
-    { id: 'p-ia-11', text: 'What boundary would make this week softer?' },
-    { id: 'p-ia-12', text: 'How do I want to be spoken to when I feel overwhelmed?' },
+    { id: 'p-ia-1', text: 'What snack or rest break would actually help my body today?' },
+    { id: 'p-ia-2', text: 'One pregnancy symptom I keep brushing off that deserves gentleness…' },
+    { id: 'p-ia-3', text: 'When did I last feel baby move — and what was I doing?' },
+    { id: 'p-ia-4', text: 'What am I tired of explaining to people about this pregnancy?' },
+    { id: 'p-ia-5', text: 'A worry about birth or after that keeps looping in my head…' },
+    { id: 'p-ia-6', text: 'Who could I text tonight if I need a real human, not advice?' },
+    { id: 'p-ia-7', text: 'What part of getting ready (bag, nursery, plans) feels most unfinished?' },
+    { id: 'p-ia-8', text: 'How do I want my partner / support person to show up this week?' },
+    { id: 'p-ia-9', text: 'Something I miss from before pregnancy that I can still do in a smaller way…' },
+    { id: 'p-ia-10', text: 'What would “taking it easy” look like for the next 24 hours?' },
+    { id: 'p-ia-11', text: 'A appointment or conversation I’m dreading — and what would make it softer…' },
+    { id: 'p-ia-12', text: 'One thing I’m proud of handling lately, even if nobody noticed…' },
   ],
   postpartum: [
-    { id: 'pp-ia-1', text: 'What does my body need more of — rest, water, or kindness?' },
-    { id: 'pp-ia-2', text: 'A moment today when I mothered myself, even slightly…' },
-    { id: 'pp-ia-3', text: 'What emotion visited me most this week, and what did it want?' },
-    { id: 'pp-ia-4', text: 'Where do I still feel like “the old me,” and where am I new?' },
-    { id: 'pp-ia-5', text: 'One hard thing I handled that nobody saw…' },
-    { id: 'pp-ia-6', text: 'What would it feel like to ask for help without apologizing?' },
-    { id: 'pp-ia-7', text: 'A soft memory with my baby I want to keep forever…' },
-    { id: 'pp-ia-8', text: 'What pressure can I set down for the next 24 hours?' },
-    { id: 'pp-ia-9', text: 'How is my heart different at night versus morning?' },
-    { id: 'pp-ia-10', text: 'What do I wish someone would say to me right now?' },
-    { id: 'pp-ia-11', text: 'Where am I healing — body, mind, or both — even slowly?' },
-    { id: 'pp-ia-12', text: 'A truth about motherhood I’m ready to write, not perform…' },
+    { id: 'pp-ia-1', text: 'Did I drink water / eat a real meal today — and if not, what’s in the way?' },
+    { id: 'pp-ia-2', text: 'The hardest stretch of last night / this morning looked like…' },
+    { id: 'pp-ia-3', text: 'A moment I felt annoyed, lonely, or touched-out — what did I need instead?' },
+    { id: 'pp-ia-4', text: 'What do I wish people would stop asking me right now?' },
+    { id: 'pp-ia-5', text: 'One thing that went okay with baby today (feeding, nap, walk, bath)…' },
+    { id: 'pp-ia-6', text: 'Where is my body still sore, leaking, or healing — and how can I care for it?' },
+    { id: 'pp-ia-7', text: 'If I had 20 quiet minutes, how would I actually spend them?' },
+    { id: 'pp-ia-8', text: 'Who could take the baby for one short window so I could shower / nap / cry?' },
+    { id: 'pp-ia-9', text: 'A feeling about my “old life” that showed up this week…' },
+    { id: 'pp-ia-10', text: 'What pressure am I putting on myself that I can drop until tomorrow?' },
+    { id: 'pp-ia-11', text: 'Something sweet my baby did that I want to remember…' },
+    { id: 'pp-ia-12', text: 'What would help tonight feel 10% more doable?' },
   ],
   hybrid: [
-    { id: 'h-ia-1', text: 'How do I hold pregnancy and parenting in the same breath today?' },
-    { id: 'h-ia-2', text: 'What does my toddler need from me — and what do I need too?' },
-    { id: 'h-ia-3', text: 'A moment I felt stretched thin, and what softens it…' },
-    { id: 'h-ia-4', text: 'How is growing a baby while raising a little one rewriting me?' },
-    { id: 'h-ia-5', text: 'What can I release so both seasons feel less competing?' },
-    { id: 'h-ia-6', text: 'Where did I show up with love even when I was tired?' },
-    { id: 'h-ia-7', text: 'What do I want my child to remember about this chapter of me?' },
-    { id: 'h-ia-8', text: 'One fear about adding another baby I can name gently…' },
-    { id: 'h-ia-9', text: 'How do I protect a pocket of stillness in a loud day?' },
-    { id: 'h-ia-10', text: 'What support would make dual-track motherhood feel possible?' },
-    { id: 'h-ia-11', text: 'A gratitude for my body doing two sacred jobs at once…' },
-    { id: 'h-ia-12', text: 'If I spoke to myself like a village sister tonight, I’d say…' },
+    { id: 'h-ia-1', text: 'When did toddler needs and pregnancy needs collide today?' },
+    { id: 'h-ia-2', text: 'What does my little one need from me that I can still give while tired?' },
+    { id: 'h-ia-3', text: 'One shortcut that saved us this week (snack, screen, takeout, early bed)…' },
+    { id: 'h-ia-4', text: 'How is my body handling pregnancy on top of chasing a little one?' },
+    { id: 'h-ia-5', text: 'A guilt thought I keep having about “not enough” for either kid…' },
+    { id: 'h-ia-6', text: 'What help would change this week — laundry, dinner, an hour of childcare?' },
+    { id: 'h-ia-7', text: 'How can I give my older child a pocket of “just us” this week?' },
+    { id: 'h-ia-8', text: 'Something I’m nervous about with a newborn + toddler under one roof…' },
+    { id: 'h-ia-9', text: 'Where can I lower the bar at home without feeling like I failed?' },
+    { id: 'h-ia-10', text: 'A moment both of us (me + my little one) actually laughed or softened…' },
+    { id: 'h-ia-11', text: 'What do I need my partner / village to understand about this season?' },
+    { id: 'h-ia-12', text: 'If tomorrow only had three priorities, what would they be?' },
   ],
 });
 
@@ -62,66 +62,66 @@ const PREMIUM_IN_APP_PROMPTS = Object.freeze({
     {
       id: 'p-pr-1',
       premium: true,
-      text: 'What ancestral softness am I ready to inherit — and what patterns can I gently refuse?',
+      text: 'What am I most afraid will change about me after baby — and what do I hope stays?',
     },
     {
       id: 'p-pr-2',
       premium: true,
-      text: 'If my baby could feel my nervous system today, what would I want them to borrow from me?',
+      text: 'If I could design my birth support team without people-pleasing, who would be there?',
     },
     {
       id: 'p-pr-3',
       premium: true,
-      text: 'Write the secret wish I keep polishing in quiet moments — without editing for anyone else.',
+      text: 'Write the honest update I’d send a close friend — not the polished “we’re so excited” version.',
     },
     {
       id: 'p-pr-4',
       premium: true,
-      text: 'Where is fear asking for control, and where might trust ask for companionship instead?',
+      text: 'Where do I need more information, and where do I need more comfort?',
     },
   ],
   postpartum: [
     {
       id: 'pp-pr-1',
       premium: true,
-      text: 'What part of me needs re-mothering before I can keep pouring out?',
+      text: 'What part of postpartum feels lonelier than I expected — and who could sit in it with me?',
     },
     {
       id: 'pp-pr-2',
       premium: true,
-      text: 'Name a midnight truth I only admit when the house is finally quiet…',
+      text: 'The version of motherhood I thought I’d have vs. the one I’m living — what surprised me?',
     },
     {
       id: 'pp-pr-3',
       premium: true,
-      text: 'If healing had a private ritual just for me this week, what would it look like?',
+      text: 'If my mental load had a “stop doing” list this week, what three things would be on it?',
     },
     {
       id: 'pp-pr-4',
       premium: true,
-      text: 'What story about “good motherhood” am I ready to rewrite in my own handwriting?',
+      text: 'What do I need to hear on the hard nights when everyone else is asleep?',
     },
   ],
   hybrid: [
     {
       id: 'h-pr-1',
       premium: true,
-      text: 'How do I honor the child who is already here while making room for the one arriving?',
+      text: 'How do I want my older child to feel about the new baby — and what might get in the way?',
     },
     {
       id: 'h-pr-2',
       premium: true,
-      text: 'What do I need permission to drop so both seasons can breathe?',
+      text: 'What am I pretending I can still do alone that this season clearly can’t hold?',
     },
     {
       id: 'h-pr-3',
       premium: true,
-      text: 'Write a love note to the version of me holding two timelines with one heart…',
+      text: 'Write a note to myself for the first weeks with two littles — practical and kind.',
     },
     {
       id: 'h-pr-4',
       premium: true,
-      text: 'Where does my body ask for luxury-level gentleness that the day keeps denying?',
+      text: 'Where do I need adult conversation, and where do I need actual hands-on help?',
     },
   ],
 });
@@ -134,49 +134,49 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
   pregnant: [
     {
       id: 'p-em-1',
-      affirmation: 'You are becoming a mother and a deeper version of yourself at once.',
+      affirmation: 'You do not have to feel glowing to be doing this well.',
       prompt:
-        'Write a letter to the woman you are becoming through this pregnancy — not the “perfect mama,” but the real one. What does she need to hear from you this week that nobody else can say?',
+        'Be honest: what has felt harder than the pregnancy books made it sound? Write what you wish someone had warned you — and what help would make this week lighter.',
     },
     {
       id: 'p-em-2',
-      affirmation: 'Your changing body is not a problem to solve — it is a story unfolding.',
+      affirmation: 'Your body is working overtime. Rest is not lazy.',
       prompt:
-        'Describe one place in your body that feels different this week. Without judging it, ask: what might this place be protecting, preparing, or asking for?',
+        'Walk through a normal day in your body right now — nausea, sleep, hips, energy. What is one adjustment you can make this week without apologizing for it?',
     },
     {
       id: 'p-em-3',
-      affirmation: 'Anticipation and uncertainty can sit side by side in a soft heart.',
+      affirmation: 'Excitement and fear can share the same week.',
       prompt:
-        'Name one hope and one worry you are carrying into the next few weeks. Then write how you want to be held when either one gets loud.',
+        'Name one hope and one worry you are carrying into the next few weeks. Then write how you want to be supported when either one gets loud.',
     },
     {
       id: 'p-em-4',
       affirmation: 'You do not have to earn rest by proving how hard you are trying.',
       prompt:
-        'If your future baby could leave you a sticky note for this week, what would it say about slowing down, receiving care, or staying kind to yourself?',
+        'If your future baby left you a sticky note for this week, what would it say about slowing down, asking for help, or being kinder to yourself?',
     },
     {
       id: 'p-em-5',
       affirmation: 'Every trimester asks a different kind of bravery.',
       prompt:
-        'What bravery looks quiet for you right now — saying no, asking for help, or letting yourself feel everything? Journal one brave act you will try this week.',
+        'What does bravery look like for you right now — saying no, asking for help, or letting yourself feel everything? Journal one brave act you will try this week.',
     },
     {
       id: 'p-em-6',
       affirmation: 'You are allowed to miss who you were and love who you are becoming.',
       prompt:
-        'What part of your pre-pregnancy self do you miss most — and how can you invite a piece of her into this season without forcing yourself to “go back”?',
+        'What part of your pre-pregnancy self do you miss most — and how can you invite a small piece of her into this season without forcing yourself to “go back”?',
     },
     {
       id: 'p-em-7',
-      affirmation: 'Support is sacred. You were never meant to grow life alone.',
+      affirmation: 'Support is practical. You were never meant to do this alone.',
       prompt:
-        'Map your village: who pours into you, who drains you, and who you wish would show up more. Write one sentence you could send asking for something specific.',
+        'Map your village: who shows up, who drains you, and who you wish would help more. Write one clear ask you could send this week.',
     },
     {
       id: 'p-em-8',
-      affirmation: 'Your intuition is already practicing motherhood.',
+      affirmation: 'Your gut is already practicing motherhood.',
       prompt:
         'Recall a recent moment your gut whispered something about baby, birth, or your needs. What happened when you listened — or when you ignored it?',
     },
@@ -186,7 +186,7 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
       id: 'pp-em-1',
       affirmation: 'Recovery is not linear — and neither is becoming yourself again.',
       prompt:
-        'Write about a moment this week when you felt invisible as a person (not only as “mama”). What would it mean to reclaim five minutes that are entirely yours?',
+        'Write about a moment this week when you felt invisible as a person (not only as “mama”). What would five minutes that are entirely yours look like?',
     },
     {
       id: 'pp-em-2',
@@ -196,7 +196,7 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
     },
     {
       id: 'pp-em-3',
-      affirmation: 'Night hours are holy in their honesty — you don’t have to perform here.',
+      affirmation: 'Night hours tell the truth — you don’t have to perform here.',
       prompt:
         'What does the quiet after midnight reveal about your heart that daytime busyness hides? Journal without cleaning it up.',
     },
@@ -204,11 +204,11 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
       id: 'pp-em-4',
       affirmation: 'Healing counts even when it is boring, slow, or unfinished.',
       prompt:
-        'List three microscopic signs of healing from this week (sleep, a shower, a kind thought, a softer belly). Which one deserves celebration?',
+        'List three tiny signs of healing from this week (a shower, a meal, a kind thought, a softer belly). Which one deserves a quiet celebration?',
     },
     {
       id: 'pp-em-5',
-      affirmation: 'You are allowed to rewrite the story of “good motherhood.”',
+      affirmation: 'You are allowed to rewrite what “good mom” means.',
       prompt:
         'What rule about being a “good mom” are you ready to retire? Write the kinder rule you want to live by instead.',
     },
@@ -216,17 +216,17 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
       id: 'pp-em-6',
       affirmation: 'Your baby needs a regulated you more than a perfect you.',
       prompt:
-        'Describe a moment you co-regulated (or tried to). What helped your nervous system settle — and what still feels too much?',
+        'Describe a moment you tried to calm yourself while calming baby. What helped — and what still felt like too much?',
     },
     {
       id: 'pp-em-7',
-      affirmation: 'Asking for help is an act of motherhood, not a failure of it.',
+      affirmation: 'Asking for help is part of motherhood, not a failure of it.',
       prompt:
-        'Draft the most honest help-request you have been swallowing. You do not have to send it — just practice the words in Soul Sanctuary.',
+        'Draft the most honest help-request you have been swallowing. You do not have to send it — just practice the words here.',
     },
     {
       id: 'pp-em-8',
-      affirmation: 'Postpartum identity is a soft renovation, not a demolition.',
+      affirmation: 'Postpartum identity is a renovation, not a demolition.',
       prompt:
         'Who are you becoming beyond feeding schedules and milestones? Write three words for the woman rising underneath the logistics.',
     },
@@ -234,13 +234,13 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
   hybrid: [
     {
       id: 'h-em-1',
-      affirmation: 'Holding two seasons at once is holy work — not a productivity contest.',
+      affirmation: 'Holding two seasons at once is real work — not a productivity contest.',
       prompt:
-        'Write about a moment this week when pregnancy needs and toddler needs collided. What did you choose, what did you sacrifice, and what compassion do you owe yourself for that choice?',
+        'Write about a moment this week when pregnancy needs and toddler needs collided. What did you choose, what got dropped, and what compassion do you owe yourself?',
     },
     {
       id: 'h-em-2',
-      affirmation: 'Your love is expansive enough — your energy still deserves protection.',
+      affirmation: 'Your love is big enough — your energy still deserves protection.',
       prompt:
         'If you could design a “both/and” day that honors baby-in-womb and child-in-arms, what three non-negotiables would it include for you?',
     },
@@ -254,11 +254,11 @@ const EMAIL_EXCLUSIVE_PROMPTS = Object.freeze({
       id: 'h-em-4',
       affirmation: 'Dual-track motherhood asks for a softer scoreboard.',
       prompt:
-        'Where are you measuring yourself against mothers who only hold one season? Write what “success” looks like for a mama growing life while raising life.',
+        'Where are you measuring yourself against moms who only hold one season? Write what “success” looks like for a mama growing life while raising life.',
     },
     {
       id: 'h-em-5',
-      affirmation: 'Your body is carrying history and future in the same heartbeat.',
+      affirmation: 'Your body is carrying today and tomorrow in the same heartbeat.',
       prompt:
         'Describe the physical and emotional weight of being pregnant while parenting. What support would make that weight feel shared, not solo?',
     },

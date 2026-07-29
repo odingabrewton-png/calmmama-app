@@ -314,11 +314,19 @@ function WebOmbreBackdrop({ style, palette, themeKey, theme, paused = false }) {
     };
   }, [palette, themeKey, theme, paused]);
 
-  // Always render Reanimated washes so fairy + default animate inside the app shell too.
+  // Default Calm Mama web already has living CSS ombre on #calmmama-body-ombre.
+  // Stacking Reanimated washes on top caused double-paint flicker (esp. onboarding).
+  // Fairy themes still need the React washes (body CSS is paused for fairy).
+  if (!theme) {
+    return (
+      <View style={[styles.root, style]} pointerEvents="none" collapsable={false} />
+    );
+  }
+
   return <OmbreWashLayers style={style} palette={palette} themeId={themeKey} paused={paused} />;
 }
 
-export default function VillageOmbreBackdrop({ style, paused = false }) {
+function VillageOmbreBackdrop({ style, paused = false }) {
   const { rewards } = useVillageRewards();
 
   const fairyTheme = useMemo(
@@ -350,6 +358,8 @@ export default function VillageOmbreBackdrop({ style, paused = false }) {
 
   return <OmbreWashLayers style={style} palette={palette} themeId={themeKey} paused={paused} />;
 }
+
+export default React.memo(VillageOmbreBackdrop);
 
 const styles = StyleSheet.create({
   root: {
