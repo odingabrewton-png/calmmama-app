@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Animated, Image, StyleSheet, Platform, Dimensions } from 'react-native';
 import { BrandLogoStack, LOGO_HEART_BLEED } from './brandLogoShine';
 import { DESKTOP_BREAKPOINT, DESKTOP_PHONE } from './mobileWebLayout';
@@ -6,6 +6,27 @@ import { DESKTOP_BREAKPOINT, DESKTOP_PHONE } from './mobileWebLayout';
 const LOGO_ASPECT = 323 / 1024;
 const ONBOARDING_LOGO_RATIO = 0.42;
 const ONBOARDING_LOGO_MAX = 148;
+const WEB_LOGO_PULSE_STYLE_ID = 'calmmama-onboarding-logo-pulse-css';
+
+function ensureOnboardingLogoPulseCss() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById(WEB_LOGO_PULSE_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = WEB_LOGO_PULSE_STYLE_ID;
+  style.textContent = `
+    @keyframes calmmamaOnboardingLogoPulse {
+      0%, 100% { transform: scale(0.95); }
+      50% { transform: scale(1.03); }
+    }
+    .calmmama-onboarding-logo-pulse {
+      animation: calmmamaOnboardingLogoPulse 8s ease-in-out infinite;
+      transform-origin: center center;
+      will-change: transform;
+      backface-visibility: hidden;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 /** Content width inside the app surface — never the desktop marketing viewport. */
 function getAppContentWidth() {
@@ -88,6 +109,11 @@ export default function VillageBrandHeader({
 
   const isOnboarding = variant === 'onboarding';
   const onboardingLogoSize = useMemo(() => getOnboardingLogoSize(), []);
+  const useCssLogoPulse = isOnboarding && Platform.OS === 'web';
+
+  useEffect(() => {
+    if (useCssLogoPulse) ensureOnboardingLogoPulseCss();
+  }, [useCssLogoPulse]);
 
   const { width: logoWidth, height: logoHeight } = useMemo(
     () => fitLogoToHeader(wrapWidth, natural.w, natural.h, variant),
@@ -95,6 +121,29 @@ export default function VillageBrandHeader({
   );
 
   if (isOnboarding) {
+    // Web: CSS transform pulse (compositor thread). Native: RN Animated + native driver.
+    if (useCssLogoPulse) {
+      return (
+        <View
+          // RN Web passes className through to the DOM for GPU CSS animation.
+          className="calmmama-onboarding-logo-pulse"
+          style={styles.onboardingLogoWrap}
+          pointerEvents="none"
+        >
+          <Image
+            source={{ uri: logoUri }}
+            style={{
+              width: onboardingLogoSize,
+              height: onboardingLogoSize,
+              alignSelf: 'center',
+            }}
+            resizeMode="contain"
+            accessibilityLabel="Calm Mama Village"
+          />
+        </View>
+      );
+    }
+
     return (
       <Animated.View
         style={[

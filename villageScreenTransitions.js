@@ -3,7 +3,7 @@ import { Animated, Easing, Platform, LayoutAnimation, UIManager } from 'react-na
 import { VILLAGE_IN_OUT_SIN } from './villageEasing';
 import { logNativeCheckpoint, runNativeGuard } from './nativeRuntimeGuard';
 
-export const VILLAGE_USE_NATIVE_DRIVER = Platform.OS !== 'web';
+export const VILLAGE_USE_NATIVE_DRIVER = true;
 
 /** Peaceful opacity-only scene swap (native driver). No layout/transform. */
 export const NATIVE_SCENE_FADE_MS = 280;

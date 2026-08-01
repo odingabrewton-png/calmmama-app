@@ -92,7 +92,7 @@ function OnboardingStageScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        removeClippedSubviews={Platform.OS !== 'web'}
+        removeClippedSubviews={false}
       >
         <View style={styles.brandBlock}>
           <VillageBrandHeader logoUri={logoUri} pulseAnim={pulseAnim} variant="onboarding" />
@@ -191,9 +191,10 @@ function OnboardingStageScreen({
             autoCorrect={false}
           />
 
-          {/* Keep both field stacks mounted to avoid ScrollView jump when switching journey. */}
+          {/* Keep both field stacks in-flow so journey taps never reflow the ScrollView.
+              Inactive stacks fade out but keep their height — iOS-stable, no absolute jump. */}
           <View
-            style={[styles.journeyFieldsSlot, !showPregnancyFields && styles.journeyFieldsHidden]}
+            style={!showPregnancyFields ? styles.journeyFieldsInactive : null}
             pointerEvents={showPregnancyFields ? 'auto' : 'none'}
             accessibilityElementsHidden={!showPregnancyFields}
             importantForAccessibility={showPregnancyFields ? 'yes' : 'no-hide-descendants'}
@@ -212,7 +213,7 @@ function OnboardingStageScreen({
           </View>
 
           <View
-            style={[styles.journeyFieldsSlot, !showBabyFields && styles.journeyFieldsHidden]}
+            style={!showBabyFields ? styles.journeyFieldsInactive : null}
             pointerEvents={showBabyFields ? 'auto' : 'none'}
             accessibilityElementsHidden={!showBabyFields}
             importantForAccessibility={showBabyFields ? 'yes' : 'no-hide-descendants'}
@@ -413,7 +414,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 10,
-    minHeight: 220,
+    // Always reserve hybrid-height so journey taps never resize the card.
+    minHeight: 320,
     overflow: 'hidden',
   },
   formTitle: {
@@ -441,15 +443,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#2F4238',
   },
-  journeyFieldsSlot: {
-    width: '100%',
-  },
-  journeyFieldsHidden: {
-    position: 'absolute',
+  journeyFieldsInactive: {
+    height: 0,
     opacity: 0,
-    left: 0,
-    right: 0,
-    zIndex: -1,
+    overflow: 'hidden',
+    marginTop: 0,
+    marginBottom: 0,
   },
   secureBox: {
     flexDirection: 'row',

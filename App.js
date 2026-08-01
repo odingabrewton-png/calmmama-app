@@ -745,19 +745,20 @@ function startLogoPulseLoop(pulseAnim, loopRef) {
   // Don't snap the logo to 0.95 on every Home/journey enter — that reads as a header glitch.
   if (loopRef.current) return;
   pulseAnim.setValue(0.95);
+  // Scale is transform-only — native driver works on iOS/Android and RN Web.
   loopRef.current = Animated.loop(
     Animated.sequence([
       Animated.timing(pulseAnim, {
         toValue: 1.03,
         duration: 4000,
         easing: Easing.inOut(Easing.quad),
-        useNativeDriver: USE_NATIVE_DRIVER,
+        useNativeDriver: true,
       }),
       Animated.timing(pulseAnim, {
         toValue: 0.95,
         duration: 4000,
         easing: Easing.inOut(Easing.quad),
-        useNativeDriver: USE_NATIVE_DRIVER,
+        useNativeDriver: true,
       }),
     ])
   );
@@ -1804,6 +1805,7 @@ function renderMainTabContent({
   onOpenSubscription,
   homeTrack = 'pregnant',
   onHomeTrackChange,
+  memberEmail = null,
   isActive = true,
 }) {
   const panelStyle = embedded ? styles.scrollContent : styles.scrollContentFlex;
@@ -1846,7 +1848,7 @@ function renderMainTabContent({
             pointerEvents={showPregnantHome ? 'auto' : 'none'}
             collapsable={false}
           >
-            <HomeScreen headerSlot={homeToggle} />
+            <HomeScreen headerSlot={homeToggle} memberEmail={memberEmail} />
           </View>
           <View
             style={[
@@ -1899,7 +1901,7 @@ function renderMainTabContent({
     }
 
     if (homePhase === 'pregnant') {
-      return <HomeScreen headerSlot={homeToggle} />;
+      return <HomeScreen headerSlot={homeToggle} memberEmail={memberEmail} />;
     }
 
     if (homePhase === 'infant') {
@@ -5243,15 +5245,23 @@ function CalmMamaApp() {
     setBirthPromptDismissed(true);
   };
 
-  const handleContinueOnboarding = () => {
+  const handleContinueOnboarding = useCallback(() => {
     if (sceneSwapLockRef.current) return;
     sceneSwapLockRef.current = true;
     suppressVillageLayoutAnimation();
 
-    // Instant step swap — opacity fades read as glitchy flicker during onboarding.
-    onboardingStepBlend.setValue(1);
+    // Soft opacity crossfade — GPU native driver (same feel as iOS scene swaps).
     setOnboardingStep('welcome');
-    sceneSwapLockRef.current = false;
+    onboardingStepBlend.setValue(0);
+    Animated.timing(onboardingStepBlend, {
+      toValue: 1,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) onboardingStepBlend.setValue(1);
+      sceneSwapLockRef.current = false;
+    });
 
     setTimeout(() => {
       try {
@@ -5264,9 +5274,9 @@ function CalmMamaApp() {
         /* warm is best-effort */
       }
     }, 0);
-  };
+  }, [onboardingStepBlend, userJourney, babyAge, weeksPregnant]);
 
-  const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = useCallback(() => {
     if (sceneSwapLockRef.current) return;
     sceneSwapLockRef.current = true;
 
@@ -5324,7 +5334,29 @@ function CalmMamaApp() {
         sceneSwapLockRef.current = false;
       },
     });
-  };
+  }, [
+    mamaName,
+    activeMode,
+    userJourney,
+    weeksPregnant,
+    dueDate,
+    babyAge,
+    currentPregnancy,
+    children,
+    homeTrack,
+    mamaBirthday,
+    approximateCity,
+    usState,
+    mamaDiscovery,
+    profilePhotoUri,
+    shellEnterAnim,
+    bottomNavOpacity,
+    bottomNavTranslateY,
+    flowAnim,
+    tabSceneOpacity,
+    sceneCanvasOpacity,
+    onboardingStepBlend,
+  ]);
 
   const mainTabContentProps = useMemo(
     () => ({
@@ -5396,6 +5428,7 @@ function CalmMamaApp() {
       isYearlyMember: foundingGiftsYearlyEligible,
       onReleaseUpgradePrompt: handleReleaseUpgradePrompt,
       onOpenSubscription: handleOpenSubscription,
+      memberEmail,
     }),
     [
       effectiveJourney,
@@ -5441,6 +5474,7 @@ function CalmMamaApp() {
       handleReleaseUpgradePrompt,
       handleOpenSubscription,
       notify,
+      memberEmail,
     ]
   );
 
@@ -5897,34 +5931,47 @@ function CalmMamaApp() {
               edges={['top', 'left', 'right']}
             >
               <View style={styles.onboardingSceneStack}>
-                {onboardingStep === 'intake' ? (
-                  <View style={styles.onboardingSceneLayer}>
-                    <OnboardingStageScreen
-                      logoUri={CALMMAMA_VILLAGE_BADGE}
-                      pulseAnim={pulseAnim}
-                      userJourney={userJourney}
-                      onSelectJourney={handleSelectOnboardingJourney}
-                      mamaName={mamaName}
-                      onMamaNameChange={setMamaName}
-                      weeksPregnant={weeksPregnant}
-                      onWeeksPregnantChange={setWeeksPregnant}
-                      dueDate={dueDate}
-                      onDueDateChange={setDueDate}
-                      babyAge={babyAge}
-                      onBabyAgeChange={setBabyAge}
-                      onContinue={handleContinueOnboarding}
-                    />
-                  </View>
-                ) : (
-                  <View style={styles.onboardingSceneLayer}>
-                    <WelcomeDashboardView
-                      logoUri={CALMMAMA_VILLAGE_BADGE}
-                      mamaName={mamaName}
-                      userJourney={userJourney}
-                      onGetStarted={handleCompleteOnboarding}
-                    />
-                  </View>
-                )}
+                <Animated.View
+                  style={[
+                    styles.onboardingSceneLayerStacked,
+                    {
+                      opacity: onboardingStepBlend.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 0],
+                      }),
+                    },
+                  ]}
+                  pointerEvents={onboardingStep === 'intake' ? 'auto' : 'none'}
+                  collapsable={false}
+                >
+                  <OnboardingStageScreen
+                    logoUri={CALMMAMA_VILLAGE_BADGE}
+                    pulseAnim={pulseAnim}
+                    userJourney={userJourney}
+                    onSelectJourney={handleSelectOnboardingJourney}
+                    mamaName={mamaName}
+                    onMamaNameChange={setMamaName}
+                    weeksPregnant={weeksPregnant}
+                    onWeeksPregnantChange={setWeeksPregnant}
+                    dueDate={dueDate}
+                    onDueDateChange={setDueDate}
+                    babyAge={babyAge}
+                    onBabyAgeChange={setBabyAge}
+                    onContinue={handleContinueOnboarding}
+                  />
+                </Animated.View>
+                <Animated.View
+                  style={[styles.onboardingSceneLayerStacked, { opacity: onboardingStepBlend }]}
+                  pointerEvents={onboardingStep === 'welcome' ? 'auto' : 'none'}
+                  collapsable={false}
+                >
+                  <WelcomeDashboardView
+                    logoUri={CALMMAMA_VILLAGE_BADGE}
+                    mamaName={mamaName}
+                    userJourney={userJourney}
+                    onGetStarted={handleCompleteOnboarding}
+                  />
+                </Animated.View>
               </View>
             </SafeAreaView>
           </View>
@@ -5968,6 +6015,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 50,
     backgroundColor: 'transparent',
+    ...Platform.select({
+      web: {
+        willChange: 'opacity',
+        transform: [{ translateZ: 0 }],
+        backfaceVisibility: 'hidden',
+      },
+      default: {},
+    }),
   },
   onboardingSceneStack: {
     flex: 1,
@@ -5980,8 +6035,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   onboardingSceneLayerStacked: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
+    overflow: 'hidden',
   },
   onboardingBackdropStack: {
     ...StyleSheet.absoluteFillObject,

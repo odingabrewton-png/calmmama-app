@@ -1,5 +1,7 @@
 /**
  * Web Push subscribe store + VAPID send helpers (CommonJS for Vercel/Render).
+ * Prefer Upstash/Vercel KV so subscriptions survive serverless cold starts
+ * (plain /tmp on Vercel was wiping daytime reminder subscribers).
  */
 
 const fs = require('fs');
@@ -9,9 +11,10 @@ const {
   getWeeklyDue,
 } = require('./villageReminderSchedule');
 
+const KV_STORE_KEY = 'web-push:v1:store';
 const DEFAULT_STORE = path.join(__dirname, 'data', 'web-push-subscriptions.json');
 
-function resolveStorePath() {
+function resolveFileStorePath() {
   return (
     process.env.WEB_PUSH_STORE_PATH ||
     (process.env.VERCEL ? path.join('/tmp', 'calmmama-web-push-subscriptions.json') : DEFAULT_STORE)
@@ -26,26 +29,101 @@ function ensureDir(filePath) {
   }
 }
 
-function readStore() {
-  const filePath = resolveStorePath();
+function emptyStore() {
+  return { subscriptions: {}, sentLog: {} };
+}
+
+function normalizeStore(raw) {
+  if (!raw || typeof raw !== 'object') return emptyStore();
+  return {
+    subscriptions:
+      raw.subscriptions && typeof raw.subscriptions === 'object' ? raw.subscriptions : {},
+    sentLog: raw.sentLog && typeof raw.sentLog === 'object' ? raw.sentLog : {},
+  };
+}
+
+function resolveKvConfig() {
+  const url = String(
+    process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '',
+  ).trim();
+  const token = String(
+    process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '',
+  ).trim();
+  if (!url || !token) return null;
+  return { url: url.replace(/\/$/, ''), token };
+}
+
+async function kvRun(command) {
+  const cfg = resolveKvConfig();
+  if (!cfg) return { ok: false, skipped: true, error: 'kv-not-configured' };
   try {
-    if (!fs.existsSync(filePath)) return { subscriptions: {} };
-    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    return {
-      subscriptions:
-        raw && typeof raw.subscriptions === 'object' && raw.subscriptions
-          ? raw.subscriptions
-          : {},
-    };
-  } catch (_) {
-    return { subscriptions: {} };
+    const res = await fetch(`${cfg.url}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(command),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: data.error || data.message || `KV HTTP ${res.status}`,
+      };
+    }
+    return { ok: true, result: data.result };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'kv-network-error' };
   }
 }
 
-function writeStore(store) {
-  const filePath = resolveStorePath();
+function readFileStore() {
+  const filePath = resolveFileStorePath();
+  try {
+    if (!fs.existsSync(filePath)) return emptyStore();
+    return normalizeStore(JSON.parse(fs.readFileSync(filePath, 'utf8')));
+  } catch (_) {
+    return emptyStore();
+  }
+}
+
+function writeFileStore(store) {
+  const filePath = resolveFileStorePath();
   ensureDir(filePath);
-  fs.writeFileSync(filePath, JSON.stringify(store, null, 0), 'utf8');
+  fs.writeFileSync(filePath, JSON.stringify(normalizeStore(store), null, 0), 'utf8');
+}
+
+async function readStore() {
+  const kv = await kvRun(['GET', KV_STORE_KEY]);
+  if (kv.ok && kv.result) {
+    try {
+      const parsed = typeof kv.result === 'string' ? JSON.parse(kv.result) : kv.result;
+      return { ...normalizeStore(parsed), via: 'kv' };
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  return { ...readFileStore(), via: resolveKvConfig() ? 'file-fallback' : 'file' };
+}
+
+async function writeStore(store) {
+  const payload = JSON.stringify(normalizeStore(store));
+  const kv = await kvRun(['SET', KV_STORE_KEY, payload]);
+  if (kv.ok) return { ok: true, via: 'kv' };
+
+  try {
+    writeFileStore(store);
+    return {
+      ok: true,
+      via: process.env.VERCEL ? 'tmp-file' : 'file',
+      hint: kv.skipped
+        ? 'Add Upstash/Vercel KV so web-push subscribers survive cold starts.'
+        : kv.error,
+    };
+  } catch (err) {
+    return { ok: false, error: err?.message || kv.error || 'store-write-failed' };
+  }
 }
 
 function normalizeJourney(journey) {
@@ -54,13 +132,13 @@ function normalizeJourney(journey) {
   return 'pregnant';
 }
 
-function upsertSubscription({ subscription, journey, timeZone, platform } = {}) {
+async function upsertSubscription({ subscription, journey, timeZone, platform } = {}) {
   const endpoint = String(subscription?.endpoint || '').trim();
   if (!endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
     return { ok: false, status: 400, error: 'Invalid push subscription' };
   }
 
-  const store = readStore();
+  const store = await readStore();
   store.subscriptions[endpoint] = {
     endpoint,
     keys: {
@@ -73,19 +151,28 @@ function upsertSubscription({ subscription, journey, timeZone, platform } = {}) 
     platform: String(platform || 'web'),
     updatedAt: Date.now(),
   };
-  writeStore(store);
-  return { ok: true, status: 200, count: Object.keys(store.subscriptions).length };
+  const saved = await writeStore(store);
+  if (!saved.ok) {
+    return { ok: false, status: 503, error: saved.error || 'Could not persist subscription' };
+  }
+  return {
+    ok: true,
+    status: 200,
+    count: Object.keys(store.subscriptions).length,
+    via: saved.via,
+  };
 }
 
-function listSubscriptions() {
-  return Object.values(readStore().subscriptions || {});
+async function listSubscriptions() {
+  const store = await readStore();
+  return Object.values(store.subscriptions || {});
 }
 
-function removeSubscription(endpoint) {
-  const store = readStore();
+async function removeSubscription(endpoint) {
+  const store = await readStore();
   if (store.subscriptions[endpoint]) {
     delete store.subscriptions[endpoint];
-    writeStore(store);
+    await writeStore(store);
   }
 }
 
@@ -135,7 +222,7 @@ async function sendPushToSubscription(subscription, payload) {
   } catch (err) {
     const statusCode = err?.statusCode || err?.status;
     if (statusCode === 404 || statusCode === 410) {
-      removeSubscription(subscription.endpoint);
+      await removeSubscription(subscription.endpoint);
       return { ok: false, reason: 'gone', removed: true };
     }
     return { ok: false, reason: err?.message || 'send-failed', statusCode };
@@ -158,7 +245,7 @@ function dayKey(timeZone) {
 /**
  * Dispatch due village reminders to all stored push subscriptions.
  */
-async function dispatchDueVillagePush({ now = new Date(), windowMinutes = 7 } = {}) {
+async function dispatchDueVillagePush({ now = new Date(), windowMinutes = 8 } = {}) {
   const vapid = resolveVapid();
   if (!vapid.publicKey || !vapid.privateKey) {
     return { ok: false, reason: 'missing-vapid', sent: 0 };
@@ -169,7 +256,7 @@ async function dispatchDueVillagePush({ now = new Date(), windowMinutes = 7 } = 
     return { ok: false, reason: 'web-push-not-installed', sent: 0 };
   }
 
-  const store = readStore();
+  const store = await readStore();
   const sentLog = store.sentLog && typeof store.sentLog === 'object' ? store.sentLog : {};
   let sent = 0;
   let skipped = 0;
@@ -234,7 +321,7 @@ async function dispatchDueVillagePush({ now = new Date(), windowMinutes = 7 } = 
     if (Number(sentLog[key]) < cutoff) delete sentLog[key];
   });
   store.sentLog = sentLog;
-  writeStore(store);
+  const saved = await writeStore(store);
 
   return {
     ok: true,
@@ -242,6 +329,7 @@ async function dispatchDueVillagePush({ now = new Date(), windowMinutes = 7 } = 
     skipped,
     failed,
     subscribers: Object.keys(store.subscriptions || {}).length,
+    storeVia: store.via || saved.via,
   };
 }
 

@@ -32,6 +32,7 @@ import BotanicalGardenFrame from './BotanicalGardenFrame';
 import RegistryVillageAskPanel from './RegistryVillageAskPanel';
 import { injectNurseryWebFonts, mamaCardScriptTitle } from './nurseryRetroFonts';
 import { useVillageRewards } from './VillageRewardsContext';
+import { loadMamaRegistry, saveMamaRegistry } from './mamaRegistrySync';
 import { useVillageUiInk } from './villageUiInk';
 import {
   PREGNANT_HOME_LAYOUT,
@@ -477,7 +478,7 @@ const RegistryTrackingBox = memo(
 
         <LoungeProgressBar progress={progress} />
 
-        <Text style={styles.registrySyncLabel}>Universal registry sync</Text>
+        <Text style={styles.registrySyncLabel}>Your mama registry</Text>
         <View style={styles.registryLinksRow}>
           {REGISTRY_EXTERNAL_LINKS.map((link) => (
             <RegistryLinkButton
@@ -567,7 +568,7 @@ const LoungePage = memo(
     prev.onWordSearchDragChange === next.onWordSearchDragChange,
 );
 
-function HomeScreen({ headerSlot = null }) {
+function HomeScreen({ headerSlot = null, memberEmail = null }) {
   if (__DEV__ && !PREGNANT_HOME_LAYOUT_LOCKED) {
     console.warn('[HomeScreen] PREGNANT_HOME_LAYOUT_LOCKED is false — layout edits allowed');
   }
@@ -577,9 +578,12 @@ function HomeScreen({ headerSlot = null }) {
   const [pagerWidth, setPagerWidth] = useState(() => Math.max(1, Math.round(FALLBACK_PAGE_WIDTH)));
   const pageWidth = pagerWidth;
   const [activePage, setActivePage] = useState(0);
-  const [babyProgress, setBabyProgress] = useState(LOUNGE_PAGES[0].initialProgress);
+  const [babyProgress, setBabyProgress] = useState(0);
   const [rewardModalVisible, setRewardModalVisible] = useState(false);
   const [isDraggingWord, setIsDraggingWord] = useState(false);
+  const registryEmailRef = useRef(null);
+  const registryItemsRef = useRef([]);
+  const rewardedForEmailRef = useRef(null);
 
   const handleWordSearchDragChange = useCallback((dragging) => {
     setIsDraggingWord(dragging);
@@ -588,6 +592,42 @@ function HomeScreen({ headerSlot = null }) {
   useEffect(() => {
     injectNurseryWebFonts();
   }, []);
+
+  // Fresh 0% per mama email — load that email's cloud/local progress (or empty).
+  useEffect(() => {
+    let cancelled = false;
+    const email = String(memberEmail || '')
+      .trim()
+      .toLowerCase();
+    registryEmailRef.current = email || null;
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setBabyProgress(0);
+      registryItemsRef.current = [];
+      return undefined;
+    }
+
+    loadMamaRegistry(email)
+      .then((result) => {
+        if (cancelled || registryEmailRef.current !== email) return;
+        const progress = Number(result?.registry?.progress) || 0;
+        const items = Array.isArray(result?.registry?.items) ? result.registry.items : [];
+        setBabyProgress(progress);
+        registryItemsRef.current = items;
+        if (progress >= 1) {
+          rewardedForEmailRef.current = email;
+        }
+      })
+      .catch(() => {
+        if (cancelled || registryEmailRef.current !== email) return;
+        setBabyProgress(0);
+        registryItemsRef.current = [];
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [memberEmail]);
 
   const loungePageData = useMemo(
     () =>
@@ -611,9 +651,36 @@ function HomeScreen({ headerSlot = null }) {
 
     Linking.openURL(url).catch(() => {});
 
+    const email = String(registryEmailRef.current || memberEmail || '')
+      .trim()
+      .toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setBabyProgress((prev) => Math.min(1, prev + LINK_PROGRESS_BUMP));
+      return;
+    }
+
     setBabyProgress((prev) => {
       const next = Math.min(1, prev + LINK_PROGRESS_BUMP);
-      if (next >= 1) {
+      const nextItems = [
+        ...registryItemsRef.current,
+        {
+          id: `link-${Date.now()}`,
+          source: String(url || ''),
+          label: 'registry-link',
+          addedAt: new Date().toISOString(),
+        },
+      ].slice(-80);
+      registryItemsRef.current = nextItems;
+
+      saveMamaRegistry({
+        email,
+        progress: next,
+        items: nextItems,
+        source: 'registry_link',
+      }).catch(() => {});
+
+      if (next >= 1 && rewardedForEmailRef.current !== email) {
+        rewardedForEmailRef.current = email;
         setTimeout(() => {
           setRewardModalVisible(true);
           addPoints(250, 'registryCompleted');
@@ -621,7 +688,7 @@ function HomeScreen({ headerSlot = null }) {
       }
       return next;
     });
-  }, [addPoints]);
+  }, [addPoints, memberEmail]);
 
   const handleMomentumScrollEnd = useCallback((e) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / pageWidth);

@@ -2,10 +2,8 @@
  * VillageOmbreBackdrop — sage / lavender / peach ombre by default.
  * Fairy Godmother perk swaps the same living wash to a custom 3-color cycle.
  *
- * Web: body `#calmmama-body-ombre` is the full-bleed layer.
- *   - Calm Mama: CSS gradient position shift (existing)
- *   - Fairy: three wash layers with opacity crossfade (same recipe as native)
- * Native / RN Web React layer: Reanimated opacity crossfade across three washes.
+ * Live app / PWA / native: Reanimated opacity crossfade across three solid washes
+ * (GPU-composited — iOS-smooth). Marketing web landing keeps the CSS body gradient.
  */
 import React, { useEffect, useMemo } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
@@ -86,6 +84,41 @@ function syncWebFairyTextContrast(theme) {
       text-shadow: 0 1px 2px rgba(20, 16, 28, 0.4);
     }
   `;
+}
+
+/**
+ * Park the marketing CSS gradient (background-position) while React owns the live app.
+ * background-position animation forces continuous full-viewport paints and reads as
+ * heavy onboarding jank on mobile Safari / PWAs — opacity washes are GPU-composited.
+ */
+function parkWebBodyOmbreForReactWashes(baseColor) {
+  if (typeof document === 'undefined') return;
+  const layer = document.getElementById('calmmama-body-ombre');
+  if (!layer) return;
+  layer.setAttribute('data-react-washes', '1');
+  layer.style.setProperty('animation', 'none', 'important');
+  layer.style.setProperty('background-image', 'none', 'important');
+  layer.style.setProperty('background-size', 'auto', 'important');
+  layer.style.setProperty('background', baseColor || CALM_MAMA_PASTEL.sage, 'important');
+  layer.style.setProperty('background-color', baseColor || CALM_MAMA_PASTEL.sage, 'important');
+  layer.querySelectorAll('.wash').forEach((node) => {
+    node.style.setProperty('display', 'none', 'important');
+  });
+}
+
+function releaseWebBodyOmbrePark() {
+  if (typeof document === 'undefined') return;
+  const layer = document.getElementById('calmmama-body-ombre');
+  if (!layer) return;
+  layer.removeAttribute('data-react-washes');
+  layer.style.removeProperty('animation');
+  layer.style.removeProperty('background-image');
+  layer.style.removeProperty('background-size');
+  layer.style.removeProperty('background');
+  layer.style.removeProperty('background-color');
+  layer.querySelectorAll('.wash').forEach((node) => {
+    node.style.removeProperty('display');
+  });
 }
 
 function clearFairyWashes(layer) {
@@ -296,28 +329,30 @@ function shouldSyncWebBodyOmbre() {
 }
 
 function WebOmbreBackdrop({ style, palette, themeKey, theme, paused = false }) {
+  // Live app / PWA: React opacity washes only. Marketing landing: CSS body ombre alone.
+  const useReactWashes = shouldSyncWebBodyOmbre();
+
   useEffect(() => {
     ensureTitleShimmerCss();
-    // Marketing shell already paints #calmmama-body-ombre — don't fight it with Fairy body CSS
-    // (desktop live-app-in-phone would otherwise flash the whole landing page).
-    if (!shouldSyncWebBodyOmbre()) {
+    // Marketing shell already paints #calmmama-body-ombre — don't fight it with React washes
+    // (desktop live-app-in-phone would otherwise double-paint inside the device frame).
+    if (!useReactWashes) {
       syncWebBodyFairyOmbre(null);
+      releaseWebBodyOmbrePark();
       return undefined;
     }
-    if (paused) {
-      syncWebBodyFairyOmbre(null);
-      return undefined;
-    }
-    syncWebBodyFairyOmbre(theme);
+    // Live app: one GPU opacity system only — never stack body CSS + React washes.
+    syncWebBodyFairyOmbre(null);
+    parkWebBodyOmbreForReactWashes(palette?.a);
+    // Keep fairy text contrast when a fairy theme is active.
+    syncWebFairyTextContrast(theme);
     return () => {
-      syncWebBodyFairyOmbre(null);
+      syncWebFairyTextContrast(null);
+      releaseWebBodyOmbrePark();
     };
-  }, [palette, themeKey, theme, paused]);
+  }, [palette, themeKey, theme, paused, useReactWashes]);
 
-  // Default Calm Mama web already has living CSS ombre on #calmmama-body-ombre.
-  // Stacking Reanimated washes on top caused double-paint flicker (esp. onboarding).
-  // Fairy themes still need the React washes (body CSS is paused for fairy).
-  if (!theme) {
+  if (!useReactWashes) {
     return (
       <View style={[styles.root, style]} pointerEvents="none" collapsable={false} />
     );
@@ -370,5 +405,14 @@ const styles = StyleSheet.create({
   },
   fill: {
     ...StyleSheet.absoluteFillObject,
+    ...Platform.select({
+      web: {
+        // Promote each wash to its own compositor layer (iOS-smooth opacity crossfade).
+        willChange: 'opacity',
+        transform: [{ translateZ: 0 }],
+        backfaceVisibility: 'hidden',
+      },
+      default: {},
+    }),
   },
 });

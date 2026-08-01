@@ -60,6 +60,16 @@ app.options('/api/mama-profile', (req, res) => {
 app.get('/api/mama-profile', express.json({ limit: '1mb' }), mamaProfileHandler);
 app.post('/api/mama-profile', express.json({ limit: '1mb' }), mamaProfileHandler);
 
+const mamaRegistryHandler = require('./api/mama-registry');
+app.options('/api/mama-registry', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(204).end();
+});
+app.get('/api/mama-registry', express.json({ limit: '256kb' }), mamaRegistryHandler);
+app.post('/api/mama-registry', express.json({ limit: '256kb' }), mamaRegistryHandler);
+
 app.use(express.json({ limit: '32kb' }));
 
 /** Welcome email for Free Explorer + completed signup (styled HTML via Resend). */
@@ -268,10 +278,10 @@ app.post('/api/stripe/checkout-session', handleStripeCheckoutSession);
 app.post('/api/checkout', handleStripeCheckoutSession);
 
 /** Persist browser Web Push subscription for daytime village reminders. */
-app.post('/api/web-push/subscribe', (req, res) => {
+app.post('/api/web-push/subscribe', async (req, res) => {
   try {
     const body = req.body || {};
-    const result = upsertSubscription({
+    const result = await upsertSubscription({
       subscription: body.subscription || body,
       journey: body.journey,
       timeZone: body.timeZone || body.timezone,

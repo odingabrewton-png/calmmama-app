@@ -145,6 +145,24 @@ export function syncVillageWebReminderSchedule(userJourney = 'pregnant') {
     });
   }, 60 * 1000);
 
+  // When the PWA returns to the foreground, catch any slot that was due while suspended.
+  if (typeof document !== 'undefined' && !document.__calmmamaWebReminderVis) {
+    document.__calmmamaWebReminderVis = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      if (!activeJourney) return;
+      const now = new Date();
+      const mins = now.getHours() * 60 + now.getMinutes();
+      buildSlots(activeJourney).forEach((slot) => {
+        const slotMins = slot.hour * 60 + slot.minute;
+        if (Math.abs(mins - slotMins) <= 2) {
+          fireSlot(slot).catch(() => {});
+        }
+      });
+    });
+  }
+
   return { scheduled, journey: userJourney, via: 'web-local' };
 }
 

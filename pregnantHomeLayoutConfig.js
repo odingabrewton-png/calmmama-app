@@ -17,7 +17,7 @@ export const PREGNANT_HOME_LOUNGE_PAGES = Object.freeze([
   {
     id: 'baby',
     title: 'Baby Registry',
-    initialProgress: 0.35,
+    initialProgress: 0,
   },
   {
     id: 'crossword',

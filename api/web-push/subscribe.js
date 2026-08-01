@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-    const result = upsertSubscription({
+    const result = await upsertSubscription({
       subscription: body.subscription || body,
       journey: body.journey,
       timeZone: body.timeZone || body.timezone,
